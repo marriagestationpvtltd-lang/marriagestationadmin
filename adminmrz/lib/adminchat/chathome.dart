@@ -208,122 +208,173 @@ class _ChatWindowState extends State<ChatWindow> {
     }
   }
 
+  // ── ICON BUTTON HELPER ────────────────────────────────────────────
+  Widget _iconBtn({
+    required IconData icon,
+    required VoidCallback onTap,
+    bool active = false,
+    Color? iconColor,
+  }) {
+    const kPrimary = Color(0xFFD81B60);
+    const kPrimaryLight = Color(0xFFFCE4EC);
+    const kMuted = Color(0xFF64748B);
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          color: active ? kPrimaryLight : const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          icon,
+          size: 18,
+          color: iconColor ?? (active ? kPrimary : kMuted),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    const kPrimary = Color(0xFFD81B60);
+    const kPrimaryLight = Color(0xFFFCE4EC);
+    const kText = Color(0xFF1E293B);
+    const kMuted = Color(0xFF64748B);
+    const kBorder = Color(0xFFE2E8F0);
+    const kOnline = Color(0xFF22C55E);
+
     final chatProvider = Provider.of<ChatProvider>(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Row(
-          children: [
-            // Profile image with paid badge
-            Stack(
-              children: [
-                CircleAvatar(
-                  radius: 20,
-                  backgroundColor: Colors.grey[300],
-                  backgroundImage: chatProvider.profilePicture != null &&
-                      chatProvider.profilePicture!.isNotEmpty
-                      ? NetworkImage(chatProvider.profilePicture!)
-                      : null,
-                  child: chatProvider.profilePicture == null ||
-                      chatProvider.profilePicture!.isEmpty
-                      ? Icon(Icons.person, size: 20, color: Colors.grey[700])
-                      : null,
-                ),
-                if (chatProvider.ispaid)
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 16,
-                      height: 16,
-                      decoration: BoxDecoration(
-                        color: Colors.amber,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
-                      ),
-                      child: Icon(
-                        Icons.star,
-                        size: 10,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-            SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      backgroundColor: const Color(0xFFF0F2F5),
+      appBar: PreferredSize(
+        preferredSize: const Size.fromHeight(60),
+        child: Container(
+          height: 60,
+          color: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(bottom: BorderSide(color: kBorder, width: 1)),
+          ),
+          child: Row(
+            children: [
+              // Avatar + paid badge
+              Stack(
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          chatProvider.namee.toString(),
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: chatProvider.ispaid ? Colors.amber[800] : null,
-                          ),
-                          overflow: TextOverflow.ellipsis,
+                  CircleAvatar(
+                    radius: 18,
+                    backgroundColor: const Color(0xFFF1F5F9),
+                    backgroundImage: chatProvider.profilePicture != null &&
+                            chatProvider.profilePicture!.isNotEmpty
+                        ? NetworkImage(chatProvider.profilePicture!)
+                        : null,
+                    child: chatProvider.profilePicture == null ||
+                            chatProvider.profilePicture!.isEmpty
+                        ? Icon(Icons.person, size: 18, color: Colors.grey[400])
+                        : null,
+                  ),
+                  if (chatProvider.ispaid)
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 14,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: Colors.amber,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1.5),
                         ),
+                        child: const Icon(Icons.star, size: 8, color: Colors.white),
                       ),
-                      if (chatProvider.matchesCount != null && chatProvider.matchesCount! > 0)
-                        Container(
-                          margin: EdgeInsets.only(left: 4),
-                          padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.favorite, color: Colors.white, size: 10),
-                              SizedBox(width: 2),
-                              Text(
-                                '${chatProvider.matchesCount}',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                  Text(
-                    chatProvider.online ? "Online" : "Offline",
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: chatProvider.online ? Colors.green : Colors.red,
                     ),
-                  ),
                 ],
               ),
-            ),
+              const SizedBox(width: 10),
 
-            // Match info toggle button
-            IconButton(
-              icon: Icon(
-                _showMatchInfo ? Icons.favorite : Icons.favorite_border,
-                color: Colors.red,
-                size: 20,
+              // Name + status
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            chatProvider.namee.toString(),
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: chatProvider.ispaid ? kPrimary : kText,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (chatProvider.matchesCount != null && chatProvider.matchesCount! > 0)
+                          Container(
+                            margin: const EdgeInsets.only(left: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: kPrimaryLight,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.favorite, color: kPrimary, size: 10),
+                                const SizedBox(width: 2),
+                                Text(
+                                  '${chatProvider.matchesCount}',
+                                  style: const TextStyle(
+                                    color: kPrimary,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          margin: const EdgeInsets.only(right: 4),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: chatProvider.online ? kOnline : kMuted,
+                          ),
+                        ),
+                        Text(
+                          chatProvider.online ? "Online" : "Offline",
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: chatProvider.online ? kOnline : kMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-              onPressed: () {
-                setState(() {
-                  _showMatchInfo = !_showMatchInfo;
-                });
-              },
-            ),
 
-            // Video call button (only for paid members)
-
-              GestureDetector(
+              // Action buttons
+              _iconBtn(
+                icon: _showMatchInfo ? Icons.favorite : Icons.favorite_border,
+                active: _showMatchInfo,
+                iconColor: _showMatchInfo ? kPrimary : kMuted,
+                onTap: () => setState(() => _showMatchInfo = !_showMatchInfo),
+              ),
+              const SizedBox(width: 6),
+              _iconBtn(
+                icon: Icons.video_call_outlined,
+                iconColor: kPrimary,
                 onTap: () async {
                   Navigator.push(
                     context,
@@ -337,25 +388,11 @@ class _ChatWindowState extends State<ChatWindow> {
                     ),
                   );
                 },
-                child: Container(
-                  padding: EdgeInsets.all(4),
-                  height: 32,
-                  width: 32,
-                  decoration: BoxDecoration(
-                    color: Colors.pink,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Center(
-                    child: Icon(Icons.video_call_outlined, color: Colors.white, size: 20),
-                  ),
-                ),
               ),
-
-            SizedBox(width: 8),
-
-            // Audio call button (only for paid members)
-
-              GestureDetector(
+              const SizedBox(width: 6),
+              _iconBtn(
+                icon: Icons.call_outlined,
+                iconColor: const Color(0xFF334155),
                 onTap: () async {
                   Navigator.push(
                     context,
@@ -369,68 +406,58 @@ class _ChatWindowState extends State<ChatWindow> {
                     ),
                   );
                 },
-                child: Container(
-                  padding: EdgeInsets.all(4),
-                  height: 32,
-                  width: 32,
-                  decoration: BoxDecoration(
-                    color: Colors.black,
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                  child: Center(
-                    child: Icon(Icons.call_outlined, color: Colors.white, size: 20),
-                  ),
-                ),
               ),
-
-            SizedBox(width: 8),
-
-            // Search button
-            GestureDetector(
-              onTap: () {
-                setState(() {
-                  _isSearching = !_isSearching;
-                  if (!_isSearching) {
-                    _searchController.clear();
-                    _filteredMessages.clear();
-                  }
-                });
-              },
-              child: Container(
-                padding: EdgeInsets.all(4),
-                height: 32,
-                width: 32,
-                decoration: BoxDecoration(
-                  color: Colors.pink,
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: Center(
-                  child: Icon(
-                    _isSearching ? Icons.close : Icons.search,
-                    color: Colors.white,
-                    size: 20,
-                  ),
-                ),
+              const SizedBox(width: 6),
+              _iconBtn(
+                icon: _isSearching ? Icons.close : Icons.search,
+                active: _isSearching,
+                onTap: () {
+                  setState(() {
+                    _isSearching = !_isSearching;
+                    if (!_isSearching) {
+                      _searchController.clear();
+                      _filteredMessages.clear();
+                    }
+                  });
+                },
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
       body: Column(
         children: [
           if (_isSearching)
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: TextField(
-                controller: _searchController,
-                decoration: InputDecoration(
-                  hintText: "Search messages...",
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(16),
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: SizedBox(
+                height: 38,
+                child: TextField(
+                  controller: _searchController,
+                  decoration: InputDecoration(
+                    hintText: "Search messages...",
+                    hintStyle: const TextStyle(fontSize: 12, color: kMuted),
+                    prefixIcon: const Icon(Icons.search, size: 16, color: kMuted),
+                    filled: true,
+                    fillColor: const Color(0xFFF8FAFC),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      borderSide: const BorderSide(color: kBorder),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      borderSide: const BorderSide(color: kBorder),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20),
+                      borderSide: const BorderSide(color: kPrimary),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                    isDense: true,
                   ),
-                  contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                  onChanged: _searchMessages,
                 ),
-                onChanged: _searchMessages,
               ),
             ),
 
@@ -452,27 +479,30 @@ class _ChatWindowState extends State<ChatWindow> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.error_outline, color: Colors.red, size: 48),
-                        SizedBox(height: 16),
-                        Text(
+                        const Icon(Icons.error_outline, color: Colors.red, size: 40),
+                        const SizedBox(height: 12),
+                        const Text(
                           "Firebase Error",
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.red),
+                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Colors.red),
                         ),
-                        SizedBox(height: 8),
+                        const SizedBox(height: 8),
                         Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16.0),
                           child: Text(
                             snapshot.error.toString(),
                             textAlign: TextAlign.center,
-                            style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                            style: const TextStyle(fontSize: 11, color: kMuted),
                           ),
                         ),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
                         ElevatedButton(
-                          onPressed: () {
-                            _handleIndexError(snapshot.error.toString());
-                          },
-                          child: Text("Create Index"),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: kPrimary,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          ),
+                          onPressed: () => _handleIndexError(snapshot.error.toString()),
+                          child: const Text("Create Index", style: TextStyle(fontSize: 12)),
                         ),
                       ],
                     ),
@@ -480,7 +510,7 @@ class _ChatWindowState extends State<ChatWindow> {
                 }
 
                 if (snapshot.connectionState == ConnectionState.waiting && _lastSnapshot == null) {
-                  return Center(child: CircularProgressIndicator());
+                  return const Center(child: CircularProgressIndicator(color: kPrimary));
                 }
 
                 final messages = _isSearching && _filteredMessages.isNotEmpty
@@ -496,13 +526,16 @@ class _ChatWindowState extends State<ChatWindow> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.chat_bubble_outline, size: 48, color: Colors.grey),
-                        SizedBox(height: 16),
-                        Text("No messages found"),
-                        SizedBox(height: 8),
-                        Text(
+                        Icon(Icons.chat_bubble_outline, size: 40, color: Colors.grey[300]),
+                        const SizedBox(height: 12),
+                        const Text(
+                          "No messages yet",
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: kMuted),
+                        ),
+                        const SizedBox(height: 4),
+                        const Text(
                           "Start a conversation!",
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                          style: TextStyle(fontSize: 11, color: kMuted),
                         ),
                       ],
                     ),
@@ -513,7 +546,7 @@ class _ChatWindowState extends State<ChatWindow> {
 
                 return ListView.builder(
                   controller: _scrollController,
-                  padding: EdgeInsets.symmetric(vertical: 6, horizontal: 10),
+                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
                   reverse: true,
                   itemCount: itemCount,
                   itemBuilder: (context, index) {
@@ -561,13 +594,15 @@ class _ChatWindowState extends State<ChatWindow> {
   }
 
   Widget _buildMatchInfoPanel(ChatProvider chatProvider) {
+    const kPrimary = Color(0xFFD81B60);
+    const kPrimaryLight = Color(0xFFFCE4EC);
+    const kMuted = Color(0xFF64748B);
+
     return Container(
-      padding: EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        border: Border(
-          bottom: BorderSide(color: Colors.red.shade200),
-        ),
+      padding: const EdgeInsets.all(12),
+      decoration: const BoxDecoration(
+        color: Color(0xFFFFF1F5),
+        border: Border(bottom: BorderSide(color: Color(0xFFFFCDD2), width: 1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -575,48 +610,45 @@ class _ChatWindowState extends State<ChatWindow> {
         children: [
           Row(
             children: [
-              Icon(Icons.favorite, color: Colors.red, size: 20),
-              SizedBox(width: 8),
-              Text(
+              const Icon(Icons.favorite, color: kPrimary, size: 16),
+              const SizedBox(width: 6),
+              const Text(
                 'Match Information',
                 style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.red.shade800,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: kPrimary,
                 ),
               ),
-              Spacer(),
+              const Spacer(),
               if (_isLoadingMatchDetails)
-                SizedBox(
-                  height: 16,
-                  width: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
+                const SizedBox(
+                  height: 14,
+                  width: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary),
                 ),
             ],
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
 
           if (_matchDetails != null && _matchDetails!['percentage'] != null)
             Container(
-              margin: EdgeInsets.only(bottom: 8),
-              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              margin: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
                 color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    'Match Score: ',
-                    style: TextStyle(fontSize: 12),
-                  ),
+                  const Text('Match Score: ', style: TextStyle(fontSize: 12, color: kMuted)),
                   Text(
                     '${_matchDetails!['percentage']}%',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.red,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: kPrimary,
                     ),
                   ),
                 ],
@@ -629,26 +661,26 @@ class _ChatWindowState extends State<ChatWindow> {
               runSpacing: 4,
               children: (_matchDetails!['commonInterests'] as List).map((interest) {
                 return Container(
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: Colors.red.shade100,
+                    color: kPrimaryLight,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     interest,
-                    style: TextStyle(fontSize: 10, color: Colors.red.shade800),
+                    style: const TextStyle(fontSize: 10, color: kPrimary),
                   ),
                 );
               }).toList(),
             ),
 
           if (_mutualMatches.isNotEmpty) ...[
-            SizedBox(height: 8),
-            Text(
+            const SizedBox(height: 8),
+            const Text(
               'Mutual Matches:',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kMuted),
             ),
-            SizedBox(height: 4),
+            const SizedBox(height: 4),
             SizedBox(
               height: 50,
               child: ListView.builder(
@@ -657,25 +689,25 @@ class _ChatWindowState extends State<ChatWindow> {
                 itemBuilder: (context, index) {
                   final match = _mutualMatches[index];
                   return Container(
-                    margin: EdgeInsets.only(right: 8),
+                    margin: const EdgeInsets.only(right: 8),
                     child: Column(
                       children: [
                         CircleAvatar(
                           radius: 16,
-                          backgroundColor: Colors.grey[300],
+                          backgroundColor: const Color(0xFFF1F5F9),
                           backgroundImage: match['profile_picture'] != null &&
-                              match['profile_picture'].toString().isNotEmpty
+                                  match['profile_picture'].toString().isNotEmpty
                               ? NetworkImage(match['profile_picture'])
                               : null,
                           child: match['profile_picture'] == null ||
-                              match['profile_picture'].toString().isEmpty
-                              ? Icon(Icons.person, size: 16, color: Colors.grey[700])
+                                  match['profile_picture'].toString().isEmpty
+                              ? Icon(Icons.person, size: 16, color: Colors.grey[400])
                               : null,
                         ),
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
                           match['name'] ?? '',
-                          style: TextStyle(fontSize: 8),
+                          style: const TextStyle(fontSize: 8, color: kMuted),
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,
                         ),
@@ -691,19 +723,15 @@ class _ChatWindowState extends State<ChatWindow> {
             Align(
               alignment: Alignment.centerRight,
               child: TextButton.icon(
-                onPressed: () {
-                  _showMatchSelectionDialog(chatProvider);
-                },
-                icon: Icon(Icons.send, size: 14),
-                label: Text(
-                  'Send Match Profile',
-                  style: TextStyle(fontSize: 11),
-                ),
+                onPressed: () => _showMatchSelectionDialog(chatProvider),
+                icon: const Icon(Icons.send, size: 12),
+                label: const Text('Send Match Profile', style: TextStyle(fontSize: 11)),
                 style: TextButton.styleFrom(
-                  backgroundColor: Colors.red.shade100,
-                  foregroundColor: Colors.red.shade800,
-                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  minimumSize: Size(0, 30),
+                  backgroundColor: kPrimaryLight,
+                  foregroundColor: kPrimary,
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  minimumSize: const Size(0, 28),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
               ),
             ),
@@ -812,6 +840,10 @@ class _ChatWindowState extends State<ChatWindow> {
 
   Widget _buildChatBubble(String message, bool isSentByMe, DateTime timestamp,
       [String? type, Map<String, dynamic>? profileData, String? imageUrl]) {
+    const kPrimary = Color(0xFFD81B60);
+    const kText = Color(0xFF1E293B);
+    const kMuted = Color(0xFF64748B);
+
     if (type == 'image' && imageUrl != null) {
       return Align(
         alignment: isSentByMe ? Alignment.centerRight : Alignment.centerLeft,
@@ -819,13 +851,13 @@ class _ChatWindowState extends State<ChatWindow> {
           crossAxisAlignment: isSentByMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             Container(
-              margin: EdgeInsets.symmetric(vertical: 3, horizontal: 6),
+              margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 6),
               decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(8),
-                boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 3)],
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 4, offset: const Offset(0, 1))],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(12),
                 child: Image.network(
                   imageUrl,
                   width: MediaQuery.of(context).size.width * 0.24,
@@ -833,18 +865,16 @@ class _ChatWindowState extends State<ChatWindow> {
                   cacheWidth: (MediaQuery.of(context).size.width * 0.24).toInt(),
                   loadingBuilder: (context, child, loadingProgress) {
                     if (loadingProgress == null) return child;
-                    return Center(child: CircularProgressIndicator());
+                    return const Center(child: CircularProgressIndicator(color: kPrimary));
                   },
                   errorBuilder: (context, error, stackTrace) {
                     return Column(
                       children: [
-                        Text('Error loading image'),
-                        Text('Details: $error', style: TextStyle(fontSize: 10)),
+                        const Text('Error loading image'),
+                        Text('Details: $error', style: const TextStyle(fontSize: 10)),
                         ElevatedButton(
-                          onPressed: () {
-                            setState(() {});
-                          },
-                          child: Text("Retry"),
+                          onPressed: () => setState(() {}),
+                          child: const Text("Retry"),
                         ),
                       ],
                     );
@@ -856,7 +886,7 @@ class _ChatWindowState extends State<ChatWindow> {
               padding: const EdgeInsets.only(right: 6, left: 6),
               child: Text(
                 DateFormat('hh:mm a').format(timestamp),
-                style: TextStyle(fontSize: 8, color: Colors.grey[600]),
+                style: const TextStyle(fontSize: 10, color: kMuted),
               ),
             ),
           ],
@@ -865,32 +895,35 @@ class _ChatWindowState extends State<ChatWindow> {
     }
 
     if (type == 'profile_card' && profileData != null) {
+      const kPrimaryLocal = Color(0xFFD81B60);
       return Align(
         alignment: isSentByMe ? Alignment.centerRight : Alignment.centerLeft,
         child: Container(
           width: MediaQuery.of(context).size.width * 0.224,
-          padding: EdgeInsets.all(8),
-          margin: EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+          padding: const EdgeInsets.all(12),
+          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(12),
-            boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 3)],
+            border: Border.all(color: const Color(0xFFE2E8F0)),
+            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 2))],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Stack(
+                alignment: Alignment.center,
                 children: [
                   CircleAvatar(
-                    radius: 30,
-                    backgroundColor: Colors.grey[300],
+                    radius: 28,
+                    backgroundColor: const Color(0xFFF1F5F9),
                     backgroundImage: profileData['profileImage'] != null &&
-                        profileData['profileImage'].toString().isNotEmpty
+                            profileData['profileImage'].toString().isNotEmpty
                         ? NetworkImage(profileData['profileImage'])
                         : null,
                     child: profileData['profileImage'] == null ||
-                        profileData['profileImage'].toString().isEmpty
-                        ? Icon(Icons.person, size: 30, color: Colors.grey[700])
+                            profileData['profileImage'].toString().isEmpty
+                        ? Icon(Icons.person, size: 28, color: Colors.grey[400])
                         : null,
                   ),
                   if (profileData['is_paid'] == true)
@@ -905,34 +938,36 @@ class _ChatWindowState extends State<ChatWindow> {
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white, width: 2),
                         ),
-                        child: Icon(Icons.star, size: 10, color: Colors.white),
+                        child: const Icon(Icons.star, size: 10, color: Colors.white),
                       ),
                     ),
                 ],
               ),
-              SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(
                 profileData['name'] ?? 'Unknown',
                 style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: profileData['is_paid'] == true ? Colors.amber[800] : null,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: profileData['is_paid'] == true ? kPrimaryLocal : kText,
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              SizedBox(height: 1),
+              const SizedBox(height: 2),
               Text(
                 profileData['bio'] ?? 'No bio available',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.red, fontSize: 10, fontWeight: FontWeight.bold),
+                style: const TextStyle(color: kPrimary, fontSize: 10, fontWeight: FontWeight.w600),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
+              const Divider(height: 1, color: Color(0xFFE2E8F0)),
+              const SizedBox(height: 6),
               _buildProfileDetails(profileData),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
@@ -955,33 +990,49 @@ class _ChatWindowState extends State<ChatWindow> {
       );
     }
 
+    // Text message bubble
     return Align(
       alignment: isSentByMe ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.24,
-        ),
+        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.24),
         child: Column(
           crossAxisAlignment: isSentByMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
             Container(
-              padding: EdgeInsets.all(8),
-              margin: EdgeInsets.symmetric(vertical: 3, horizontal: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+              margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 6),
               decoration: BoxDecoration(
-                color: isSentByMe ? Colors.pinkAccent : Colors.grey[300],
-                borderRadius: BorderRadius.circular(8),
+                color: isSentByMe ? kPrimary : Colors.white,
+                borderRadius: isSentByMe
+                    ? const BorderRadius.only(
+                        topLeft: Radius.circular(18),
+                        topRight: Radius.circular(18),
+                        bottomLeft: Radius.circular(18),
+                        bottomRight: Radius.circular(4),
+                      )
+                    : const BorderRadius.only(
+                        topLeft: Radius.circular(4),
+                        topRight: Radius.circular(18),
+                        bottomLeft: Radius.circular(18),
+                        bottomRight: Radius.circular(18),
+                      ),
+                boxShadow: isSentByMe
+                    ? null
+                    : [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, offset: const Offset(0, 1))],
               ),
               child: Text(
                 message,
                 style: TextStyle(
-                    color: isSentByMe ? Colors.white : Colors.black, fontSize: 12),
+                  color: isSentByMe ? Colors.white : kText,
+                  fontSize: 13,
+                ),
               ),
             ),
             Padding(
-              padding: const EdgeInsets.only(right: 6, left: 6),
+              padding: const EdgeInsets.only(right: 8, left: 8, bottom: 2),
               child: Text(
                 DateFormat('hh:mm a').format(timestamp),
-                style: TextStyle(fontSize: 8, color: Colors.grey[600]),
+                style: const TextStyle(fontSize: 10, color: kMuted),
               ),
             ),
           ],
@@ -1059,95 +1110,151 @@ class _ChatWindowState extends State<ChatWindow> {
   }
 
   Widget _buildMessageInput(ChatProvider chatProvider) {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
+    const kPrimary = Color(0xFFD81B60);
+    const kMuted = Color(0xFF64748B);
+    const kBorder = Color(0xFFE2E8F0);
+
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: kBorder, width: 1)),
+      ),
       child: Column(
         children: [
           if (_selectedImage != null || _selectedImageBytes != null)
-            Row(
-              children: [
-                Container(
-                  height: 100,
-                  width: 100,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(8),
-                    image: DecorationImage(
-                      image: kIsWeb
-                          ? MemoryImage(_selectedImageBytes!) as ImageProvider
-                          : FileImage(_selectedImage!),
-                      fit: BoxFit.cover,
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Row(
+                children: [
+                  Container(
+                    height: 80,
+                    width: 80,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(8),
+                      image: DecorationImage(
+                        image: kIsWeb
+                            ? MemoryImage(_selectedImageBytes!) as ImageProvider
+                            : FileImage(_selectedImage!),
+                        fit: BoxFit.cover,
+                      ),
                     ),
                   ),
-                ),
-                SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: _isSendingImage
-                      ? null
-                      : () async {
-                    await _sendImageMessage();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    foregroundColor: Colors.white,
-                  ),
-                  child: _isSendingImage
-                      ? SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
+                  const SizedBox(width: 8),
+                  ElevatedButton(
+                    onPressed: _isSendingImage ? null : () async => await _sendImageMessage(),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: kPrimary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     ),
-                  )
-                      : Text("Send"),
-                ),
-                SizedBox(width: 8),
-                IconButton(
-                  icon: Icon(Icons.close, color: Colors.grey),
-                  onPressed: () {
-                    setState(() {
-                      _selectedImage = null;
-                      _selectedImageBytes = null;
-                    });
-                  },
-                ),
-              ],
+                    child: _isSendingImage
+                        ? const SizedBox(
+                            height: 18,
+                            width: 18,
+                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+                          )
+                        : const Text("Send", style: TextStyle(fontSize: 13)),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: kMuted, size: 18),
+                    onPressed: () {
+                      setState(() {
+                        _selectedImage = null;
+                        _selectedImageBytes = null;
+                      });
+                    },
+                    constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                    padding: EdgeInsets.zero,
+                  ),
+                ],
+              ),
             ),
           Row(
             children: [
               IconButton(
-                icon: Icon(Icons.emoji_emotions, color: Colors.orange, size: 20),
+                icon: const Icon(Icons.emoji_emotions, color: kMuted, size: 20),
                 onPressed: _showEmojiPicker,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                padding: EdgeInsets.zero,
               ),
+              const SizedBox(width: 2),
               IconButton(
-                icon: Icon(Icons.attach_file, color: Colors.blue, size: 20),
+                icon: const Icon(Icons.attach_file, color: kMuted, size: 20),
                 onPressed: _pickImage,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                padding: EdgeInsets.zero,
               ),
+              const SizedBox(width: 2),
               IconButton(
                 icon: Icon(
                   _isListening ? Icons.mic_off : Icons.mic,
-                  color: _isListening ? Colors.red : Colors.blue,
+                  color: _isListening ? kPrimary : kMuted,
                   size: 20,
                 ),
                 onPressed: _isListening ? _stopListening : _startListening,
+                constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                padding: EdgeInsets.zero,
               ),
+              const SizedBox(width: 6),
               Expanded(
-                child: TextField(
-                  controller: _messageController,
-                  focusNode: _messageFocusNode,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => _sendMessage(),
-                  decoration: InputDecoration(
-                    hintText: "Type a message",
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                    contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                  ),
+                child: ValueListenableBuilder<TextEditingValue>(
+                  valueListenable: _messageController,
+                  builder: (context, value, child) {
+                    return TextField(
+                      controller: _messageController,
+                      focusNode: _messageFocusNode,
+                      textInputAction: TextInputAction.send,
+                      onSubmitted: (_) => _sendMessage(),
+                      style: const TextStyle(fontSize: 13),
+                      decoration: InputDecoration(
+                        hintText: "Type a message...",
+                        hintStyle: const TextStyle(fontSize: 13, color: kMuted),
+                        filled: true,
+                        fillColor: const Color(0xFFF8FAFC),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: const BorderSide(color: kBorder),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: const BorderSide(color: kBorder),
+                        ),
+                        focusedBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide: const BorderSide(color: kPrimary),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
+                        isDense: true,
+                      ),
+                    );
+                  },
                 ),
               ),
-              IconButton(
-                icon: Icon(Icons.send, color: Colors.red, size: 20),
-                onPressed: () {
-                  _sendMessage();
+              const SizedBox(width: 6),
+              ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _messageController,
+                builder: (context, value, child) {
+                  final hasText = value.text.trim().isNotEmpty;
+                  return GestureDetector(
+                    onTap: _sendMessage,
+                    child: Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: hasText ? kPrimary : const Color(0xFFE2E8F0),
+                        borderRadius: BorderRadius.circular(19),
+                      ),
+                      child: Icon(
+                        Icons.send_rounded,
+                        color: hasText ? Colors.white : kMuted,
+                        size: 18,
+                      ),
+                    ),
+                  );
                 },
               ),
             ],
