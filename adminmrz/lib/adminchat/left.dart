@@ -619,6 +619,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
 
                           return _buildUserRow(
                             user["name"] ?? "",
+                            user["id"].toString(),
                             conversationMap[user["id"].toString()]
                                     ?['lastMessage'] ??
                                 user["chat_message"] ??
