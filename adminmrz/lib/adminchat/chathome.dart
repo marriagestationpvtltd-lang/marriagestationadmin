@@ -159,9 +159,32 @@ class _ChatWindowState extends State<ChatWindow> {
       });
 
       _webSpeechRecognition!.onError.listen((event) {
-        setState(() => _isListening = false);
+        // Reset the text field to what it was before voice input started,
+        // so no partial/stale transcription remains in the field.
+        final resetText = _textBeforeVoice.trimRight();
+        setState(() {
+          _isListening = false;
+          _messageController.text = resetText;
+          _messageController.selection = TextSelection.fromPosition(
+            TextPosition(offset: resetText.length),
+          );
+        });
+        String errorMsg;
+        switch (event.error) {
+          case 'not-allowed':
+          case 'service-not-allowed':
+            errorMsg = 'Microphone access denied. Please allow microphone permission in your browser settings.';
+            break;
+          case 'no-speech':
+            errorMsg = 'No speech detected. Please try again.';
+            break;
+          case 'aborted':
+            return; // user-initiated stop, no message needed
+          default:
+            errorMsg = 'Speech error: ${event.error}';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Speech error: ${event.error}")),
+          SnackBar(content: Text(errorMsg)),
         );
       });
     }
@@ -174,23 +197,19 @@ class _ChatWindowState extends State<ChatWindow> {
     }
   }
 
-  void _startListening() async {
+  void _startListening() {
     if (_webSpeechRecognition != null && !_isListening) {
-      try {
-        await html.window.navigator.getUserMedia(audio: true);
-        // Save current text as base so transcript is appended, not replaced
-        _textBeforeVoice = _messageController.text;
-        if (_textBeforeVoice.isNotEmpty && !_textBeforeVoice.endsWith(' ')) {
-          _textBeforeVoice += ' ';
-        }
-        _webSpeechRecognition!.lang = _selectedLanguage;
-        _webSpeechRecognition!.start();
-        setState(() => _isListening = true);
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Microphone access denied")),
-        );
+      // Save current text as base so transcript is appended, not replaced.
+      // Do NOT call getUserMedia() here — the Web Speech API handles its own
+      // microphone permission internally. Calling getUserMedia first creates a
+      // double permission prompt which causes browsers to report "access denied".
+      _textBeforeVoice = _messageController.text;
+      if (_textBeforeVoice.isNotEmpty && !_textBeforeVoice.endsWith(' ')) {
+        _textBeforeVoice += ' ';
       }
+      _webSpeechRecognition!.lang = _selectedLanguage;
+      _webSpeechRecognition!.start();
+      setState(() => _isListening = true);
     }
   }
 
