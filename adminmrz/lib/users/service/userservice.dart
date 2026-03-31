@@ -40,42 +40,40 @@ class UserService {
   }
 
   Future<bool> suspendUsers(List<int> userIds) async {
-    bool success = true;
-    for (final userId in userIds) {
+    final headers = await _authHeaders();
+    final results = await Future.wait(userIds.map((userId) async {
       final response = await http
           .post(
             Uri.parse('$baseUrl/admin/users/activeInactiveUsers'),
-            headers: await _authHeaders(),
+            headers: headers,
             body: json.encode({'id': userId}),
           )
           .timeout(AppConstants.requestTimeout);
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['status'] != 200) success = false;
-      } else {
-        success = false;
+        return data['status'] == 200;
       }
-    }
-    return success;
+      return false;
+    }));
+    return results.every((r) => r);
   }
 
   Future<bool> deleteUsers(List<int> userIds) async {
-    bool success = true;
-    for (final userId in userIds) {
+    final headers = await _authHeaders();
+    final results = await Future.wait(userIds.map((userId) async {
       final response = await http
           .post(
             Uri.parse('$baseUrl/admin/users/deleteUser'),
-            headers: await _authHeaders(),
+            headers: headers,
             body: json.encode({'id': userId}),
           )
           .timeout(AppConstants.requestTimeout);
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        if (data['status'] != 200) success = false;
-      } else {
-        success = false;
+        return data['status'] == 200;
       }
-    }
-    return success;
+      return false;
+    }));
+    return results.every((r) => r);
   }
 }

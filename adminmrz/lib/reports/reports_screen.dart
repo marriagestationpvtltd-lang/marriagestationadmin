@@ -283,7 +283,7 @@ class _ReportTabViewState extends State<_ReportTabView>
 
   String _formatColumnName(String col) {
     return col
-        .replaceAllMapped(RegExp(r'([A-Z])'), (m) => ' ${m.group(0)}')
+        .replaceAllMapped(RegExp(r'(?<=[a-z0-9])([A-Z])'), (m) => ' ${m[1]}')
         .replaceAll('_', ' ')
         .trim()
         .split(' ')
