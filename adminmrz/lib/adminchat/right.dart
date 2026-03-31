@@ -17,6 +17,8 @@ const _kOnline       = Color(0xFF22C55E);
 const _kBg           = Color(0xFFF8FAFC);
 const _kCardBg       = Colors.white;
 
+const _kPaginationScrollThreshold = 200.0;
+
 class ProfileSidebar extends StatefulWidget {
   final int selectedTab;
   final Function(int) onTabChange;
@@ -48,6 +50,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
 
   // ── track which user's matches we've loaded ───────────────────────────────
   int? _lastFetchedUserId;
+  bool _matchesLoaded = false;
 
   // ── scroll ────────────────────────────────────────────────────────────────
   final ScrollController _scrollController = ScrollController();
@@ -59,6 +62,16 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
     _searchController.addListener(() {
       setState(() => _searchQuery = _searchController.text.toLowerCase());
     });
+    _scrollController.addListener(_onScroll);
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - _kPaginationScrollThreshold) {
+      final provider = Provider.of<MatchedProfileProvider>(
+          context, listen: false);
+      provider.fetchMoreProfiles();
+    }
   }
 
   @override
@@ -68,9 +81,12 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
     final userId = chatProvider.id;
     if (userId != null && userId != _lastFetchedUserId) {
       _lastFetchedUserId = userId;
-      // Fetch matching profiles for this user
+      // Reset so the user must press "Show Match" again for the new user
+      if (mounted) {
+        setState(() => _matchesLoaded = false);
+      }
       Provider.of<MatchedProfileProvider>(context, listen: false)
-          .fetchMatchedProfiles(userId);
+          .clearData();
       // Fetch Firestore share history
       _loadSharedProfilesForUser(userId.toString());
     }
@@ -79,8 +95,18 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
   @override
   void dispose() {
     _searchController.dispose();
+    _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
+  }
+
+  void _loadMatches() {
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    final userId = chatProvider.id;
+    if (userId == null) return;
+    setState(() => _matchesLoaded = true);
+    Provider.of<MatchedProfileProvider>(context, listen: false)
+        .fetchMatchedProfiles(userId);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -354,20 +380,51 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
             ),
           ),
           Consumer<MatchedProfileProvider>(
-            builder: (_, p, __) => Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: _kPrimaryLight,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Text(
-                '${p.ids.length}',
-                style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: _kPrimary),
-              ),
-            ),
+            builder: (_, p, __) {
+              if (_matchesLoaded && !p.isloading && chat.id != null) {
+                return Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: _kPrimaryLight,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        p.totalCount > 0 ? '${p.totalCount}' : '${p.ids.length}',
+                        style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: _kPrimary),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    GestureDetector(
+                      onTap: _loadMatches,
+                      child: const Tooltip(
+                        message: 'Refresh matches',
+                        child: Icon(Icons.refresh, size: 16, color: _kMuted),
+                      ),
+                    ),
+                  ],
+                );
+              }
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: _kPrimaryLight,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${p.ids.length}',
+                  style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      color: _kPrimary),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -626,7 +683,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
   Widget _buildProfileList() {
     return Consumer<MatchedProfileProvider>(
       builder: (context, provider, _) {
-        // ── Loading skeleton ───────────────────────────────────────────
+        // ── Loading skeleton (first load) ──────────────────────────────
         if (provider.isloading) {
           return _buildSkeletonLoader();
         }
@@ -642,6 +699,11 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
           );
         }
 
+        // ── Show Match button (not yet loaded) ─────────────────────────
+        if (!_matchesLoaded) {
+          return _buildShowMatchButton(chatProvider);
+        }
+
         final indices = _sortProfiles(
             _filterProfiles(provider), provider);
 
@@ -651,6 +713,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
             icon: Icons.favorite_border,
             title: 'No matches yet',
             subtitle: 'No matching profiles found for this user',
+            showRefetch: true,
           );
         }
 
@@ -663,14 +726,19 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
           );
         }
 
-        // ── Profile cards ─────────────────────────────────────────────
+        // ── Profile cards with scroll pagination ──────────────────────
         return ListView.builder(
           controller: _scrollController,
           padding: const EdgeInsets.only(top: 6, bottom: 16),
-          itemCount: indices.length,
+          itemCount: indices.length + (provider.hasMore || provider.isLoadingMore ? 1 : 0),
           cacheExtent: 300,
           physics: const BouncingScrollPhysics(),
           itemBuilder: (context, i) {
+            // Pagination footer
+            if (i == indices.length) {
+              return _buildPaginationFooter(provider);
+            }
+
             final idx       = indices[i];
             final profileId = provider.ids[idx];
             final isPaid    = provider.isPaidList[idx];
@@ -723,6 +791,127 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
     );
   }
 
+  // ── Show Match button ────────────────────────────────────────────────────
+  Widget _buildShowMatchButton(ChatProvider chat) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 64, height: 64,
+              decoration: const BoxDecoration(
+                color: _kPrimaryLight,
+                shape: BoxShape.circle,
+              ),
+              child: const Icon(Icons.manage_search_rounded,
+                  size: 30, color: _kPrimary),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              chat.namee != null
+                  ? '${chat.namee} को म्याच हेर्नुहोस्'
+                  : 'Match profiles',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: _kText),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'यस युजरसँग मिल्दो प्रोफाइलहरू लोड गर्न तलको बटन थिच्नुहोस्',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 11, color: _kMuted, height: 1.5),
+            ),
+            const SizedBox(height: 18),
+            GestureDetector(
+              onTap: _loadMatches,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 20, vertical: 10),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFD81B60), Color(0xFFAD1457)],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _kPrimary.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.favorite, size: 14, color: Colors.white),
+                    SizedBox(width: 6),
+                    Text(
+                      'Show Match',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ── Pagination footer ────────────────────────────────────────────────────
+  Widget _buildPaginationFooter(MatchedProfileProvider provider) {
+    if (provider.isLoadingMore) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(
+          child: SizedBox(
+            width: 20, height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              valueColor: AlwaysStoppedAnimation<Color>(_kPrimary),
+            ),
+          ),
+        ),
+      );
+    }
+    if (provider.hasMore) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Center(
+          child: TextButton.icon(
+            onPressed: provider.fetchMoreProfiles,
+            icon: const Icon(Icons.expand_more, size: 16, color: _kPrimary),
+            label: const Text('Load more',
+                style: TextStyle(fontSize: 11, color: _kPrimary)),
+            style: TextButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+        ),
+      );
+    }
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: Center(
+        child: Text(
+          'सबै ${provider.totalCount > 0 ? provider.totalCount : provider.ids.length} म्याच देखाइयो',
+          style: const TextStyle(fontSize: 10, color: _kMuted),
+        ),
+      ),
+    );
+  }
+
   // ── Skeleton loader ───────────────────────────────────────────────────────
   Widget _buildSkeletonLoader() {
     return ListView.builder(
@@ -739,6 +928,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
     required String title,
     required String subtitle,
     bool showClear = false,
+    bool showRefetch = false,
   }) {
     return Center(
       child: Padding(
@@ -778,6 +968,16 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
                 style: TextButton.styleFrom(foregroundColor: _kPrimary),
                 child: const Text('Clear filters',
                     style: TextStyle(fontSize: 11)),
+              ),
+            ],
+            if (showRefetch) ...[
+              const SizedBox(height: 12),
+              TextButton.icon(
+                onPressed: _loadMatches,
+                icon: const Icon(Icons.refresh, size: 14),
+                label: const Text('Retry',
+                    style: TextStyle(fontSize: 11)),
+                style: TextButton.styleFrom(foregroundColor: _kPrimary),
               ),
             ],
           ],
