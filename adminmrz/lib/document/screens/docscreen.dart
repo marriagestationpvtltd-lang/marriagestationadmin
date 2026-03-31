@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:adminmrz/theme/app_theme.dart';
 import '../docprovider/docmodel.dart';
 import '../docprovider/docservice.dart';
 
@@ -44,17 +45,42 @@ class _DocumentsPageState extends State<DocumentsPage>
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Approve Document'),
-        content: Text('Are you sure you want to approve ${document.fullName}\'s document?'),
+        shape: RoundedRectangleBorder(borderRadius: AppTheme.radiusMd),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.successLight,
+                borderRadius: AppTheme.radiusSm,
+              ),
+              child: const Icon(Icons.check_circle_outline,
+                  color: AppTheme.success, size: 20),
+            ),
+            const SizedBox(width: 12),
+            const Text('Approve Document',
+                style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary)),
+          ],
+        ),
+        content: Text(
+          'Are you sure you want to approve ${document.fullName}\'s document?',
+          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: const Text('Cancel',
+                style: TextStyle(color: AppTheme.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.green,
+              backgroundColor: AppTheme.success,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: AppTheme.radiusSm),
             ),
             child: const Text('Approve'),
           ),
@@ -73,14 +99,14 @@ class _DocumentsPageState extends State<DocumentsPage>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Document approved for ${document.fullName}'),
-              backgroundColor: Colors.green,
+              backgroundColor: AppTheme.success,
             ),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Failed to approve: ${provider.error}'),
-              backgroundColor: Colors.red,
+              backgroundColor: AppTheme.error,
             ),
           );
         }
@@ -88,7 +114,7 @@ class _DocumentsPageState extends State<DocumentsPage>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppTheme.error,
           ),
         );
       }
@@ -99,18 +125,46 @@ class _DocumentsPageState extends State<DocumentsPage>
   Future<void> _rejectDocument(Document document) async {
     _rejectReasonController.clear();
 
-    // Show dialog to enter rejection reason
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Reject Document'),
+        shape: RoundedRectangleBorder(borderRadius: AppTheme.radiusMd),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppTheme.errorLight,
+                borderRadius: AppTheme.radiusSm,
+              ),
+              child: const Icon(Icons.cancel_outlined,
+                  color: AppTheme.error, size: 20),
+            ),
+            const SizedBox(width: 12),
+            const Text('Reject Document',
+                style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimary)),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Document for ${document.fullName}'),
+            Text(
+              'Document for ${document.fullName}',
+              style: const TextStyle(
+                  color: AppTheme.textSecondary, fontSize: 13),
+            ),
             const SizedBox(height: 16),
-            const Text('Please provide a reason for rejection:'),
+            const Text(
+              'Please provide a reason for rejection:',
+              style: TextStyle(
+                  color: AppTheme.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500),
+            ),
             const SizedBox(height: 8),
             TextField(
               controller: _rejectReasonController,
@@ -124,10 +178,9 @@ class _DocumentsPageState extends State<DocumentsPage>
         ),
         actions: [
           TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-            },
-            child: const Text('Cancel'),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel',
+                style: TextStyle(color: AppTheme.textSecondary)),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -135,7 +188,7 @@ class _DocumentsPageState extends State<DocumentsPage>
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Please enter a rejection reason'),
-                    backgroundColor: Colors.red,
+                    backgroundColor: AppTheme.error,
                   ),
                 );
                 return;
@@ -145,7 +198,9 @@ class _DocumentsPageState extends State<DocumentsPage>
               await _performReject(document);
             },
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: AppTheme.error,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: AppTheme.radiusSm),
             ),
             child: const Text('Reject'),
           ),
@@ -168,14 +223,14 @@ class _DocumentsPageState extends State<DocumentsPage>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Document rejected for ${document.fullName}'),
-            backgroundColor: Colors.orange,
+            backgroundColor: AppTheme.warning,
           ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to reject: ${provider.error}'),
-            backgroundColor: Colors.red,
+            backgroundColor: AppTheme.error,
           ),
         );
       }
@@ -183,7 +238,7 @@ class _DocumentsPageState extends State<DocumentsPage>
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: $e'),
-          backgroundColor: Colors.red,
+          backgroundColor: AppTheme.error,
         ),
       );
     }
@@ -209,8 +264,9 @@ class _DocumentsPageState extends State<DocumentsPage>
                 maxWidth: MediaQuery.of(context).size.width * 0.9,
               ),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                color: AppTheme.cardBg,
+                borderRadius: AppTheme.radiusMd,
+                boxShadow: AppTheme.elevatedShadow,
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -233,25 +289,25 @@ class _DocumentsPageState extends State<DocumentsPage>
                               child: CircularProgressIndicator(
                                 value: loadingProgress.expectedTotalBytes != null
                                     ? loadingProgress.cumulativeBytesLoaded /
-                                    loadingProgress.expectedTotalBytes!
+                                        loadingProgress.expectedTotalBytes!
                                     : null,
+                                color: AppTheme.primary,
                               ),
                             );
                           },
                           errorBuilder: (context, error, stackTrace) {
                             return Container(
-                              color: Colors.grey[200],
+                              color: AppTheme.borderLight,
                               child: const Center(
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Icon(
-                                      Icons.broken_image,
-                                      size: 48,
-                                      color: Colors.grey,
-                                    ),
+                                    Icon(Icons.broken_image,
+                                        size: 48, color: AppTheme.textMuted),
                                     SizedBox(height: 8),
-                                    Text('Failed to load image'),
+                                    Text('Failed to load image',
+                                        style: TextStyle(
+                                            color: AppTheme.textMuted)),
                                   ],
                                 ),
                               ),
@@ -264,7 +320,7 @@ class _DocumentsPageState extends State<DocumentsPage>
                   Container(
                     padding: const EdgeInsets.all(16),
                     decoration: const BoxDecoration(
-                      color: Colors.white,
+                      color: AppTheme.cardBg,
                       borderRadius: BorderRadius.vertical(
                         bottom: Radius.circular(12),
                       ),
@@ -276,12 +332,11 @@ class _DocumentsPageState extends State<DocumentsPage>
                         icon: const Icon(Icons.close, size: 20),
                         label: const Text('Close'),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
+                          backgroundColor: AppTheme.primary,
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(8),
-                          ),
+                              borderRadius: AppTheme.radiusSm),
                         ),
                       ),
                     ),
@@ -300,11 +355,7 @@ class _DocumentsPageState extends State<DocumentsPage>
                     color: Colors.black.withOpacity(0.5),
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.close,
-                    color: Colors.white,
-                    size: 24,
-                  ),
+                  child: const Icon(Icons.close, color: Colors.white, size: 24),
                 ),
               ),
             ),
@@ -318,485 +369,416 @@ class _DocumentsPageState extends State<DocumentsPage>
     });
   }
 
-  // ================= DOCUMENT CARD WITH ACTION BUTTONS =================
-  // ================= DOCUMENT CARD WITH ACTION BUTTONS =================
+  // ================= DOCUMENT CARD =================
   Widget _buildDocumentCard(Document document, String currentTab) {
+    final statusColor = _getStatusColor(document.status);
+    final statusBg = _getStatusBgColor(document.status);
+    final isPending = currentTab == 'pending';
+
     return Container(
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        color: AppTheme.cardBg,
+        borderRadius: AppTheme.radiusMd,
+        boxShadow: AppTheme.cardShadow,
+        border: Border(
+          left: BorderSide(color: statusColor, width: 4),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // ================= DOCUMENT IMAGE =================
-          GestureDetector(
-            onTap: () => _showImagePreview(document.fullPhotoUrl),
-            child: Container(
-              height: 220,
+          // ── Pending header highlight ──────────────────────────────────────
+          if (isPending)
+            Container(
               width: double.infinity,
-              decoration: BoxDecoration(
-                borderRadius: const BorderRadius.only(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: const BoxDecoration(
+                color: AppTheme.warningLight,
+                borderRadius: BorderRadius.only(
                   topLeft: Radius.circular(12),
                   topRight: Radius.circular(12),
                 ),
-                color: Colors.grey[100],
               ),
-              child: Stack(
-                fit: StackFit.expand,
+              child: Row(
                 children: [
-                  // Image with gradient overlay
-                  ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(12),
-                      topRight: Radius.circular(12),
-                    ),
-                    child: Image.network(
-                      document.fullPhotoUrl,
-                      fit: BoxFit.cover,
-                      loadingBuilder: (context, child, loadingProgress) {
-                        if (loadingProgress == null) return child;
-                        return Center(
-                          child: CircularProgressIndicator(
-                            value: loadingProgress.expectedTotalBytes != null
-                                ? loadingProgress.cumulativeBytesLoaded /
-                                loadingProgress.expectedTotalBytes!
-                                : null,
-                          ),
-                        );
-                      },
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey[200],
-                          child: const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.broken_image,
-                                  size: 48,
-                                  color: Colors.grey,
-                                ),
-                                SizedBox(height: 8),
-                                Text(
-                                  'Failed to load image',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-
-                  // Gradient overlay
-                  Container(
-                    decoration: BoxDecoration(
-                      borderRadius: const BorderRadius.only(
-                        topLeft: Radius.circular(12),
-                        topRight: Radius.circular(12),
-                      ),
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withOpacity(0.3),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Zoom overlay with icon
-                  Positioned(
-                    top: 12,
-                    right: 12,
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.6),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.zoom_in,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-
-                  // Status overlay on bottom left
-                  Positioned(
-                    bottom: 12,
-                    left: 12,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor(document.status).withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Text(
-                        document.status.toUpperCase(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                  const Icon(Icons.hourglass_top_rounded,
+                      size: 14, color: AppTheme.warning),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Awaiting Review',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.warning,
                     ),
                   ),
                 ],
               ),
             ),
-          ),
 
-          // ================= DOCUMENT DETAILS =================
           Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
+            padding: const EdgeInsets.all(16),
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // User Name and Verification
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // User Avatar
-                    Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        shape: BoxShape.circle,
-                        border: Border.all(
-                          color: Colors.blue.shade100,
-                          width: 2,
-                        ),
-                      ),
-                      child: Center(
-                        child: Text(
-                          document.firstName.isNotEmpty
-                              ? document.firstName[0].toUpperCase()
-                              : 'U',
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.blue,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-
-                    // User Info
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            document.fullName,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            document.email,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 8),
-
-                          // Verification Badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 10,
-                              vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: document.isVerified == 1
-                                  ? Colors.green.shade50
-                                  : Colors.orange.shade50,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: document.isVerified == 1
-                                    ? Colors.green.shade200
-                                    : Colors.orange.shade200,
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  document.isVerified == 1
-                                      ? Icons.verified_outlined
-                                      : Icons.pending_outlined,
-                                  size: 14,
-                                  color: document.isVerified == 1
-                                      ? Colors.green
-                                      : Colors.orange,
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  document.isVerified == 1
-                                      ? 'Verified User'
-                                      : 'Not Verified',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w500,
-                                    color: document.isVerified == 1
-                                        ? Colors.green
-                                        : Colors.orange,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 20),
-
-                // Document Information Cards
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: Colors.grey.shade200,
-                    ),
-                  ),
-                  child: Column(
+                // ── Document image thumbnail ──────────────────────────────
+                GestureDetector(
+                  onTap: () => _showImagePreview(document.fullPhotoUrl),
+                  child: Stack(
                     children: [
-                      // Document Type and ID
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.badge_outlined,
-                            size: 16,
-                            color: Colors.blue,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Document Type',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
+                      Container(
+                        width: 88,
+                        height: 88,
+                        decoration: BoxDecoration(
+                          borderRadius: AppTheme.radiusSm,
+                          color: AppTheme.borderLight,
+                        ),
+                        child: ClipRRect(
+                          borderRadius: AppTheme.radiusSm,
+                          child: Image.network(
+                            document.fullPhotoUrl,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (context, child, progress) {
+                              if (progress == null) return child;
+                              return const Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: AppTheme.primary,
                                   ),
                                 ),
-                                Text(
-                                  document.documentType,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
+                              );
+                            },
+                            errorBuilder: (context, _, __) => const Center(
+                              child: Icon(Icons.broken_image,
+                                  size: 28, color: AppTheme.textMuted),
                             ),
                           ),
-                          const SizedBox(width: 20),
-                          const Icon(
-                            Icons.numbers_outlined,
-                            size: 16,
-                            color: Colors.green,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Document ID',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                                Text(
-                                  document.documentIdNumber,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-
-                      const SizedBox(height: 16),
-
-                      // Gender and User ID
-                      Row(
-                        children: [
-                          const Icon(
-                            Icons.person_outline,
-                            size: 16,
-                            color: Colors.purple,
+                      // Zoom icon overlay
+                      Positioned(
+                        bottom: 4,
+                        right: 4,
+                        child: Container(
+                          padding: const EdgeInsets.all(3),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.55),
+                            shape: BoxShape.circle,
                           ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Gender',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                                Text(
-                                  document.gender,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 20),
-                          const Icon(
-                            Icons.perm_identity_outlined,
-                            size: 16,
-                            color: Colors.orange,
-                          ),
-                          const SizedBox(width: 10),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'User ID',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                                Text(
-                                  '#${document.userId}',
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                          child: const Icon(Icons.zoom_in,
+                              color: Colors.white, size: 13),
+                        ),
                       ),
                     ],
                   ),
                 ),
 
-                // ================= ACTION BUTTONS =================
-                if (currentTab == 'pending') ...[
-                  const SizedBox(height: 20),
-                  const Divider(),
-                  const SizedBox(height: 16),
-                  Consumer<DocumentsProvider>(
-                    builder: (context, provider, child) {
-                      if (provider.isActionLoading) {
-                        return const Center(
-                          child: CircularProgressIndicator(),
-                        );
-                      }
-                      return Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
+                const SizedBox(width: 14),
+
+                // ── User info & details ───────────────────────────────────
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          // Reject Button
-                          Expanded(
-                            child: OutlinedButton.icon(
-                              onPressed: () => _rejectDocument(document),
-                              icon: const Icon(Icons.close, size: 18),
-                              label: const Text('Reject'),
-                              style: OutlinedButton.styleFrom(
-                                foregroundColor: Colors.red,
-                                side: const BorderSide(color: Colors.red),
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                          // Avatar
+                          Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              gradient: AppTheme.primaryGradient,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Center(
+                              child: Text(
+                                document.firstName.isNotEmpty
+                                    ? document.firstName[0].toUpperCase()
+                                    : 'U',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ),
-                          const SizedBox(width: 12),
+                          const SizedBox(width: 10),
 
-                          // Approve Button
+                          // Name + email
                           Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => _approveDocument(document),
-                              icon: const Icon(Icons.check, size: 18),
-                              label: const Text('Approve'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.green,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 12),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  document.fullName,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  document.email,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          // Status badge
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: statusBg,
+                              borderRadius: AppTheme.radiusSm,
+                            ),
+                            child: Text(
+                              document.status.toUpperCase(),
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: statusColor,
+                                letterSpacing: 0.4,
                               ),
                             ),
                           ),
                         ],
-                      );
-                    },
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // ── Info grid ────────────────────────────────────────
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.scaffoldBg,
+                          borderRadius: AppTheme.radiusSm,
+                          border: Border.all(color: AppTheme.borderLight),
+                        ),
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _infoCell(
+                                    icon: Icons.badge_outlined,
+                                    iconColor: AppTheme.primary,
+                                    label: 'Doc Type',
+                                    value: document.documentType,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _infoCell(
+                                    icon: Icons.numbers_outlined,
+                                    iconColor: AppTheme.success,
+                                    label: 'Doc ID',
+                                    value: document.documentIdNumber,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: _infoCell(
+                                    icon: Icons.person_outline,
+                                    iconColor: AppTheme.primaryDark,
+                                    label: 'Gender',
+                                    value: document.gender,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: _infoCell(
+                                    icon: Icons.perm_identity_outlined,
+                                    iconColor: AppTheme.accent,
+                                    label: 'User ID',
+                                    value: '#${document.userId}',
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // Verification badge
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: document.isVerified == 1
+                              ? AppTheme.successLight
+                              : AppTheme.warningLight,
+                          borderRadius: AppTheme.radiusSm,
+                          border: Border.all(
+                            color: document.isVerified == 1
+                                ? AppTheme.success.withOpacity(0.3)
+                                : AppTheme.warning.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              document.isVerified == 1
+                                  ? Icons.verified_outlined
+                                  : Icons.pending_outlined,
+                              size: 13,
+                              color: document.isVerified == 1
+                                  ? AppTheme.success
+                                  : AppTheme.warning,
+                            ),
+                            const SizedBox(width: 5),
+                            Text(
+                              document.isVerified == 1
+                                  ? 'Verified User'
+                                  : 'Not Verified',
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                color: document.isVerified == 1
+                                    ? AppTheme.success
+                                    : AppTheme.warning,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ],
             ),
           ),
+
+          // ── Action buttons (pending only) ─────────────────────────────
+          if (isPending) ...[
+            Container(
+              height: 1,
+              color: AppTheme.borderLight,
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+            ),
+            Consumer<DocumentsProvider>(
+              builder: (context, provider, child) {
+                if (provider.isActionLoading) {
+                  return const Padding(
+                    padding: EdgeInsets.all(16),
+                    child: Center(
+                      child: SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: AppTheme.primary),
+                      ),
+                    ),
+                  );
+                }
+                return Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                  child: Row(
+                    children: [
+                      // Reject
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _rejectDocument(document),
+                          icon: const Icon(Icons.close_rounded, size: 16),
+                          label: const Text('Reject'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.error,
+                            side: const BorderSide(color: AppTheme.error),
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 11),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: AppTheme.radiusSm),
+                            textStyle: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+
+                      // Approve
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () => _approveDocument(document),
+                          icon: const Icon(Icons.check_rounded, size: 16),
+                          label: const Text('Approve'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.success,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            padding:
+                                const EdgeInsets.symmetric(vertical: 11),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: AppTheme.radiusSm),
+                            textStyle: const TextStyle(
+                                fontSize: 13, fontWeight: FontWeight.w600),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ],
         ],
       ),
     );
   }
 
-  Widget _info(String label, String value) {
-    return Column(
+  Widget _infoCell({
+    required IconData icon,
+    required Color iconColor,
+    required String label,
+    required String value,
+  }) {
+    return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.grey,
-            fontWeight: FontWeight.w500,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
+        Icon(icon, size: 14, color: iconColor),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  style: const TextStyle(
+                      fontSize: 10,
+                      color: AppTheme.textMuted,
+                      fontWeight: FontWeight.w500)),
+              const SizedBox(height: 1),
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary),
+              ),
+            ],
           ),
         ),
       ],
@@ -806,13 +788,26 @@ class _DocumentsPageState extends State<DocumentsPage>
   Color _getStatusColor(String status) {
     switch (status.toLowerCase()) {
       case 'approved':
-        return Colors.green;
+        return AppTheme.success;
       case 'rejected':
-        return Colors.red;
+        return AppTheme.error;
       case 'pending':
-        return Colors.orange;
+        return AppTheme.warning;
       default:
-        return Colors.grey;
+        return AppTheme.textSecondary;
+    }
+  }
+
+  Color _getStatusBgColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'approved':
+        return AppTheme.successLight;
+      case 'rejected':
+        return AppTheme.errorLight;
+      case 'pending':
+        return AppTheme.warningLight;
+      default:
+        return AppTheme.borderLight;
     }
   }
 
@@ -822,49 +817,89 @@ class _DocumentsPageState extends State<DocumentsPage>
 
     if (provider.isLoading) {
       return const Center(
-        child: CircularProgressIndicator(),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: AppTheme.primary),
+            SizedBox(height: 16),
+            Text('Loading documents…',
+                style: TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500)),
+          ],
+        ),
       );
     }
 
     if (provider.error != null) {
       return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(
-              Icons.error_outline,
-              size: 48,
-              color: Colors.red,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              provider.error!,
-              style: const TextStyle(
-                color: Colors.red,
-                fontSize: 16,
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: AppTheme.errorLight,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.error_outline,
+                    size: 40, color: AppTheme.error),
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _loadDocuments,
-              child: const Text('Retry'),
-            ),
-          ],
+              const SizedBox(height: 16),
+              Text(
+                provider.error!,
+                style: const TextStyle(
+                    color: AppTheme.textSecondary, fontSize: 14),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                onPressed: _loadDocuments,
+                icon: const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Retry'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                      borderRadius: AppTheme.radiusSm),
+                ),
+              ),
+            ],
+          ),
         ),
       );
     }
 
     return Column(
       children: [
-        TabBar(
-          controller: _tabController,
-          tabs: const [
-            Tab(text: 'Pending'),
-            Tab(text: 'Approved'),
-            Tab(text: 'Rejected'),
-          ],
+        // ── Tab bar ───────────────────────────────────────────────────────
+        Container(
+          color: AppTheme.cardBg,
+          child: TabBar(
+            controller: _tabController,
+            indicatorColor: AppTheme.primary,
+            indicatorWeight: 3,
+            labelColor: AppTheme.primary,
+            unselectedLabelColor: AppTheme.textSecondary,
+            labelStyle: const TextStyle(
+                fontSize: 13, fontWeight: FontWeight.w700),
+            unselectedLabelStyle: const TextStyle(
+                fontSize: 13, fontWeight: FontWeight.w500),
+            tabs: [
+              _tabItem('Pending',
+                  provider.pendingDocuments.length, AppTheme.warning),
+              _tabItem('Approved',
+                  provider.approvedDocuments.length, AppTheme.success),
+              _tabItem('Rejected',
+                  provider.rejectedDocuments.length, AppTheme.error),
+            ],
+          ),
         ),
+
+        // ── Tab content ───────────────────────────────────────────────────
         Expanded(
           child: TabBarView(
             controller: _tabController,
@@ -879,24 +914,63 @@ class _DocumentsPageState extends State<DocumentsPage>
     );
   }
 
+  Widget _tabItem(String label, int count, Color countColor) {
+    return Tab(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(label),
+          if (count > 0) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: countColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '$count',
+                style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: countColor),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   Widget _list(List<Document> docs, String tabName) {
     if (docs.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.folder_open,
-              size: 48,
-              color: Colors.grey,
-            ),
-            SizedBox(height: 16),
-            Text(
-              'No documents',
-              style: TextStyle(
-                color: Colors.grey,
-                fontSize: 16,
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: AppTheme.borderLight,
+                shape: BoxShape.circle,
               ),
+              child: const Icon(Icons.folder_open_outlined,
+                  size: 40, color: AppTheme.textMuted),
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'No documents found',
+              style: TextStyle(
+                  color: AppTheme.textSecondary,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 6),
+            const Text(
+              'Documents will appear here once submitted.',
+              style: TextStyle(color: AppTheme.textMuted, fontSize: 12),
             ),
           ],
         ),
@@ -904,6 +978,7 @@ class _DocumentsPageState extends State<DocumentsPage>
     }
 
     return RefreshIndicator(
+      color: AppTheme.primary,
       onRefresh: _loadDocuments,
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
