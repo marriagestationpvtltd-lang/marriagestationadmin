@@ -35,6 +35,9 @@ class User {
   int isActive;
   int? pageno;
   String gender;
+  String? registrationDate;
+  String? expiryDate;
+  String? paymentStatus;
 
   User({
     required this.id,
@@ -51,6 +54,9 @@ class User {
     required this.isActive,
     this.pageno,
     required this.gender,
+    this.registrationDate,
+    this.expiryDate,
+    this.paymentStatus,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -69,6 +75,14 @@ class User {
       isActive: json['isActive'] is int ? json['isActive'] : 1,
       pageno: json['pageno'] is int ? json['pageno'] : null,
       gender: json['gender']?.toString() ?? 'Male',
+      registrationDate: json['registration_date']?.toString() ??
+          json['created_at']?.toString() ??
+          json['registrationDate']?.toString(),
+      expiryDate: json['expiry_date']?.toString() ??
+          json['subscription_expiry']?.toString() ??
+          json['expiryDate']?.toString(),
+      paymentStatus: json['payment_status']?.toString() ??
+          json['paymentStatus']?.toString(),
     );
   }
 
