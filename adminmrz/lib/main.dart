@@ -5,6 +5,7 @@ import 'package:flutter_web_plugins/flutter_web_plugins.dart';
 import 'package:provider/provider.dart';
 import 'adminchat/chatprovider.dart';
 import 'adminchat/services/MatchedProfileService.dart';
+import 'adminchat/services/callmanager.dart';
 import 'auth/dashboard.dart';
 import 'auth/login.dart';
 import 'auth/service.dart';
@@ -48,6 +49,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => PaymentProvider()),
         ChangeNotifierProvider(create: (context) => ChatProvider()),
         ChangeNotifierProvider(create: (context) => MatchedProfileProvider()),
+        ChangeNotifierProvider(create: (_) => CallManager()),
       ],
       child: MaterialApp(
         title: 'Admin Panel',

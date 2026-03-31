@@ -34,7 +34,10 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final chatProvider = Provider.of<ChatProvider>(context);
+    // Only rebuild the ProfileSidebar header when the selected user id changes.
+    // ChatWindow and ChatSidebar read the provider themselves, so we only need
+    // the id here for ProfileSidebar's didUpdateWidget check.
+    final receiverId = context.select<ChatProvider, int?>((p) => p.id) ?? 0;
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F2F5),
@@ -42,8 +45,8 @@ class _ChatScreenState extends State<ChatScreen> {
         children: [
           ChatSidebar(), // Left Sidebar
           Container(width: 1, color: const Color(0xFFE2E8F0)),
-          Expanded(
-              child: ChatWindow(name: 'select user to chat', isOnline: true, receiverIdd: 903,)), // Center Chat Window
+          const Expanded(
+              child: ChatWindow(name: 'select user to chat', isOnline: true, receiverIdd: 0)), // Center Chat Window
           Container(width: 1, color: const Color(0xFFE2E8F0)),
           ProfileSidebar(
             selectedTab: selectedTab,
@@ -51,7 +54,7 @@ class _ChatScreenState extends State<ChatScreen> {
               setState(() {
                 selectedTab = index;
               });
-            }, id: 903,
+            }, id: receiverId,
           ), // Right Sidebar
         ],
       ),
