@@ -1,3 +1,4 @@
+import 'package:adminmrz/core/app_constants.dart';
 import 'package:adminmrz/users/service/userservice.dart';
 import 'package:flutter/material.dart';
 
@@ -9,7 +10,7 @@ class UserProvider with ChangeNotifier {
 
   List<User> _allUsers = [];
   List<User> _filteredUsers = [];
-  Set<int> _selectedUserIds = {}; // Store selected user IDs
+  Set<int> _selectedUserIds = {};
   bool _isLoading = false;
   String _error = '';
   String _searchQuery = '';
@@ -17,6 +18,13 @@ class UserProvider with ChangeNotifier {
   String _userTypeFilter = 'all';
   String _genderFilter = 'all';
   bool _isSelectAll = false;
+
+  // Cache tracking
+  DateTime? _lastFetchTime;
+
+  bool get _isCacheValid =>
+      _lastFetchTime != null &&
+      DateTime.now().difference(_lastFetchTime!) < AppConstants.cacheDuration;
 
   // Getters
   List<User> get filteredUsers => _filteredUsers;
@@ -40,7 +48,10 @@ class UserProvider with ChangeNotifier {
         _filteredUsers.every((user) => _selectedUserIds.contains(user.id));
   }
 
-  Future<void> fetchUsers() async {
+  Future<void> fetchUsers({bool forceRefresh = false}) async {
+    // Serve from cache if data is fresh
+    if (!forceRefresh && _isCacheValid && _allUsers.isNotEmpty) return;
+
     _isLoading = true;
     _error = '';
     notifyListeners();
@@ -48,6 +59,7 @@ class UserProvider with ChangeNotifier {
     try {
       final response = await _userService.getUsers();
       _allUsers = response.data;
+      _lastFetchTime = DateTime.now();
       _applyFilters();
     } catch (e) {
       _error = e.toString();
@@ -70,10 +82,8 @@ class UserProvider with ChangeNotifier {
 
   void selectAllUsers() {
     if (areAllFilteredSelected) {
-      // Deselect all filtered users
       _selectedUserIds.removeAll(_filteredUsers.map((user) => user.id));
     } else {
-      // Select all filtered users
       _selectedUserIds.addAll(_filteredUsers.map((user) => user.id));
     }
     _updateSelectAllState();
@@ -98,72 +108,121 @@ class UserProvider with ChangeNotifier {
   Future<void> suspendSelectedUsers(BuildContext context) async {
     if (_selectedUserIds.isEmpty) return;
 
+    final count = _selectedUserIds.length;
     final confirmed = await _showConfirmationDialog(
         context,
         'Suspend Users',
-        'Are you sure you want to suspend ${_selectedUserIds.length} user(s)?'
+        'Are you sure you want to suspend $count user(s)?'
     );
 
-    if (confirmed) {
-      _isLoading = true;
-      notifyListeners();
+    if (!confirmed) return;
 
-      // TODO: Implement API call to suspend users
-      await Future.delayed(const Duration(seconds: 1)); // Simulate API call
+    _isLoading = true;
+    notifyListeners();
 
-      // Update local state (for demo)
-      for (var user in _allUsers) {
-        if (_selectedUserIds.contains(user.id)) {
-          // Update user status to indicate suspended
-          // This is just for demo - implement your actual API logic
+    try {
+      final success = await _userService.suspendUsers(_selectedUserIds.toList());
+      if (success) {
+        // Invalidate cache so next fetch reflects new status
+        _lastFetchTime = null;
+        clearSelection();
+        _isLoading = false;
+        notifyListeners();
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$count user(s) suspended successfully'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+      } else {
+        _error = 'Failed to suspend users';
+        _isLoading = false;
+        notifyListeners();
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to suspend users. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
         }
       }
-
-      clearSelection();
+    } catch (e) {
+      _error = e.toString();
       _isLoading = false;
       notifyListeners();
-
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${_selectedUserIds.length} user(s) suspended successfully'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
   Future<void> deleteSelectedUsers(BuildContext context) async {
     if (_selectedUserIds.isEmpty) return;
 
+    final count = _selectedUserIds.length;
     final confirmed = await _showConfirmationDialog(
         context,
         'Delete Users',
-        'Are you sure you want to delete ${_selectedUserIds.length} user(s)? This action cannot be undone.'
+        'Are you sure you want to delete $count user(s)? This action cannot be undone.'
     );
 
-    if (confirmed) {
-      _isLoading = true;
-      notifyListeners();
+    if (!confirmed) return;
 
-      // TODO: Implement API call to delete users
-      await Future.delayed(const Duration(seconds: 1)); // Simulate API call
+    _isLoading = true;
+    notifyListeners();
 
-      // Update local state (for demo)
-      _allUsers.removeWhere((user) => _selectedUserIds.contains(user.id));
-      _applyFilters();
-
-      clearSelection();
+    try {
+      final idsToDelete = _selectedUserIds.toList();
+      final success = await _userService.deleteUsers(idsToDelete);
+      if (success) {
+        // Remove deleted users from local lists immediately
+        _allUsers.removeWhere((user) => idsToDelete.contains(user.id));
+        _lastFetchTime = DateTime.now(); // mark cache fresh after mutation
+        _applyFilters();
+        clearSelection();
+        _isLoading = false;
+        notifyListeners();
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('$count user(s) deleted successfully'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } else {
+        _error = 'Failed to delete users';
+        _isLoading = false;
+        notifyListeners();
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Failed to delete users. Please try again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      _error = e.toString();
       _isLoading = false;
       notifyListeners();
-
-      // Show success message
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${_selectedUserIds.length} user(s) deleted successfully'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -213,7 +272,6 @@ class UserProvider with ChangeNotifier {
   void _applyFilters() {
     List<User> filtered = List<User>.from(_allUsers);
 
-    // Apply search filter
     if (_searchQuery.isNotEmpty) {
       filtered = filtered.where((user) {
         return user.fullName.toLowerCase().contains(_searchQuery) ||
@@ -222,17 +280,14 @@ class UserProvider with ChangeNotifier {
       }).toList();
     }
 
-    // Apply status filter
     if (_statusFilter != 'all') {
       filtered = filtered.where((user) => user.status == _statusFilter).toList();
     }
 
-    // Apply user type filter
     if (_userTypeFilter != 'all') {
       filtered = filtered.where((user) => user.usertype == _userTypeFilter).toList();
     }
 
-    // Apply gender filter
     if (_genderFilter != 'all') {
       filtered = filtered.where((user) => user.gender == _genderFilter).toList();
     }
@@ -273,7 +328,7 @@ class UserProvider with ChangeNotifier {
     };
 
     for (var user in _allUsers) {
-      stats[user.usertype] = stats[user.usertype]! + 1;
+      stats[user.usertype] = (stats[user.usertype] ?? 0) + 1;
     }
 
     return stats;

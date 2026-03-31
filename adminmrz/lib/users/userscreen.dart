@@ -1,9 +1,11 @@
+import 'package:adminmrz/document/docprovider/docservice.dart';
 import 'package:adminmrz/theme/app_theme.dart';
 import 'package:adminmrz/users/userdetails/detailscreen.dart';
 import 'package:adminmrz/users/userdetails/userdetailprovider.dart';
 import 'package:adminmrz/users/userprovider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'model/usermodel.dart';
 
@@ -45,6 +47,130 @@ class _UsersPageState extends State<UsersPage> {
         ),
       ),
     );
+  }
+
+  Future<void> _sendEmail(String email) async {
+    final uri = Uri(scheme: 'mailto', path: email);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
+
+  Future<void> _approveUserDocument(User user) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Approve Document'),
+        content: Text('Approve document for ${user.fullName}?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.success),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Approve'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final docProvider = context.read<DocumentsProvider>();
+    final success = await docProvider.updateDocumentStatus(
+      userId: user.id,
+      action: 'approve',
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success ? 'Document approved' : (docProvider.error ?? 'Failed to approve')),
+        backgroundColor: success ? AppTheme.success : Colors.red,
+      ),
+    );
+    if (success) {
+      // Refresh users to reflect updated status
+      context.read<UserProvider>().fetchUsers(forceRefresh: true);
+    }
+  }
+
+  Future<void> _rejectUserDocument(User user) async {
+    final reasonController = TextEditingController();
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Reject Document'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Reject document for ${user.fullName}?'),
+            const SizedBox(height: 12),
+            TextField(
+              controller: reasonController,
+              decoration: const InputDecoration(
+                labelText: 'Reason (optional)',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Reject'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final docProvider = context.read<DocumentsProvider>();
+    final success = await docProvider.updateDocumentStatus(
+      userId: user.id,
+      action: 'reject',
+      rejectReason: reasonController.text.trim().isEmpty ? null : reasonController.text.trim(),
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success ? 'Document rejected' : (docProvider.error ?? 'Failed to reject')),
+        backgroundColor: success ? AppTheme.error : Colors.red,
+      ),
+    );
+    if (success) {
+      context.read<UserProvider>().fetchUsers(forceRefresh: true);
+    }
+  }
+
+  Future<void> _blockUser(User user) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Block Member'),
+        content: Text('Block ${user.fullName}? They will no longer be able to access the platform.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Block'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    context.read<UserProvider>().suspendSelectedUsers(context);
   }
 
   // ─── Page Header ────────────────────────────────────────────────────────────
@@ -105,7 +231,7 @@ class _UsersPageState extends State<UsersPage> {
               color: Colors.white.withOpacity(0.15),
               borderRadius: AppTheme.radiusMd,
               child: InkWell(
-                onTap: () => provider.fetchUsers(),
+                onTap: () => provider.fetchUsers(forceRefresh: true),
                 borderRadius: AppTheme.radiusMd,
                 child: const Padding(
                   padding: EdgeInsets.all(10),
@@ -653,7 +779,8 @@ class _UsersPageState extends State<UsersPage> {
                       ],
                       onSelected: (value) {
                         if (value == 'view') _navigateToUserDetails(user);
-                        // TODO: implement message / email / block actions
+                        if (value == 'email') _sendEmail(user.email);
+                        if (value == 'block') _blockUser(user);
                       },
                     ),
                   ],
@@ -707,7 +834,7 @@ class _UsersPageState extends State<UsersPage> {
                           foreground: AppTheme.success,
                           background: AppTheme.successLight,
                           onTap: () {
-                            // TODO: implement approve action
+                            _approveUserDocument(user);
                           },
                         ),
                       ),
@@ -719,7 +846,7 @@ class _UsersPageState extends State<UsersPage> {
                           foreground: AppTheme.error,
                           background: AppTheme.errorLight,
                           onTap: () {
-                            // TODO: implement reject action
+                            _rejectUserDocument(user);
                           },
                         ),
                       ),
@@ -1243,7 +1370,7 @@ class _UsersPageState extends State<UsersPage> {
                   ),
                 )
               : RefreshIndicator(
-                  onRefresh: () => provider.fetchUsers(),
+                  onRefresh: () => provider.fetchUsers(forceRefresh: true),
                   color: AppTheme.primary,
                   child: SingleChildScrollView(
                     physics: const AlwaysScrollableScrollPhysics(),

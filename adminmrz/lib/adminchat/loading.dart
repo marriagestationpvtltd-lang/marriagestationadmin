@@ -14,8 +14,17 @@ class _LoadingState extends State<Loading> {
   void initState() {
     super.initState();
 
-    Future.microtask(() =>
-        Provider.of<ChatProvider>(context, listen: false).fetchChatList());
+    Future.microtask(() {
+      final provider = Provider.of<ChatProvider>(context, listen: false);
+      provider.fetchChatList();
+      provider.startAutoRefresh();
+    });
+  }
+
+  @override
+  void dispose() {
+    Provider.of<ChatProvider>(context, listen: false).stopAutoRefresh();
+    super.dispose();
   }
 
   @override

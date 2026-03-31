@@ -906,7 +906,7 @@ class _PackagesPageState extends State<PackagesPage> {
               _buildIconBtn(
                 icon: Icons.refresh_rounded,
                 tooltip: 'Refresh',
-                onTap: () => provider.fetchPackages(),
+                onTap: () => provider.fetchPackages(forceRefresh: true),
               ),
               const SizedBox(width: 8),
 
@@ -950,7 +950,7 @@ class _PackagesPageState extends State<PackagesPage> {
               ? _buildEmptyState()
               : RefreshIndicator(
                   color: AppTheme.primary,
-                  onRefresh: () => provider.fetchPackages(),
+                  onRefresh: () => provider.fetchPackages(forceRefresh: true),
                   child: ListView.builder(
                     padding: const EdgeInsets.only(bottom: 24),
                     itemCount: provider.packages.length,

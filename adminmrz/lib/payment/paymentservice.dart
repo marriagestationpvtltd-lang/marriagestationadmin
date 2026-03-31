@@ -1,20 +1,22 @@
 import 'dart:convert';
+import 'package:adminmrz/core/app_constants.dart';
 import 'package:adminmrz/payment/paymentmodel.dart';
 import 'package:http/http.dart' as http;
 
 class PaymentService {
-  static const String _baseUrl = 'https://digitallami.com/api9';
+  static const String _baseUrl = AppConstants.apiBaseUrl;
 
-  // Get payment history
   Future<PaymentHistoryResponse> getPaymentHistory() async {
     try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/get_payments.php'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      );
+      final response = await http
+          .get(
+            Uri.parse('$_baseUrl/get_payments.php'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+          )
+          .timeout(AppConstants.requestTimeout);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -27,7 +29,6 @@ class PaymentService {
     }
   }
 
-  // Get payment history with filters (date range)
   Future<PaymentHistoryResponse> getFilteredPayments({
     DateTime? startDate,
     DateTime? endDate,
@@ -54,13 +55,15 @@ class PaymentService {
         queryParameters: params.isNotEmpty ? params : null,
       );
 
-      final response = await http.get(
-        uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      );
+      final response = await http
+          .get(
+            uri,
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+            },
+          )
+          .timeout(AppConstants.requestTimeout);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);

@@ -1,10 +1,11 @@
 import 'dart:convert';
+import 'package:adminmrz/core/app_constants.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dashmodel.dart';
 
 class DashboardService {
-  static const String _baseUrl = 'https://digitallami.com/api9';
+  static const String _baseUrl = AppConstants.apiBaseUrl;
 
   Future<DashboardResponse> getDashboardData() async {
     try {
@@ -19,10 +20,12 @@ class DashboardService {
         headers['Authorization'] = 'Bearer $token';
       }
 
-      final response = await http.get(
-        Uri.parse('$_baseUrl/get_dashboard.php'),
-        headers: headers,
-      );
+      final response = await http
+          .get(
+            Uri.parse('$_baseUrl/get_dashboard.php'),
+            headers: headers,
+          )
+          .timeout(AppConstants.requestTimeout);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
