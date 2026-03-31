@@ -982,97 +982,318 @@ class _ChatWindowState extends State<ChatWindow> {
     }
 
     if (type == 'profile_card' && profileData != null) {
-      const kPrimaryLocal = Color(0xFFD81B60);
+      const kCardPrimary = Color(0xFFD81B60);
+      const kCardSurface = Color(0xFFFCFCFE);
+      const kCardBorder = Color(0xFFEDE7F6);
+      const kInfoLabel = Color(0xFF78909C);
+      const kInfoValue = Color(0xFF1A2340);
+
+      final bool isPaid = profileData['is_paid'] == true;
+      final String bioText = profileData['bio'] ?? '';
+      // Parse match percentage from bio like "72% Matched"
+      final matchRegex = RegExp(r'(\d+(?:\.\d+)?)%');
+      final matchMatch = matchRegex.firstMatch(bioText);
+      final double matchPct = matchMatch != null ? double.tryParse(matchMatch.group(1)!) ?? 0 : 0;
+
+      Color matchColor;
+      if (matchPct >= 70) {
+        matchColor = const Color(0xFF43A047);
+      } else if (matchPct >= 50) {
+        matchColor = const Color(0xFFFB8C00);
+      } else {
+        matchColor = const Color(0xFF78909C);
+      }
+
       return Align(
         alignment: isSentByMe ? Alignment.centerRight : Alignment.centerLeft,
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.224,
-          padding: const EdgeInsets.all(12),
-          margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 8, offset: const Offset(0, 2))],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Stack(
-                alignment: Alignment.center,
+        child: Column(
+          crossAxisAlignment: isSentByMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: MediaQuery.of(context).size.width * 0.22,
+              margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+              decoration: BoxDecoration(
+                color: kCardSurface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: kCardBorder, width: 1),
+                boxShadow: [
+                  BoxShadow(color: const Color(0xFFD81B60).withOpacity(0.08), blurRadius: 16, offset: const Offset(0, 4)),
+                  BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 2)),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  CircleAvatar(
-                    radius: 28,
-                    backgroundColor: const Color(0xFFF1F5F9),
-                    backgroundImage: profileData['profileImage'] != null &&
-                            profileData['profileImage'].toString().isNotEmpty
-                        ? NetworkImage(profileData['profileImage'])
-                        : null,
-                    child: profileData['profileImage'] == null ||
-                            profileData['profileImage'].toString().isEmpty
-                        ? Icon(Icons.person, size: 28, color: Colors.grey[400])
-                        : null,
-                  ),
-                  if (profileData['is_paid'] == true)
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: Container(
-                        width: 16,
-                        height: 16,
-                        decoration: BoxDecoration(
-                          color: Colors.amber,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 2),
+                  // ── Header gradient with avatar ──────────────────────────
+                  ClipRRect(
+                    borderRadius: const BorderRadius.only(
+                      topLeft: Radius.circular(15),
+                      topRight: Radius.circular(15),
+                    ),
+                    child: Container(
+                      height: 72,
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFFD81B60), Color(0xFFAD1457), Color(0xFF880E4F)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
-                        child: const Icon(Icons.star, size: 10, color: Colors.white),
+                      ),
+                      child: Stack(
+                        children: [
+                          // Subtle pattern dots
+                          Positioned(
+                            top: -10,
+                            right: -10,
+                            child: Container(
+                              width: 60,
+                              height: 60,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white.withOpacity(0.06),
+                              ),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: -8,
+                            left: -8,
+                            child: Container(
+                              width: 40,
+                              height: 40,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: Colors.white.withOpacity(0.06),
+                              ),
+                            ),
+                          ),
+                          // "Profile Shared" label
+                          Positioned(
+                            top: 8,
+                            left: 10,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.18),
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Icon(Icons.person_pin_rounded, size: 9, color: Colors.white),
+                                  SizedBox(width: 3),
+                                  Text('Profile Shared', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.w600, letterSpacing: 0.2)),
+                                ],
+                              ),
+                            ),
+                          ),
+                          // Premium badge
+                          if (isPaid)
+                            Positioned(
+                              top: 8,
+                              right: 10,
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(colors: [Color(0xFFFFD54F), Color(0xFFFFA000)]),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: const Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.workspace_premium, size: 8, color: Colors.white),
+                                    SizedBox(width: 2),
+                                    Text('Premium', style: TextStyle(color: Colors.white, fontSize: 7.5, fontWeight: FontWeight.w700, letterSpacing: 0.2)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
                     ),
+                  ),
+
+                  // ── Avatar overlapping the gradient ──────────────────────
+                  Transform.translate(
+                    offset: const Offset(0, -28),
+                    child: Column(
+                      children: [
+                        Center(
+                          child: Stack(
+                            alignment: Alignment.center,
+                            clipBehavior: Clip.none,
+                            children: [
+                              // Match ring
+                              if (matchPct > 0)
+                                Container(
+                                  width: 60,
+                                  height: 60,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: matchColor, width: 2.5),
+                                  ),
+                                ),
+                              Container(
+                                width: 54,
+                                height: 54,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 2.5),
+                                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 8, offset: const Offset(0, 3))],
+                                ),
+                                child: ClipOval(
+                                  child: profileData['profileImage'] != null &&
+                                          profileData['profileImage'].toString().isNotEmpty
+                                      ? Image.network(
+                                          profileData['profileImage'],
+                                          fit: BoxFit.cover,
+                                          errorBuilder: (_, __, ___) => Container(
+                                            color: const Color(0xFFF8BBD9),
+                                            child: const Icon(Icons.person_rounded, size: 28, color: Color(0xFFD81B60)),
+                                          ),
+                                        )
+                                      : Container(
+                                          color: const Color(0xFFF8BBD9),
+                                          child: const Icon(Icons.person_rounded, size: 28, color: Color(0xFFD81B60)),
+                                        ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // ── Name & match badge ─────────────────────────────
+                        const SizedBox(height: 4),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          child: Text(
+                            profileData['name'] ?? 'Unknown',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                              color: kInfoValue,
+                              letterSpacing: 0.1,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        if (matchPct > 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: matchColor.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: matchColor.withOpacity(0.35), width: 1),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.favorite_rounded, size: 9, color: matchColor),
+                                const SizedBox(width: 3),
+                                Text(
+                                  '${matchPct.toStringAsFixed(0)}% Match',
+                                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: matchColor),
+                                ),
+                              ],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                  // ── Info grid ──────────────────────────────────────────
+                  Transform.translate(
+                    offset: const Offset(0, -18),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Column(
+                        children: [
+                          _buildInfoRow(Icons.badge_rounded, 'Member ID', profileData['Member ID'], kInfoLabel, kInfoValue),
+                          _buildInfoRow(Icons.wc_rounded, 'Gender', profileData['gender'], kInfoLabel, kInfoValue),
+                          _buildInfoRow(Icons.work_rounded, 'Occupation', profileData['occupation'], kInfoLabel, kInfoValue),
+                          _buildInfoRow(Icons.school_rounded, 'Education', profileData['education'], kInfoLabel, kInfoValue),
+                          _buildInfoRow(Icons.favorite_border_rounded, 'Marital', profileData['marit'], kInfoLabel, kInfoValue),
+                          _buildInfoRow(Icons.cake_rounded, 'Age', profileData['age']?.toString(), kInfoLabel, kInfoValue),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  // ── Action buttons ─────────────────────────────────────
+                  Transform.translate(
+                    offset: const Offset(0, -12),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () => openUrl("https://digitallami.com/profile.php?id=${profileData['id']}"),
+                              child: Container(
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  border: Border.all(color: kCardPrimary, width: 1.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.open_in_new_rounded, size: 12, color: kCardPrimary),
+                                    SizedBox(width: 4),
+                                    Text('Profile', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kCardPrimary)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  Provider.of<ChatProvider>(context, listen: false)
+                                      .updateName("${profileData['last']}  ${profileData['first']}");
+                                  Provider.of<ChatProvider>(context, listen: false)
+                                      .updateidd(profileData['id']);
+                                });
+                              },
+                              child: Container(
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  gradient: const LinearGradient(
+                                    colors: [Color(0xFFD81B60), Color(0xFFAD1457)],
+                                  ),
+                                  borderRadius: BorderRadius.circular(8),
+                                  boxShadow: [BoxShadow(color: const Color(0xFFD81B60).withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 2))],
+                                ),
+                                child: const Row(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.chat_bubble_rounded, size: 12, color: Colors.white),
+                                    SizedBox(width: 4),
+                                    Text('Chat', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white)),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              const SizedBox(height: 8),
-              Text(
-                profileData['name'] ?? 'Unknown',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: profileData['is_paid'] == true ? kPrimaryLocal : kText,
-                ),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+            ),
+            Padding(
+              padding: const EdgeInsets.only(right: 8, left: 8, bottom: 2),
+              child: Text(
+                DateFormat('hh:mm a').format(timestamp),
+                style: const TextStyle(fontSize: 10, color: kMuted),
               ),
-              const SizedBox(height: 2),
-              Text(
-                profileData['bio'] ?? 'No bio available',
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: kPrimary, fontSize: 10, fontWeight: FontWeight.w600),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 8),
-              const Divider(height: 1, color: Color(0xFFE2E8F0)),
-              const SizedBox(height: 6),
-              _buildProfileDetails(profileData),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildActionButton("Profile", Colors.blue, () {
-                    openUrl("https://digitallami.com/profile.php?id=${profileData['id']}");
-                  }),
-                  _buildActionButton("Chat", Colors.green, () {
-                    setState(() {
-                      Provider.of<ChatProvider>(context, listen: false)
-                          .updateName("${profileData['last']}  ${profileData['first']}");
-                      Provider.of<ChatProvider>(context, listen: false)
-                          .updateidd(profileData['id']);
-                    });
-                  }),
-                ],
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       );
     }
@@ -1128,45 +1349,28 @@ class _ChatWindowState extends State<ChatWindow> {
     );
   }
 
-  Widget _buildProfileDetails(Map<String, dynamic> profileData) {
-    return Column(
-      children: [
-        _buildProfileDetail('MemberID', profileData['Member ID']),
-        _buildProfileDetail('Gender', profileData['gender']),
-        _buildProfileDetail('Occupation', profileData['occupation']),
-        _buildProfileDetail('Education', profileData['education']),
-        _buildProfileDetail('Marit', profileData['marit']),
-        _buildProfileDetail('Age', profileData['age']?.toString()),
-        _buildProfileDetail('id', profileData['id']?.toString()),
-      ],
-    );
-  }
-
-  Widget _buildProfileDetail(String label, String? value) {
+  Widget _buildInfoRow(IconData icon, String label, String? value, Color labelColor, Color valueColor) {
+    if (value == null || value.isEmpty || value == 'null') return const SizedBox.shrink();
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 0.5),
+      padding: const EdgeInsets.symmetric(vertical: 2.5),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
-            margin: EdgeInsets.only(left: 40),
-            width: 80,
-            alignment: Alignment.centerLeft,
+          Icon(icon, size: 11, color: labelColor),
+          const SizedBox(width: 5),
+          SizedBox(
+            width: 58,
             child: Text(
-              "$label:",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 10, color: Colors.black),
-              textAlign: TextAlign.left,
+              label,
+              style: TextStyle(fontSize: 9.5, color: labelColor, fontWeight: FontWeight.w500),
             ),
           ),
-          SizedBox(width: 8),
-          Container(
-            width: 100,
-            alignment: Alignment.centerLeft,
+          Expanded(
             child: Text(
-              value ?? 'Unknown',
-              style: TextStyle(fontSize: 10, color: Colors.black, fontWeight: FontWeight.bold),
-              textAlign: TextAlign.left,
+              value,
+              style: TextStyle(fontSize: 9.5, color: valueColor, fontWeight: FontWeight.w600),
               overflow: TextOverflow.ellipsis,
+              maxLines: 1,
             ),
           ),
         ],
