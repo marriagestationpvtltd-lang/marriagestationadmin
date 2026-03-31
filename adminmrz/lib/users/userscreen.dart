@@ -9,7 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'model/usermodel.dart';
 
-// Stat card config (soft colours, no heavy gradients)
+// Stat chip config
 class _StatConfig {
   final String label;
   final IconData icon;
@@ -42,6 +42,20 @@ class _UsersPageState extends State<UsersPage>
     _StatConfig('Paid',     Icons.workspace_premium_rounded, Color(0xFF9333EA), Color(0xFFFAF5FF), 'paid'),
     _StatConfig('Online',   Icons.circle,                    Color(0xFF0EA5E9), Color(0xFFF0F9FF), 'online'),
   ];
+
+  // Column label style
+  static const TextStyle _colHeader = TextStyle(
+    fontSize: 10, fontWeight: FontWeight.w700,
+    color: AppTheme.textMuted, letterSpacing: 0.7,
+  );
+
+  // Column flex values — shared by header and data rows to keep alignment
+  static const int _flexMember     = 5;
+  static const int _flexStatus     = 2;
+  static const int _flexPlan       = 2;
+  static const int _flexGender     = 2;
+  static const int _flexLastActive = 3;
+  static const double _actionsWidth = 100;
 
   @override
   void initState() {
@@ -196,57 +210,245 @@ class _UsersPageState extends State<UsersPage>
     ));
   }
 
-  static const Duration _transitionDuration = Duration(milliseconds: 200);
-
-  Widget _buildHeader(UserProvider provider) {
-    final hasSelection = provider.selectedCount > 0;
-    return AnimatedContainer(
-      duration: _transitionDuration,
-      color: hasSelection ? AppTheme.primary : Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 10, 10, 10),
-      child: hasSelection ? _buildBulkActionRow(provider) : _buildTitleRow(provider),
-    );
+  // ── Stat counts helper ───────────────────────────────────────────────────────
+  List<int> _statCounts(UserProvider provider) {
+    final statusStats = provider.getStatusStats();
+    final typeStats = provider.getUserTypeStats();
+    final onlineCount = provider.allUsers.where((u) => u.isOnline == 1).length;
+    final verifiedCount = provider.allUsers.where((u) => u.isVerified == 1).length;
+    return [
+      provider.totalCount, verifiedCount,
+      statusStats['pending'] ?? 0, statusStats['approved'] ?? 0,
+      typeStats['paid'] ?? 0, onlineCount,
+    ];
   }
 
-  Widget _buildTitleRow(UserProvider provider) {
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Manage Members',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppTheme.textPrimary, letterSpacing: -0.3),
-              ),
-              const SizedBox(height: 2),
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
-                    decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.1), borderRadius: AppTheme.radiusSm),
-                    child: Text('${provider.totalCount} total',
-                        style: const TextStyle(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.w600)),
-                  ),
-                  const SizedBox(width: 6),
-                  const Text('Marriage Station', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-                ],
-              ),
-            ],
-          ),
-        ),
-        Tooltip(
-          message: 'Refresh',
-          child: InkWell(
-            onTap: () => provider.fetchUsers(forceRefresh: true),
-            borderRadius: AppTheme.radiusSm,
-            child: const Padding(
-              padding: EdgeInsets.all(8),
-              child: Icon(Icons.refresh_rounded, color: AppTheme.textSecondary, size: 20),
+  // ── TOP BAR: title row + stat chips + search/filter toolbar ─────────────────
+  Widget _buildTopBar(UserProvider provider) {
+    final counts = _statCounts(provider);
+    final hasSelection = provider.selectedCount > 0;
+    final hasFilters = provider.statusFilter != 'all' ||
+        provider.userTypeFilter != 'all' ||
+        provider.genderFilter != 'all' ||
+        provider.searchQuery.isNotEmpty;
+
+    return Container(
+      color: Colors.white,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ── Title / Bulk-action row ──────────────────────────────────────
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
+            color: hasSelection ? AppTheme.primary : Colors.white,
+            padding: const EdgeInsets.fromLTRB(14, 10, 10, 8),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 200),
+              child: hasSelection
+                  ? _buildBulkActionRow(provider)
+                  : Row(
+                      key: const ValueKey('title'),
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(7),
+                          decoration: BoxDecoration(
+                            gradient: AppTheme.primaryGradient,
+                            borderRadius: AppTheme.radiusSm,
+                          ),
+                          child: const Icon(Icons.people_alt_rounded, color: Colors.white, size: 16),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Text('Member Management',
+                                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800,
+                                      color: AppTheme.textPrimary, letterSpacing: -0.3)),
+                              Text('${provider.totalCount} members · Marriage Station',
+                                  style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                            ],
+                          ),
+                        ),
+                        Tooltip(
+                          message: 'Refresh',
+                          child: InkWell(
+                            onTap: () => provider.fetchUsers(forceRefresh: true),
+                            borderRadius: AppTheme.radiusSm,
+                            child: const Padding(
+                              padding: EdgeInsets.all(8),
+                              child: Icon(Icons.refresh_rounded, color: AppTheme.textSecondary, size: 18),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
             ),
           ),
-        ),
-      ],
+
+          // ── Stat chips (horizontal scroll) ──────────────────────────────
+          SizedBox(
+            height: 36,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 4),
+              itemCount: _statCards.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 6),
+              itemBuilder: (_, i) {
+                final cfg = _statCards[i];
+                final isActive = provider.statFilter == cfg.key;
+                return GestureDetector(
+                  onTap: () => provider.setStatFilter(cfg.key),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: isActive ? cfg.color : cfg.bg,
+                      borderRadius: AppTheme.radiusSm,
+                      border: Border.all(
+                        color: isActive ? cfg.color : cfg.color.withOpacity(0.25),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(cfg.icon, size: 11, color: isActive ? Colors.white : cfg.color),
+                        const SizedBox(width: 5),
+                        Text('${counts[i]}',
+                            style: TextStyle(
+                                fontSize: 12, fontWeight: FontWeight.w800,
+                                color: isActive ? Colors.white : cfg.color)),
+                        const SizedBox(width: 3),
+                        Text(cfg.label,
+                            style: TextStyle(
+                                fontSize: 11, fontWeight: FontWeight.w500,
+                                color: isActive
+                                    ? Colors.white.withOpacity(0.88)
+                                    : cfg.color.withOpacity(0.72))),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // ── Search + filters toolbar (single row) ───────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 6, 12, 8),
+            child: Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    style: const TextStyle(fontSize: 12, color: AppTheme.textPrimary),
+                    decoration: InputDecoration(
+                      hintText: 'Search name, email or ID\u2026',
+                      hintStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                      prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.primary, size: 16),
+                      filled: true,
+                      fillColor: AppTheme.scaffoldBg,
+                      isDense: true,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 9, horizontal: 10),
+                      border: OutlineInputBorder(borderRadius: AppTheme.radiusSm, borderSide: const BorderSide(color: AppTheme.border)),
+                      enabledBorder: OutlineInputBorder(borderRadius: AppTheme.radiusSm, borderSide: const BorderSide(color: AppTheme.border)),
+                      focusedBorder: OutlineInputBorder(borderRadius: AppTheme.radiusSm, borderSide: const BorderSide(color: AppTheme.primary, width: 1.5)),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.close_rounded, size: 14, color: AppTheme.textMuted),
+                              onPressed: () {
+                                _searchController.clear();
+                                provider.setSearchQuery('');
+                                setState(() {});
+                              },
+                            )
+                          : null,
+                    ),
+                    onChanged: (v) { provider.setSearchQuery(v); setState(() {}); },
+                  ),
+                ),
+                const SizedBox(width: 6),
+                _compactDropdown<String>(
+                  value: provider.statusFilter,
+                  items: const {'all': 'All Status', 'approved': 'Approved', 'pending': 'Pending', 'rejected': 'Rejected', 'not_uploaded': 'Not Uploaded'},
+                  onChanged: provider.setStatusFilter,
+                ),
+                const SizedBox(width: 6),
+                _compactDropdown<String>(
+                  value: provider.userTypeFilter,
+                  items: const {'all': 'All Plans', 'paid': 'Paid', 'free': 'Free'},
+                  onChanged: provider.setUserTypeFilter,
+                ),
+                const SizedBox(width: 6),
+                _compactDropdown<String>(
+                  value: provider.genderFilter,
+                  items: const {'all': 'All Gender', 'Male': 'Male', 'Female': 'Female'},
+                  onChanged: provider.setGenderFilter,
+                ),
+                if (hasFilters) ...[
+                  const SizedBox(width: 6),
+                  Tooltip(
+                    message: 'Clear all filters',
+                    child: InkWell(
+                      onTap: () {
+                        provider.clearFilters();
+                        _searchController.clear();
+                        setState(() {});
+                      },
+                      borderRadius: AppTheme.radiusSm,
+                      child: Container(
+                        padding: const EdgeInsets.all(7),
+                        decoration: BoxDecoration(
+                          color: AppTheme.errorLight,
+                          borderRadius: AppTheme.radiusSm,
+                          border: Border.all(color: AppTheme.error.withOpacity(0.2)),
+                        ),
+                        child: const Icon(Icons.filter_alt_off_rounded, size: 15, color: AppTheme.error),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          ),
+
+          // ── Table column headers ─────────────────────────────────────────
+          Container(
+            color: AppTheme.scaffoldBg,
+            padding: const EdgeInsets.fromLTRB(14, 7, 14, 7),
+            child: Row(
+              children: [
+                // Select-all checkbox (tristate: null = indeterminate)
+                SizedBox(
+                  width: 20, height: 20,
+                  child: Checkbox(
+                    tristate: true,
+                    value: provider.filteredUsers.isEmpty || provider.selectedCount == 0
+                        ? false
+                        : provider.areAllFilteredSelected
+                            ? true
+                            : null,
+                    onChanged: provider.filteredUsers.isEmpty ? null : (_) => provider.selectAllUsers(),
+                    activeColor: AppTheme.primary,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                    side: const BorderSide(color: AppTheme.textMuted, width: 1.5),
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                ),
+                const SizedBox(width: 52), // checkbox gap + avatar
+                const Expanded(flex: _flexMember,     child: Text('MEMBER',      style: _colHeader)),
+                const Expanded(flex: _flexStatus,     child: Text('STATUS',      style: _colHeader)),
+                const Expanded(flex: _flexPlan,       child: Text('PLAN',        style: _colHeader)),
+                const Expanded(flex: _flexGender,     child: Text('GENDER',      style: _colHeader)),
+                const Expanded(flex: _flexLastActive, child: Text('LAST ACTIVE', style: _colHeader)),
+                SizedBox(width: _actionsWidth, child: const Text('ACTIONS', style: _colHeader, textAlign: TextAlign.center)),
+              ],
+            ),
+          ),
+
+          const Divider(height: 1, color: AppTheme.border),
+        ],
+      ),
     );
   }
 
@@ -277,164 +479,6 @@ class _UsersPageState extends State<UsersPage>
     );
   }
 
-  Widget _buildStatCards(UserProvider provider) {
-    final statusStats = provider.getStatusStats();
-    final typeStats = provider.getUserTypeStats();
-    final onlineCount = provider.allUsers.where((u) => u.isOnline == 1).length;
-    final verifiedCount = provider.allUsers.where((u) => u.isVerified == 1).length;
-    final counts = [
-      provider.totalCount, verifiedCount,
-      statusStats['pending'] ?? 0, statusStats['approved'] ?? 0,
-      typeStats['paid'] ?? 0, onlineCount,
-    ];
-    return Container(
-      color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: List.generate(_statCards.length, (i) {
-            final cfg = _statCards[i];
-            final isActive = provider.statFilter == cfg.key;
-            return Padding(
-              padding: EdgeInsets.only(right: i < _statCards.length - 1 ? 8 : 0),
-              child: _buildStatCard(cfg, counts[i], isActive, provider),
-            );
-          }),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatCard(_StatConfig cfg, int count, bool isActive, UserProvider provider) {
-    return GestureDetector(
-      onTap: () => provider.setStatFilter(cfg.key),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: isActive ? cfg.color : Colors.white,
-          borderRadius: AppTheme.radiusMd,
-          border: Border.all(color: isActive ? cfg.color : AppTheme.border, width: isActive ? 1.5 : 1),
-          boxShadow: isActive
-              ? [BoxShadow(color: cfg.color.withOpacity(0.22), blurRadius: 8, offset: const Offset(0, 2))]
-              : [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, offset: const Offset(0, 1))],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: isActive ? Colors.white.withOpacity(0.25) : cfg.bg,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(cfg.icon, size: 14, color: isActive ? Colors.white : cfg.color),
-            ),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(count.toString(),
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
-                        color: isActive ? Colors.white : AppTheme.textPrimary, height: 1.1)),
-                Text(cfg.label,
-                    style: TextStyle(fontSize: 11,
-                        color: isActive ? Colors.white.withOpacity(0.85) : AppTheme.textMuted,
-                        fontWeight: FontWeight.w500)),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSearchFilterBar(UserProvider provider) {
-    final hasFilters = provider.statusFilter != 'all' || provider.userTypeFilter != 'all' || provider.genderFilter != 'all';
-    return Container(
-      color: AppTheme.scaffoldBg,
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _searchController,
-                  style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary),
-                  decoration: InputDecoration(
-                    hintText: 'Search name, email or ID\u2026',
-                    hintStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
-                    prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.primary, size: 18),
-                    filled: true,
-                    fillColor: Colors.white,
-                    isDense: true,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
-                    border: OutlineInputBorder(borderRadius: AppTheme.radiusMd, borderSide: const BorderSide(color: AppTheme.border)),
-                    enabledBorder: OutlineInputBorder(borderRadius: AppTheme.radiusMd, borderSide: const BorderSide(color: AppTheme.border)),
-                    focusedBorder: OutlineInputBorder(borderRadius: AppTheme.radiusMd, borderSide: const BorderSide(color: AppTheme.primary, width: 1.5)),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.close_rounded, size: 15, color: AppTheme.textMuted),
-                            onPressed: () { _searchController.clear(); provider.setSearchQuery(''); setState(() {}); },
-                          )
-                        : null,
-                  ),
-                  onChanged: (v) { provider.setSearchQuery(v); setState(() {}); },
-                ),
-              ),
-              if (hasFilters) ...[
-                const SizedBox(width: 8),
-                Tooltip(
-                  message: 'Clear all filters',
-                  child: GestureDetector(
-                    onTap: () { provider.clearFilters(); _searchController.clear(); setState(() {}); },
-                    child: Container(
-                      padding: const EdgeInsets.all(9),
-                      decoration: BoxDecoration(
-                        color: AppTheme.errorLight,
-                        borderRadius: AppTheme.radiusSm,
-                        border: Border.all(color: AppTheme.error.withOpacity(0.2)),
-                      ),
-                      child: const Icon(Icons.filter_alt_off_rounded, size: 17, color: AppTheme.error),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 7),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _compactDropdown<String>(
-                  value: provider.statusFilter,
-                  items: const {'all': 'All Status', 'approved': 'Approved', 'pending': 'Pending', 'rejected': 'Rejected', 'not_uploaded': 'Not Uploaded'},
-                  onChanged: provider.setStatusFilter,
-                ),
-                const SizedBox(width: 8),
-                _compactDropdown<String>(
-                  value: provider.userTypeFilter,
-                  items: const {'all': 'All Plans', 'paid': 'Paid', 'free': 'Free'},
-                  onChanged: provider.setUserTypeFilter,
-                ),
-                const SizedBox(width: 8),
-                _compactDropdown<String>(
-                  value: provider.genderFilter,
-                  items: const {'all': 'All Gender', 'Male': 'Male', 'Female': 'Female'},
-                  onChanged: provider.setGenderFilter,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _compactDropdown<T>({required T value, required Map<T, String> items, required ValueChanged<T> onChanged}) {
     return Container(
       height: 34,
@@ -453,60 +497,24 @@ class _UsersPageState extends State<UsersPage>
     );
   }
 
-  Widget _buildSelectAllRow(UserProvider provider) {
-    if (provider.filteredUsers.isEmpty) return const SizedBox.shrink();
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 4, 12, 2),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: AppTheme.radiusSm, border: Border.all(color: AppTheme.borderLight)),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 20, height: 20,
-            child: Checkbox(
-              value: provider.areAllFilteredSelected,
-              onChanged: (_) => provider.selectAllUsers(),
-              activeColor: AppTheme.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-              side: const BorderSide(color: AppTheme.textMuted),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(provider.areAllFilteredSelected ? 'Deselect All' : 'Select All',
-              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
-          const SizedBox(width: 5),
-          Text('(${provider.filteredCount})', style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
-          const Spacer(),
-          if (provider.selectedCount > 0)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-              decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.1), borderRadius: AppTheme.radiusSm),
-              child: Text('${provider.selectedCount} selected',
-                  style: const TextStyle(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.w700)),
-            ),
-        ],
-      ),
-    );
-  }
-
+  // ── Table data row ───────────────────────────────────────────────────────────
   Widget _buildMemberRow(User user, UserProvider provider) {
     final isSelected = provider.isUserSelected(user.id);
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       decoration: BoxDecoration(
         color: isSelected ? AppTheme.primary.withOpacity(0.04) : Colors.white,
-        borderRadius: AppTheme.radiusMd,
+        borderRadius: AppTheme.radiusSm,
         border: Border.all(
-          color: isSelected ? AppTheme.primary.withOpacity(0.3) : AppTheme.borderLight,
+          color: isSelected ? AppTheme.primary.withOpacity(0.28) : AppTheme.borderLight,
           width: isSelected ? 1.5 : 1,
         ),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 4, offset: const Offset(0, 1))],
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
         child: Row(
           children: [
+            // ── Checkbox ──────────────────────────────────────────────────
             SizedBox(
               width: 20, height: 20,
               child: Checkbox(
@@ -519,13 +527,15 @@ class _UsersPageState extends State<UsersPage>
               ),
             ),
             const SizedBox(width: 8),
+
+            // ── Avatar ────────────────────────────────────────────────────
             GestureDetector(
               onTap: () => _openPreview(user),
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
                   Container(
-                    width: 38, height: 38,
+                    width: 36, height: 36,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: user.hasProfilePicture ? null : AppTheme.primaryGradient,
@@ -550,80 +560,111 @@ class _UsersPageState extends State<UsersPage>
                 ],
               ),
             ),
-            const SizedBox(width: 10),
+            const SizedBox(width: 8),
+
+            // ── Member (name + email) ──────────────────────────────────────
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Flexible(
-                        child: Text(user.fullName,
-                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
-                            maxLines: 1, overflow: TextOverflow.ellipsis),
-                      ),
-                      if (user.isVerified == 1) ...[
-                        const SizedBox(width: 3),
-                        const Tooltip(message: 'Verified',
-                            child: Icon(Icons.verified_rounded, size: 12, color: AppTheme.info)),
+              flex: _flexMember,
+              child: GestureDetector(
+                onTap: () => _openPreview(user),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Flexible(
+                          child: Text(user.fullName,
+                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                              maxLines: 1, overflow: TextOverflow.ellipsis),
+                        ),
+                        if (user.isVerified == 1) ...[
+                          const SizedBox(width: 3),
+                          const Tooltip(message: 'Verified',
+                              child: Icon(Icons.verified_rounded, size: 12, color: AppTheme.info)),
+                        ],
+                        const SizedBox(width: 4),
+                        Text('#${user.id}',
+                            style: const TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.w500)),
                       ],
-                      const SizedBox(width: 4),
-                      Text('#${user.id}',
-                          style: const TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.w500)),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Wrap(
-                    spacing: 4, runSpacing: 3,
-                    children: [
-                      _statusBadge(user.formattedStatus, user.status),
-                      _typeBadge(user.usertype),
-                      if (user.gender.isNotEmpty) _genderBadge(user.gender),
-                    ],
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      const Icon(Icons.access_time_rounded, size: 10, color: AppTheme.textMuted),
-                      const SizedBox(width: 3),
-                      Text(_formatLastLogin(user.lastLogin),
-                          style: const TextStyle(fontSize: 10, color: AppTheme.textMuted)),
-                    ],
+                    ),
+                    const SizedBox(height: 2),
+                    Text(user.email,
+                        style: const TextStyle(fontSize: 10, color: AppTheme.textMuted),
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                  ],
+                ),
+              ),
+            ),
+
+            // ── Status ────────────────────────────────────────────────────
+            Expanded(
+              flex: _flexStatus,
+              child: _statusBadge(user.formattedStatus, user.status),
+            ),
+
+            // ── Plan ──────────────────────────────────────────────────────
+            Expanded(
+              flex: _flexPlan,
+              child: _typeBadge(user.usertype),
+            ),
+
+            // ── Gender ────────────────────────────────────────────────────
+            Expanded(
+              flex: _flexGender,
+              child: _genderBadge(user.gender),
+            ),
+
+            // ── Last Active ───────────────────────────────────────────────
+            Expanded(
+              flex: _flexLastActive,
+              child: Row(
+                children: [
+                  const Icon(Icons.access_time_rounded, size: 11, color: AppTheme.textMuted),
+                  const SizedBox(width: 4),
+                  Flexible(
+                    child: Text(_formatLastLogin(user.lastLogin),
+                        style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
                   ),
                 ],
               ),
             ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _iconBtn(Icons.visibility_rounded, AppTheme.info, 'View Profile', () => _openPreview(user)),
-                if (user.isPending) ...[
-                  const SizedBox(width: 2),
-                  _iconBtn(Icons.check_rounded, AppTheme.success, 'Approve', () => _approveUserDocument(user)),
-                  const SizedBox(width: 2),
-                  _iconBtn(Icons.close_rounded, AppTheme.error, 'Reject', () => _rejectUserDocument(user)),
-                ],
-                const SizedBox(width: 2),
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert_rounded, size: 17, color: AppTheme.textSecondary),
-                  shape: RoundedRectangleBorder(borderRadius: AppTheme.radiusMd),
-                  offset: const Offset(0, 28),
-                  tooltip: 'More options',
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  itemBuilder: (_) => [
-                    _popupItem('view', Icons.person_rounded, 'View Full Profile', AppTheme.primary),
-                    _popupItem('email', Icons.email_outlined, 'Send Email', AppTheme.warning),
-                    const PopupMenuDivider(),
-                    _popupItem('block', Icons.block_rounded, 'Block Member', AppTheme.error),
+
+            // ── Actions ───────────────────────────────────────────────────
+            SizedBox(
+              width: _actionsWidth,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _iconBtn(Icons.visibility_rounded, AppTheme.info, 'View Profile', () => _openPreview(user)),
+                  if (user.isPending) ...[
+                    const SizedBox(width: 2),
+                    _iconBtn(Icons.check_rounded, AppTheme.success, 'Approve', () => _approveUserDocument(user)),
+                    const SizedBox(width: 2),
+                    _iconBtn(Icons.close_rounded, AppTheme.error, 'Reject', () => _rejectUserDocument(user)),
                   ],
-                  onSelected: (v) {
-                    if (v == 'view') _navigateToUserDetails(user);
-                    if (v == 'email') _sendEmail(user.email);
-                    if (v == 'block') _blockUser(user);
-                  },
-                ),
-              ],
+                  const SizedBox(width: 2),
+                  PopupMenuButton<String>(
+                    icon: const Icon(Icons.more_vert_rounded, size: 16, color: AppTheme.textSecondary),
+                    shape: RoundedRectangleBorder(borderRadius: AppTheme.radiusMd),
+                    offset: const Offset(0, 28),
+                    tooltip: 'More options',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    itemBuilder: (_) => [
+                      _popupItem('view', Icons.person_rounded, 'View Full Profile', AppTheme.primary),
+                      _popupItem('email', Icons.email_outlined, 'Send Email', AppTheme.warning),
+                      const PopupMenuDivider(),
+                      _popupItem('block', Icons.block_rounded, 'Block Member', AppTheme.error),
+                    ],
+                    onSelected: (v) {
+                      if (v == 'view') _navigateToUserDetails(user);
+                      if (v == 'email') _sendEmail(user.email);
+                      if (v == 'block') _blockUser(user);
+                    },
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -1004,9 +1045,7 @@ class _UsersPageState extends State<UsersPage>
       children: [
         Column(
           children: [
-            _buildHeader(provider),
-            _buildStatCards(provider),
-            _buildSearchFilterBar(provider),
+            _buildTopBar(provider),
             Expanded(
               child: provider.isLoading
                   ? const Center(
@@ -1031,7 +1070,6 @@ class _UsersPageState extends State<UsersPage>
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _buildSelectAllRow(provider),
                             if (provider.filteredUsers.isEmpty)
                               _buildEmptyState(provider)
                             else
