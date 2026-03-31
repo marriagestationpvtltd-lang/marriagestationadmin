@@ -18,67 +18,62 @@ class UserService {
     };
   }
 
-  Future<UserListResponse> getUsers() async {
-    try {
-      final response = await http
-          .get(
-            Uri.parse('$baseUrl/get_users.php'),
-            headers: await _authHeaders(),
-          )
-          .timeout(AppConstants.requestTimeout);
+  Future<UserListResponse> getUsers({int startIndex = 0, int fetchRecord = 50, String searchString = ''}) async {
+    final response = await http
+        .post(
+          Uri.parse('$baseUrl/admin/appUsers/getAppUsers'),
+          headers: await _authHeaders(),
+          body: json.encode({
+            'startIndex': startIndex,
+            'fetchRecord': fetchRecord,
+            'searchString': searchString,
+          }),
+        )
+        .timeout(AppConstants.requestTimeout);
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return UserListResponse.fromJson(data);
-      } else {
-        throw Exception('Failed to load users: ${response.statusCode}');
-      }
-    } catch (e) {
-      rethrow;
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return UserListResponse.fromJson(data);
+    } else {
+      throw Exception('Failed to load users: ${response.statusCode}');
     }
   }
 
-  /// Suspend the users identified by [userIds].
   Future<bool> suspendUsers(List<int> userIds) async {
-    try {
+    final headers = await _authHeaders();
+    final results = await Future.wait(userIds.map((userId) async {
       final response = await http
           .post(
-            Uri.parse('$baseUrl/suspend_users.php'),
-            headers: await _authHeaders(),
-            body: json.encode({'user_ids': userIds}),
+            Uri.parse('$baseUrl/admin/users/activeInactiveUsers'),
+            headers: headers,
+            body: json.encode({'id': userId}),
           )
           .timeout(AppConstants.requestTimeout);
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return data['success'] == true;
-      } else {
-        throw Exception('Failed to suspend users: ${response.statusCode}');
+        return data['status'] == 200;
       }
-    } catch (e) {
-      rethrow;
-    }
+      return false;
+    }));
+    return results.every((r) => r);
   }
 
-  /// Permanently delete the users identified by [userIds].
   Future<bool> deleteUsers(List<int> userIds) async {
-    try {
+    final headers = await _authHeaders();
+    final results = await Future.wait(userIds.map((userId) async {
       final response = await http
           .post(
-            Uri.parse('$baseUrl/delete_users.php'),
-            headers: await _authHeaders(),
-            body: json.encode({'user_ids': userIds}),
+            Uri.parse('$baseUrl/admin/users/deleteUser'),
+            headers: headers,
+            body: json.encode({'id': userId}),
           )
           .timeout(AppConstants.requestTimeout);
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return data['success'] == true;
-      } else {
-        throw Exception('Failed to delete users: ${response.statusCode}');
+        return data['status'] == 200;
       }
-    } catch (e) {
-      rethrow;
-    }
+      return false;
+    }));
+    return results.every((r) => r);
   }
 }

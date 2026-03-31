@@ -8,33 +8,28 @@ class DashboardService {
   static const String _baseUrl = AppConstants.apiBaseUrl;
 
   Future<DashboardResponse> getDashboardData() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('token');
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
 
-      final headers = <String, String>{
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
-      if (token != null) {
-        headers['Authorization'] = 'Bearer $token';
-      }
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
 
-      final response = await http
-          .get(
-            Uri.parse('$_baseUrl/get_dashboard.php'),
-            headers: headers,
-          )
-          .timeout(AppConstants.requestTimeout);
+    final response = await http
+        .post(
+          Uri.parse('$_baseUrl/admin/dashboard/getDashboardData'),
+          headers: headers,
+          body: json.encode({}),
+        )
+        .timeout(AppConstants.requestTimeout);
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        return DashboardResponse.fromJson(data);
-      } else {
-        throw Exception('Failed to load dashboard data: ${response.statusCode}');
-      }
-    } catch (e) {
-      rethrow;
+    if (response.statusCode == 200) {
+      final data = json.decode(response.body);
+      return DashboardResponse.fromJson(data);
+    } else {
+      throw Exception('Failed to load dashboard data: ${response.statusCode}');
     }
   }
 }

@@ -8,8 +8,10 @@ import '../adminchat/left.dart';
 import '../adminchat/loading.dart';
 import '../dashboard/dashboardhome.dart';
 import '../document/screens/docscreen.dart';
+import '../masterdata/masterdata_screen.dart';
 import '../package/packageScreen.dart';
 import '../payment/paymentscreen.dart';
+import '../reports/reports_screen.dart';
 import '../users/userscreen.dart';
 
 class DashboardPage extends StatefulWidget {
@@ -32,6 +34,8 @@ class _DashboardPageState extends State<DashboardPage> {
     const PackagesPage(),
     const PaymentsPage(),
     Loading(),
+    const MasterDataScreen(),
+    const ReportsScreen(),
   ];
 
   final List<String> _pageTitles = [
@@ -41,6 +45,8 @@ class _DashboardPageState extends State<DashboardPage> {
     'Packages',
     'Payments',
     'Chat',
+    'Master Data',
+    'Reports',
   ];
 
   final List<String> _pageSubtitles = [
@@ -50,6 +56,8 @@ class _DashboardPageState extends State<DashboardPage> {
     'Subscription Packages',
     'Payment History',
     'Support Chat',
+    'Manage Lookup Values',
+    'Analytics & Reports',
   ];
 
   final List<IconData> _navIcons = [
@@ -59,6 +67,8 @@ class _DashboardPageState extends State<DashboardPage> {
     Icons.card_membership_outlined,
     Icons.receipt_long_outlined,
     Icons.chat_bubble_outline,
+    Icons.list_alt_outlined,
+    Icons.bar_chart_outlined,
   ];
 
   final List<IconData> _navIconsFilled = [
@@ -68,6 +78,8 @@ class _DashboardPageState extends State<DashboardPage> {
     Icons.card_membership,
     Icons.receipt_long,
     Icons.chat_bubble,
+    Icons.list_alt,
+    Icons.bar_chart,
   ];
 
   void _onItemTapped(int index) {

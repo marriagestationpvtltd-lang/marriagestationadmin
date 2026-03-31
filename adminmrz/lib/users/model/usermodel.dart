@@ -1,21 +1,23 @@
 import 'package:flutter/material.dart';
 
 class UserListResponse {
-  bool success;
-  int count;
-  List<User> data;
+  final bool success;
+  final int totalRecords;
+  final List<User> data;
 
   UserListResponse({
     required this.success,
-    required this.count,
+    required this.totalRecords,
     required this.data,
   });
 
   factory UserListResponse.fromJson(Map<String, dynamic> json) {
+    final status = json['status'];
+    final success = status == 200 || status?.toString() == '200';
     return UserListResponse(
-      success: json['success'] ?? false,
-      count: json['count'] ?? 0,
-      data: List<User>.from((json['data'] ?? []).map((x) => User.fromJson(x))),
+      success: success,
+      totalRecords: json['totalRecords'] is int ? json['totalRecords'] : int.tryParse(json['totalRecords']?.toString() ?? '') ?? 0,
+      data: List<User>.from((json['recordList'] ?? []).map((x) => User.fromJson(x))),
     );
   }
 }
@@ -23,77 +25,74 @@ class UserListResponse {
 class User {
   int id;
   String firstName;
+  String? middleName;
   String lastName;
   String email;
-  int isVerified;
-  String status;
-  String privacy;
-  String usertype;
-  String lastLogin;
-  String? profilePicture;
-  int isOnline;
-  int isActive;
-  int? pageno;
+  String? contactNo;
   String gender;
+  int isDisable;
+  int? isVerified;
+  int isActive;
+  int isDelete;
+  String? createdDate;
+  int? roleId;
 
   User({
     required this.id,
     required this.firstName,
+    this.middleName,
     required this.lastName,
     required this.email,
-    required this.isVerified,
-    required this.status,
-    required this.privacy,
-    required this.usertype,
-    required this.lastLogin,
-    this.profilePicture,
-    required this.isOnline,
-    required this.isActive,
-    this.pageno,
+    this.contactNo,
     required this.gender,
+    required this.isDisable,
+    this.isVerified,
+    required this.isActive,
+    required this.isDelete,
+    this.createdDate,
+    this.roleId,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
     return User(
-      id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()) ?? 0,
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '') ?? 0,
       firstName: json['firstName']?.toString() ?? '',
+      middleName: json['middleName']?.toString(),
       lastName: json['lastName']?.toString() ?? '',
       email: json['email']?.toString() ?? '',
-      isVerified: json['isVerified'] is int ? json['isVerified'] : 0,
-      status: json['status']?.toString() ?? 'pending',
-      privacy: json['privacy']?.toString() ?? 'private',
-      usertype: json['usertype']?.toString() ?? 'free',
-      lastLogin: json['lastLogin']?.toString() ?? '',
-      profilePicture: json['profile_picture']?.toString(),
-      isOnline: json['isOnline'] is int ? json['isOnline'] : 0,
-      isActive: json['isActive'] is int ? json['isActive'] : 1,
-      pageno: json['pageno'] is int ? json['pageno'] : null,
-      gender: json['gender']?.toString() ?? 'Male',
+      contactNo: json['contactNo']?.toString(),
+      gender: json['gender']?.toString() ?? '',
+      isDisable: json['isDisable'] is int ? json['isDisable'] : int.tryParse(json['isDisable']?.toString() ?? '') ?? 0,
+      isVerified: json['isVerified'] is int ? json['isVerified'] : int.tryParse(json['isVerified']?.toString() ?? ''),
+      isActive: json['isActive'] is int ? json['isActive'] : int.tryParse(json['isActive']?.toString() ?? '') ?? 1,
+      isDelete: json['isDelete'] is int ? json['isDelete'] : int.tryParse(json['isDelete']?.toString() ?? '') ?? 0,
+      createdDate: json['createdDate']?.toString(),
+      roleId: json['roleId'] is int ? json['roleId'] : int.tryParse(json['roleId']?.toString() ?? ''),
     );
   }
 
-  String get fullName => '$firstName $lastName';
+  String get fullName {
+    final parts = [firstName, middleName, lastName]
+        .where((p) => p?.isNotEmpty ?? false)
+        .toList();
+    return parts.join(' ');
+  }
 
-  bool get hasProfilePicture => profilePicture != null && profilePicture!.isNotEmpty;
+  bool get hasProfilePicture => false;
 
-  bool get isPending => status.toLowerCase() == 'pending';
+  bool get isPending => isVerified == null;
 
   String get formattedStatus {
-    return status.replaceAll('_', ' ').toUpperCase();
+    if (isActive == 0) return 'INACTIVE';
+    if (isVerified == null) return 'PENDING';
+    if (isVerified == 1) return 'VERIFIED';
+    return 'ACTIVE';
   }
 
   Color get statusColor {
-    switch (status.toLowerCase()) {
-      case 'approved':
-        return Colors.green;
-      case 'pending':
-        return Colors.orange;
-      case 'rejected':
-        return Colors.red;
-      case 'not_uploaded':
-        return Colors.grey;
-      default:
-        return Colors.blue;
-    }
+    if (isActive == 0) return Colors.red;
+    if (isVerified == null) return Colors.orange;
+    if (isVerified == 1) return Colors.green;
+    return Colors.blue;
   }
 }
