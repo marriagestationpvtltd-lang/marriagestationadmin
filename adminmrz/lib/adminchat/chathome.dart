@@ -709,6 +709,12 @@ class _ChatWindowState extends State<ChatWindow> {
                   });
                 },
               ),
+              const SizedBox(width: 6),
+              _iconBtn(
+                icon: Icons.notifications_outlined,
+                iconColor: kMuted,
+                onTap: () {},
+              ),
             ],
           ),
         ),
