@@ -227,18 +227,7 @@ class _CallScreenState extends State<CallScreen> {
 
     if (!mounted) return;
 
-    // ✅ MAIN FIX (root navigator + microtask)
-    Future.microtask(() {
-      if (!mounted) return;
-
-      if (Navigator.of(context, rootNavigator: true).canPop()) {
-        Navigator.of(context, rootNavigator: true).pop(true);
-      } else {
-        // 🔥 FALLBACK (FOR WEB BUG)
-        Navigator.of(context, rootNavigator: true)
-            .pushNamedAndRemoveUntil('/', (route) => false);
-      }
-    });
+    _exit();
   }
 
   void _exit() {
