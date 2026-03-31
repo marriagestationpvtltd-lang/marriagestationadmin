@@ -4,6 +4,16 @@ import 'package:provider/provider.dart';
 
 import 'detailmodel.dart';
 
+// ─────────────────────────── colour palette ───────────────────────────────────
+const _kPrimary   = Color(0xFF1E40AF);
+const _kPersonal  = Color(0xFF1E40AF);
+const _kEducation = Color(0xFF065F46);
+const _kFamily    = Color(0xFF6D28D9);
+const _kLifestyle = Color(0xFFD97706);
+const _kPartner   = Color(0xFFBE185D);
+const _kPageBg    = Color(0xFFF1F5F9);
+
+// ──────────────────────────── Screen ─────────────────────────────────────────
 class UserDetailsScreen extends StatefulWidget {
   final int userId;
   final int myId;
@@ -19,257 +29,385 @@ class UserDetailsScreen extends StatefulWidget {
 }
 
 class _UserDetailsScreenState extends State<UserDetailsScreen> {
+  String? _editingKey;
+  final TextEditingController _editCtrl = TextEditingController();
+  bool _isSaving = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<UserDetailsProvider>().fetchUserDetails(
-        widget.userId,
-        widget.myId,
-      );
+      context
+          .read<UserDetailsProvider>()
+          .fetchUserDetails(widget.userId, widget.myId);
     });
   }
 
   @override
   void dispose() {
     context.read<UserDetailsProvider>().clearData();
+    _editCtrl.dispose();
     super.dispose();
   }
 
-  Widget _buildProfileHeader(PersonalDetail personal) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          bottom: BorderSide(color: Colors.blue.shade100, width: 1),
+  // ── edit helpers ────────────────────────────────────────────────────────────
+
+  void _startEdit(String key, String currentValue) {
+    setState(() {
+      _editingKey = key;
+      _editCtrl.text =
+          (currentValue == 'Not available' || currentValue == 'null')
+              ? ''
+              : currentValue;
+    });
+  }
+
+  void _cancelEdit() {
+    setState(() {
+      _editingKey = null;
+      _editCtrl.clear();
+    });
+  }
+
+  Future<void> _saveEdit(String key, String section, String apiField) async {
+    final newValue = _editCtrl.text.trim();
+    setState(() => _isSaving = true);
+
+    final ok = await context.read<UserDetailsProvider>().updateField(
+          section: section,
+          field: apiField,
+          value: newValue,
+        );
+
+    setState(() {
+      _isSaving = false;
+      _editingKey = null;
+    });
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+              ok ? 'Updated successfully' : 'Update failed — please try again'),
+          backgroundColor:
+              ok ? Colors.green.shade700 : Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          margin: const EdgeInsets.all(16),
+          duration: const Duration(seconds: 3),
         ),
+      );
+    }
+  }
+
+  // ── reusable editable row ────────────────────────────────────────────────────
+
+  Widget _row(
+    String key,
+    String label,
+    String rawValue, {
+    required String section,
+    required String apiField,
+    IconData? icon,
+    bool highlight = false,
+  }) {
+    final displayValue =
+        (rawValue.isEmpty || rawValue == 'null') ? '—' : rawValue;
+    final isEditing = _editingKey == key;
+    final faded = displayValue == 'Not available' || displayValue == '—';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: Colors.grey.shade100)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          SizedBox(
+            width: 26,
+            child: icon != null
+                ? Icon(icon, size: 15, color: Colors.blueGrey.shade300)
+                : null,
+          ),
+          const SizedBox(width: 4),
+          SizedBox(
+            width: 170,
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 13,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: isEditing
+                ? Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 34,
+                          child: TextField(
+                            controller: _editCtrl,
+                            autofocus: true,
+                            onSubmitted: (_) =>
+                                _saveEdit(key, section, apiField),
+                            decoration: InputDecoration(
+                              contentPadding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 7),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                borderSide: BorderSide(
+                                    color: _kPrimary.withOpacity(0.4)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(6),
+                                borderSide: const BorderSide(
+                                    color: _kPrimary, width: 1.5),
+                              ),
+                              isDense: true,
+                            ),
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      _btn(
+                        'Save',
+                        bg: _kPrimary,
+                        fg: Colors.white,
+                        loading: _isSaving,
+                        onPressed: _isSaving
+                            ? null
+                            : () => _saveEdit(key, section, apiField),
+                      ),
+                      const SizedBox(width: 4),
+                      _btn(
+                        'Cancel',
+                        bg: Colors.white,
+                        fg: Colors.grey.shade700,
+                        border: Colors.grey.shade300,
+                        onPressed: _isSaving ? null : _cancelEdit,
+                      ),
+                    ],
+                  )
+                : Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          displayValue,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: faded
+                                ? Colors.grey.shade400
+                                : highlight
+                                    ? _kPrimary
+                                    : Colors.grey.shade900,
+                            fontWeight: faded
+                                ? FontWeight.w400
+                                : highlight
+                                    ? FontWeight.w600
+                                    : FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      InkWell(
+                        onTap: () => _startEdit(key, rawValue),
+                        borderRadius: BorderRadius.circular(4),
+                        child: Padding(
+                          padding: const EdgeInsets.all(5),
+                          child: Icon(Icons.edit_outlined,
+                              size: 13, color: Colors.blueGrey.shade300),
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _btn(
+    String label, {
+    required Color bg,
+    required Color fg,
+    Color? border,
+    VoidCallback? onPressed,
+    bool loading = false,
+  }) =>
+      SizedBox(
+        height: 30,
+        child: ElevatedButton(
+          onPressed: onPressed,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: bg,
+            foregroundColor: fg,
+            elevation: 0,
+            shadowColor: Colors.transparent,
+            padding: const EdgeInsets.symmetric(horizontal: 10),
+            minimumSize: const Size(52, 30),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(6),
+              side: border != null ? BorderSide(color: border) : BorderSide.none,
+            ),
+          ),
+          child: loading
+              ? SizedBox(
+                  width: 12,
+                  height: 12,
+                  child: CircularProgressIndicator(strokeWidth: 2, color: fg),
+                )
+              : Text(label,
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600)),
+        ),
+      );
+
+  // ── section wrapper ──────────────────────────────────────────────────────────
+
+  Widget _section({
+    required String title,
+    required IconData icon,
+    required Color color,
+    required List<Widget> rows,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        border: Border(left: BorderSide(color: color, width: 4)),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            color: color.withOpacity(0.05),
+            child: Row(
+              children: [
+                Icon(icon, size: 17, color: color),
+                const SizedBox(width: 10),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                    letterSpacing: 0.2,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+            child: Column(children: rows),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  // ── profile header ───────────────────────────────────────────────────────────
+
+  Widget _buildHeader(PersonalDetail p) {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.all(28),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Profile Picture
               Container(
-                width: 100,
-                height: 100,
+                width: 92,
+                height: 92,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.blue.shade300, width: 3),
+                  border: Border.all(color: Colors.blue.shade200, width: 3),
+                  color: Colors.blue.shade50,
                 ),
                 child: ClipOval(
-                  child: personal.hasProfilePicture
+                  child: p.hasProfilePicture
                       ? Image.network(
-                    personal.profilePicture,
-                    fit: BoxFit.cover,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return Center(
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          value: loadingProgress.expectedTotalBytes != null
-                              ? loadingProgress.cumulativeBytesLoaded /
-                              loadingProgress.expectedTotalBytes!
-                              : null,
-                        ),
-                      );
-                    },
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: Colors.blue.shade50,
-                        child: Icon(
-                          Icons.person,
-                          size: 40,
-                          color: Colors.blue.shade300,
-                        ),
-                      );
-                    },
-                  )
-                      : Container(
-                    color: Colors.blue.shade50,
-                    child: Icon(
-                      Icons.person,
-                      size: 40,
-                      color: Colors.blue.shade300,
-                    ),
-                  ),
+                          p.profilePicture,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (_, child, prog) => prog == null
+                              ? child
+                              : Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    value: prog.expectedTotalBytes != null
+                                        ? prog.cumulativeBytesLoaded /
+                                            prog.expectedTotalBytes!
+                                        : null,
+                                  ),
+                                ),
+                          errorBuilder: (_, __, ___) => Icon(Icons.person,
+                              size: 40, color: Colors.blue.shade300),
+                        )
+                      : Icon(Icons.person, size: 40, color: Colors.blue.shade300),
                 ),
               ),
-              const SizedBox(width: 20),
-
-              // Basic Info
+              const SizedBox(width: 22),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      personal.fullName,
+                      p.fullName,
                       style: const TextStyle(
-                        fontSize: 24,
+                        fontSize: 21,
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF1E3A8A),
                       ),
                     ),
-                    const SizedBox(height: 8),
-
-                    Row(
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 18,
+                      runSpacing: 4,
                       children: [
-                        if (personal.age != null) ...[
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.cake,
-                                size: 18,
-                                color: Colors.blue.shade600,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                '${personal.age} years',
-                                style: TextStyle(
-                                  fontSize: 15,
-                                  color: Colors.blue.shade700,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(width: 24),
-                        ],
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.location_on,
-                              size: 18,
-                              color: Colors.blue.shade600,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              personal.city,
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: Colors.blue.shade700,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(width: 24),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.favorite,
-                              size: 18,
-                              color: Colors.pink.shade600,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              personal.maritalStatusName,
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: Colors.pink.shade700,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
+                        if (p.age != null)
+                          _metaChip(Icons.cake, '\${p.age} yrs', Colors.blue.shade700),
+                        _metaChip(Icons.location_on, p.city, Colors.blue.shade700),
+                        if (p.country != 'Not available')
+                          _metaChip(Icons.public, p.country, Colors.teal.shade700),
+                        _metaChip(Icons.favorite, p.maritalStatusName, Colors.pink.shade600),
+                        _metaChip(Icons.badge, 'ID: \${p.memberId}', Colors.grey.shade600),
                       ],
                     ),
-
-                    const SizedBox(height: 16),
-
-                    // Status Row
+                    const SizedBox(height: 12),
                     Wrap(
-                      spacing: 12,
-                      runSpacing: 8,
+                      spacing: 8,
+                      runSpacing: 6,
                       children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: personal.userType == 'paid'
-                                ? Colors.green.shade50
-                                : Colors.grey.shade100,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: personal.userType == 'paid'
-                                  ? Colors.green.shade300
-                                  : Colors.grey.shade300,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                personal.userType == 'paid'
-                                    ? Icons.verified
-                                    : Icons.person_outline,
-                                size: 14,
-                                color: personal.userType == 'paid'
-                                    ? Colors.green.shade700
-                                    : Colors.grey.shade700,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                personal.userType.toUpperCase(),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: personal.userType == 'paid'
-                                      ? Colors.green.shade800
-                                      : Colors.grey.shade800,
-                                ),
-                              ),
-                            ],
-                          ),
+                        _badge(
+                          label: p.userType.isEmpty ? 'FREE' : p.userType.toUpperCase(),
+                          icon: p.userType == 'paid' ? Icons.workspace_premium : Icons.person_outline,
+                          bg: p.userType == 'paid' ? Colors.amber.shade50 : Colors.grey.shade100,
+                          border: p.userType == 'paid' ? Colors.amber.shade400 : Colors.grey.shade300,
+                          fg: p.userType == 'paid' ? Colors.amber.shade900 : Colors.grey.shade700,
                         ),
-
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: personal.isVerified == 1
-                                ? Colors.blue.shade50
-                                : Colors.orange.shade50,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: personal.isVerified == 1
-                                  ? Colors.blue.shade300
-                                  : Colors.orange.shade300,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                personal.isVerified == 1
-                                    ? Icons.verified_user
-                                    : Icons.pending_actions,
-                                size: 14,
-                                color: personal.isVerified == 1
-                                    ? Colors.blue.shade700
-                                    : Colors.orange.shade700,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                personal.isVerified == 1
-                                    ? 'Verified'
-                                    : 'Pending Verification',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: personal.isVerified == 1
-                                      ? Colors.blue.shade800
-                                      : Colors.orange.shade800,
-                                ),
-                              ),
-                            ],
-                          ),
+                        _badge(
+                          label: p.isVerified == 1 ? 'Verified' : 'Pending Verification',
+                          icon: p.isVerified == 1 ? Icons.verified_user : Icons.pending_actions,
+                          bg: p.isVerified == 1 ? Colors.green.shade50 : Colors.orange.shade50,
+                          border: p.isVerified == 1 ? Colors.green.shade300 : Colors.orange.shade300,
+                          fg: p.isVerified == 1 ? Colors.green.shade800 : Colors.orange.shade800,
                         ),
+                        if (p.privacy.isNotEmpty)
+                          _badge(
+                            label: p.privacy,
+                            icon: Icons.lock_outline,
+                            bg: Colors.indigo.shade50,
+                            border: Colors.indigo.shade200,
+                            fg: Colors.indigo.shade800,
+                          ),
                       ],
                     ),
                   ],
@@ -277,396 +415,263 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
               ),
             ],
           ),
-
-          // About Me
-          if (personal.aboutMe.isNotEmpty && personal.aboutMe != 'Not available')
+          if (p.aboutMe.isNotEmpty && p.aboutMe != 'Not available') ...[
+            const SizedBox(height: 20),
             Container(
-              margin: const EdgeInsets.only(top: 20),
+              width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: Colors.blue.shade100),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'About Me',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFF1E3A8A),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    personal.aboutMe,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                      height: 1.5,
-                    ),
-                  ),
+                  Text('About Me',
+                      style: TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w700, color: _kPrimary)),
+                  const SizedBox(height: 6),
+                  Text(p.aboutMe,
+                      style: TextStyle(
+                          fontSize: 14, color: Colors.blueGrey.shade800, height: 1.6)),
                 ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSection({
-    required String title,
-    required IconData icon,
-    required Widget content,
-    Color color = Colors.blue,
-  }) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Section Header
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.05),
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
-              ),
-              border: Border(
-                bottom: BorderSide(color: color.withOpacity(0.2), width: 1),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  icon,
-                  size: 20,
-                  color: color,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: color,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Section Content
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: content,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value, {IconData? icon, bool highlight = false}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 12),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: Colors.grey.shade100, width: 1),
-        ),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Expanded(
-            flex: 2,
-            child: Row(
-              children: [
-                if (icon != null) ...[
-                  Icon(
-                    icon,
-                    size: 18,
-                    color: Colors.blue.shade600,
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                Expanded(
-                  child: Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey.shade700,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            flex: 3,
-            child: Text(
-              value,
-              style: TextStyle(
-                fontSize: 15,
-                color: highlight ? Colors.blue.shade800 : Colors.grey.shade900,
-                fontWeight: highlight ? FontWeight.w600 : FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPersonalDetails(PersonalDetail personal) {
-    return _buildSection(
-      title: 'Personal Details',
-      icon: Icons.person,
-      color: const Color(0xFF1E40AF),
-      content: Column(
-        children: [
-          _buildInfoRow('Height', personal.heightName, icon: Icons.height),
-          _buildInfoRow('Religion', personal.religionName, icon: Icons.flag),
-          _buildInfoRow('Blood Group', personal.bloodGroup, icon: Icons.water_drop),
-          _buildInfoRow('Community', personal.communityName, icon: Icons.people),
-          _buildInfoRow('Mother Tongue', personal.motherTongue, icon: Icons.language),
-          _buildInfoRow('Sub Community', personal.subCommunityName, icon: Icons.people_outline),
-          _buildInfoRow('Birth City', personal.birthcity, icon: Icons.place),
-          _buildInfoRow('Disability', personal.disability, icon: Icons.accessible),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEducationCareer(PersonalDetail personal) {
-    return _buildSection(
-      title: 'Education & Career',
-      icon: Icons.school,
-      color: const Color(0xFF065F46),
-      content: Column(
-        children: [
-          _buildInfoRow('Education Type', personal.educationType, icon: Icons.school, highlight: true),
-          _buildInfoRow('Degree', personal.degree, icon: Icons.school_outlined),
-          _buildInfoRow('Faculty', personal.faculty, icon: Icons.book),
-          _buildInfoRow('Education Medium', personal.educationMedium, icon: Icons.language),
-          _buildInfoRow('Occupation', personal.occupationType, icon: Icons.work, highlight: true),
-          _buildInfoRow('Company', personal.companyName, icon: Icons.business),
-          _buildInfoRow('Designation', personal.designation, icon: Icons.badge),
-          _buildInfoRow('Annual Income', personal.annualIncome, icon: Icons.attach_money),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFamilyDetails(FamilyDetail family) {
-    return _buildSection(
-      title: 'Family Details',
-      icon: Icons.family_restroom,
-      color: const Color(0xFF7C3AED),
-      content: Column(
-        children: [
-          _buildInfoRow('Family Type', family.familyType, icon: Icons.house),
-          _buildInfoRow('Family Background', family.familyBackground, icon: Icons.history_edu),
-          _buildInfoRow('Family Origin', family.familyOrigin, icon: Icons.public),
-          _buildInfoRow('Father Status', family.fatherStatus, icon: Icons.person_outline),
-          _buildInfoRow('Mother Status', family.motherStatus, icon: Icons.person_outline),
-          _buildInfoRow('Mother Education', family.motherEducation, icon: Icons.school),
-          _buildInfoRow('Mother Occupation', family.motherOccupation, icon: Icons.work_outline),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLifestyle(Lifestyle lifestyle) {
-    return _buildSection(
-      title: 'Lifestyle',
-      icon: Icons.emoji_food_beverage,
-      color: const Color(0xFFEA580C),
-      content: Column(
-        children: [
-          _buildInfoRow('Diet', lifestyle.diet, icon: Icons.restaurant, highlight: true),
-          _buildInfoRow('Smoking', lifestyle.smoke, icon: Icons.smoking_rooms),
-          _buildInfoRow('Drinking', lifestyle.drinks, icon: Icons.local_drink),
-          _buildInfoRow('Smoke Type', lifestyle.smokeType, icon: Icons.smoke_free),
-          _buildInfoRow('Drink Type', lifestyle.drinkType, icon: Icons.wine_bar),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPartnerPreference(PartnerPreference partner) {
-    return _buildSection(
-      title: 'Partner Preferences',
-      icon: Icons.favorite,
-      color: const Color(0xFFBE185D),
-      content: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Basic Preferences
-          const Padding(
-            padding: EdgeInsets.only(bottom: 16),
-            child: Text(
-              'Basic Preferences',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFFBE185D),
-              ),
-            ),
-          ),
-          _buildInfoRow('Age Range', partner.ageRange, icon: Icons.calendar_today),
-          _buildInfoRow('Marital Status', partner.maritalStatus, icon: Icons.favorite_border),
-          _buildInfoRow('Religion', partner.religion, icon: Icons.flag),
-          _buildInfoRow('Caste', partner.caste, icon: Icons.people),
-          _buildInfoRow('Country', partner.country, icon: Icons.public),
-          _buildInfoRow('City', partner.city, icon: Icons.location_city),
-
-          const SizedBox(height: 24),
-
-          // Lifestyle & Physical
-          const Padding(
-            padding: EdgeInsets.only(bottom: 16),
-            child: Text(
-              'Lifestyle & Physical',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-                color: Color(0xFFBE185D),
-              ),
-            ),
-          ),
-          _buildInfoRow('Diet', partner.diet, icon: Icons.restaurant_menu),
-          _buildInfoRow('Complexion', partner.complexion, icon: Icons.palette),
-          _buildInfoRow('Body Type', partner.bodyType, icon: Icons.accessibility),
-          _buildInfoRow('Smoke Accept', partner.smokeAccept, icon: Icons.smoking_rooms),
-          _buildInfoRow('Drink Accept', partner.drinkAccept, icon: Icons.local_bar),
-          _buildInfoRow('Disability Accept', partner.disabilityAccept, icon: Icons.accessible_forward),
-
-          // Other Expectations
-          if (partner.otherExpectation.isNotEmpty && partner.otherExpectation != 'Not available')
-            Container(
-              margin: const EdgeInsets.only(top: 24),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.pink.shade50,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.pink.shade100),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Other Expectations',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFFBE185D),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    partner.otherExpectation,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.pink.shade900,
-                      height: 1.5,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLoadingState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          SizedBox(
-            width: 50,
-            height: 50,
-            child: CircularProgressIndicator(
-              strokeWidth: 3,
-              valueColor: AlwaysStoppedAnimation<Color>(Colors.blue.shade700),
-            ),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Loading Profile...',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-              color: Colors.grey,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorState() {
-    return Center(
-      child: Container(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.error_outline,
-              size: 48,
-              color: Colors.red.shade500,
-            ),
-            const SizedBox(height: 20),
-            Consumer<UserDetailsProvider>(
-              builder: (context, provider, child) {
-                return Text(
-                  provider.error,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.red,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  textAlign: TextAlign.center,
-                );
-              },
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton(
-              onPressed: () {
-                context.read<UserDetailsProvider>().fetchUserDetails(
-                  widget.userId,
-                  widget.myId,
-                );
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue.shade700,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
-                ),
-              ),
-              child: const Text(
-                'Retry',
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
               ),
             ),
           ],
+        ],
+      ),
+    );
+  }
+
+  Widget _metaChip(IconData icon, String label, Color color) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 3),
+          Text(label,
+              style: TextStyle(fontSize: 13, color: color, fontWeight: FontWeight.w500)),
+        ],
+      );
+
+  Widget _badge({
+    required String label,
+    required IconData icon,
+    required Color bg,
+    required Color border,
+    required Color fg,
+  }) =>
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: fg),
+            const SizedBox(width: 5),
+            Text(label,
+                style:
+                    TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: fg)),
+          ],
+        ),
+      );
+
+  // ── section builders ─────────────────────────────────────────────────────────
+
+  Widget _buildPersonal(PersonalDetail p) => _section(
+        title: 'Personal Details',
+        icon: Icons.person_outline,
+        color: _kPersonal,
+        rows: [
+          _row('p_height', 'Height', p.heightName, section: 'personal', apiField: 'height_name', icon: Icons.height, highlight: true),
+          _row('p_dob', 'Birth Date', p.birthDate, section: 'personal', apiField: 'birthDate', icon: Icons.cake),
+          _row('p_birthtime', 'Birth Time', p.birthtime, section: 'personal', apiField: 'birthtime', icon: Icons.access_time),
+          _row('p_birthcity', 'Birth City', p.birthcity, section: 'personal', apiField: 'birthcity', icon: Icons.place),
+          _row('p_religion', 'Religion', p.religionName, section: 'personal', apiField: 'religionName', icon: Icons.flag),
+          _row('p_community', 'Community', p.communityName, section: 'personal', apiField: 'communityName', icon: Icons.people),
+          _row('p_subcomm', 'Sub Community', p.subCommunityName, section: 'personal', apiField: 'subCommunityName', icon: Icons.people_outline),
+          _row('p_tongue', 'Mother Tongue', p.motherTongue, section: 'personal', apiField: 'motherTongue', icon: Icons.language),
+          _row('p_blood', 'Blood Group', p.bloodGroup, section: 'personal', apiField: 'bloodGroup', icon: Icons.water_drop),
+          _row('p_marital', 'Marital Status', p.maritalStatusName, section: 'personal', apiField: 'maritalStatusName', icon: Icons.favorite_border),
+          _row('p_manglik', 'Manglik', p.manglik, section: 'personal', apiField: 'manglik', icon: Icons.star_border),
+          _row('p_disability', 'Disability', p.disability, section: 'personal', apiField: 'Disability', icon: Icons.accessible),
+          _row('p_photo', 'Photo Request', p.photoRequest, section: 'personal', apiField: 'photo_request', icon: Icons.photo_camera_outlined),
+          _row('p_privacy', 'Privacy Setting', p.privacy, section: 'personal', apiField: 'privacy', icon: Icons.lock_outline),
+        ],
+      );
+
+  Widget _buildEducation(PersonalDetail p) => _section(
+        title: 'Education & Career',
+        icon: Icons.school_outlined,
+        color: _kEducation,
+        rows: [
+          _row('e_type', 'Education Type', p.educationType, section: 'personal', apiField: 'educationtype', icon: Icons.school, highlight: true),
+          _row('e_degree', 'Degree', p.degree, section: 'personal', apiField: 'degree', icon: Icons.military_tech_outlined),
+          _row('e_faculty', 'Faculty', p.faculty, section: 'personal', apiField: 'faculty', icon: Icons.book_outlined),
+          _row('e_medium', 'Education Medium', p.educationMedium, section: 'personal', apiField: 'educationmedium', icon: Icons.translate),
+          _row('e_working', 'Are You Working?', p.areYouWorking, section: 'personal', apiField: 'areyouworking', icon: Icons.work_outline),
+          _row('e_occ', 'Occupation Type', p.occupationType, section: 'personal', apiField: 'occupationtype', icon: Icons.business_center_outlined, highlight: true),
+          _row('e_workwith', 'Working With', p.workingWith, section: 'personal', apiField: 'workingwith', icon: Icons.corporate_fare),
+          _row('e_company', 'Company Name', p.companyName, section: 'personal', apiField: 'companyname', icon: Icons.business),
+          _row('e_designation', 'Designation', p.designation, section: 'personal', apiField: 'designation', icon: Icons.badge_outlined),
+          _row('e_business', 'Business Name', p.businessName, section: 'personal', apiField: 'businessname', icon: Icons.store_outlined),
+          _row('e_income', 'Annual Income', p.annualIncome, section: 'personal', apiField: 'annualincome', icon: Icons.currency_rupee, highlight: true),
+        ],
+      );
+
+  Widget _buildFamily(FamilyDetail f) => _section(
+        title: 'Family Details',
+        icon: Icons.family_restroom,
+        color: _kFamily,
+        rows: [
+          _row('f_type', 'Family Type', f.familyType, section: 'family', apiField: 'familytype', icon: Icons.home_outlined, highlight: true),
+          _row('f_background', 'Family Background', f.familyBackground, section: 'family', apiField: 'familybackground', icon: Icons.history_edu),
+          _row('f_origin', 'Family Origin', f.familyOrigin, section: 'family', apiField: 'familyorigin', icon: Icons.public),
+          _row('f_father_status', 'Father Status', f.fatherStatus, section: 'family', apiField: 'fatherstatus', icon: Icons.person_outline),
+          _row('f_father_name', 'Father Name', f.fatherName, section: 'family', apiField: 'fathername', icon: Icons.person),
+          _row('f_father_edu', 'Father Education', f.fatherEducation, section: 'family', apiField: 'fathereducation', icon: Icons.school_outlined),
+          _row('f_father_occ', 'Father Occupation', f.fatherOccupation, section: 'family', apiField: 'fatheroccupation', icon: Icons.work_outline),
+          _row('f_mother_status', 'Mother Status', f.motherStatus, section: 'family', apiField: 'motherstatus', icon: Icons.person_outline),
+          _row('f_mother_caste', 'Mother Caste', f.motherCaste, section: 'family', apiField: 'mothercaste', icon: Icons.people_outline),
+          _row('f_mother_edu', 'Mother Education', f.motherEducation, section: 'family', apiField: 'mothereducation', icon: Icons.school_outlined),
+          _row('f_mother_occ', 'Mother Occupation', f.motherOccupation, section: 'family', apiField: 'motheroccupation', icon: Icons.work_outline),
+        ],
+      );
+
+  Widget _buildLifestyle(Lifestyle ls) => _section(
+        title: 'Lifestyle',
+        icon: Icons.emoji_food_beverage,
+        color: _kLifestyle,
+        rows: [
+          _row('l_diet', 'Diet', ls.diet, section: 'lifestyle', apiField: 'diet', icon: Icons.restaurant, highlight: true),
+          _row('l_smoke', 'Smoking', ls.smoke, section: 'lifestyle', apiField: 'smoke', icon: Icons.smoking_rooms),
+          _row('l_smoke_type', 'Smoke Type', ls.smokeType, section: 'lifestyle', apiField: 'smoketype', icon: Icons.smoke_free),
+          _row('l_drinks', 'Drinking', ls.drinks, section: 'lifestyle', apiField: 'drinks', icon: Icons.local_drink),
+          _row('l_drink_type', 'Drink Type', ls.drinkType, section: 'lifestyle', apiField: 'drinktype', icon: Icons.wine_bar),
+        ],
+      );
+
+  Widget _buildPartner(PartnerPreference pp) => _section(
+        title: 'Partner Preferences',
+        icon: Icons.favorite,
+        color: _kPartner,
+        rows: [
+          _row('pp_age', 'Age Range', pp.ageRange, section: 'partner', apiField: 'age_range', icon: Icons.calendar_today, highlight: true),
+          _row('pp_weight', 'Weight Range', pp.weightRange, section: 'partner', apiField: 'weight_range', icon: Icons.monitor_weight_outlined),
+          _row('pp_marital', 'Marital Status', pp.maritalStatus, section: 'partner', apiField: 'maritalstatus', icon: Icons.favorite_border),
+          _row('pp_child', 'Profile With Child', pp.profileWithChild, section: 'partner', apiField: 'profilewithchild', icon: Icons.child_care),
+          _row('pp_family', 'Family Type', pp.familyType, section: 'partner', apiField: 'familytype', icon: Icons.home_outlined),
+          _row('pp_religion', 'Religion', pp.religion, section: 'partner', apiField: 'religion', icon: Icons.flag),
+          _row('pp_caste', 'Caste', pp.caste, section: 'partner', apiField: 'caste', icon: Icons.people),
+          _row('pp_tongue', 'Mother Tongue', pp.motherTongue, section: 'partner', apiField: 'mothertoungue', icon: Icons.language),
+          _row('pp_country', 'Country', pp.country, section: 'partner', apiField: 'country', icon: Icons.public),
+          _row('pp_state', 'State', pp.state, section: 'partner', apiField: 'state', icon: Icons.map_outlined),
+          _row('pp_city', 'City', pp.city, section: 'partner', apiField: 'city', icon: Icons.location_city),
+          _row('pp_qual', 'Qualification', pp.qualification, section: 'partner', apiField: 'qualification', icon: Icons.school_outlined),
+          _row('pp_edu_medium', 'Education Medium', pp.educationMedium, section: 'partner', apiField: 'educationmedium', icon: Icons.translate),
+          _row('pp_profession', 'Profession', pp.profession, section: 'partner', apiField: 'proffession', icon: Icons.business_center_outlined),
+          _row('pp_workwith', 'Working With', pp.workingWith, section: 'partner', apiField: 'workingwith', icon: Icons.corporate_fare),
+          _row('pp_income', 'Annual Income', pp.annualIncome, section: 'partner', apiField: 'annualincome', icon: Icons.currency_rupee),
+          _row('pp_diet', 'Diet', pp.diet, section: 'partner', apiField: 'diet', icon: Icons.restaurant_menu),
+          _row('pp_smoke', 'Smoke Acceptable', pp.smokeAccept, section: 'partner', apiField: 'smokeaccept', icon: Icons.smoking_rooms),
+          _row('pp_drink', 'Drink Acceptable', pp.drinkAccept, section: 'partner', apiField: 'drinkaccept', icon: Icons.local_bar),
+          _row('pp_disability', 'Disability Acceptable', pp.disabilityAccept, section: 'partner', apiField: 'disabilityaccept', icon: Icons.accessible_forward),
+          _row('pp_complexion', 'Complexion', pp.complexion, section: 'partner', apiField: 'complexion', icon: Icons.palette_outlined),
+          _row('pp_body', 'Body Type', pp.bodyType, section: 'partner', apiField: 'bodytype', icon: Icons.accessibility_new),
+          _row('pp_manglik', 'Manglik', pp.manglik, section: 'partner', apiField: 'manglik', icon: Icons.star_border),
+          _row('pp_herscope', 'Hers Cope Belief', pp.hersCopeBelief, section: 'partner', apiField: 'herscopeblief', icon: Icons.psychology_outlined),
+          if (pp.otherExpectation.isNotEmpty && pp.otherExpectation != 'Not available')
+            _row('pp_other', 'Other Expectations', pp.otherExpectation, section: 'partner', apiField: 'otherexpectation', icon: Icons.notes),
+        ],
+      );
+
+  // ── loading / error ───────────────────────────────────────────────────────────
+
+  Widget _buildLoading() => const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(
+              width: 44,
+              height: 44,
+              child: CircularProgressIndicator(
+                strokeWidth: 3,
+                valueColor: AlwaysStoppedAnimation<Color>(_kPrimary),
+              ),
+            ),
+            SizedBox(height: 16),
+            Text('Loading Profile…',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w500, color: Colors.grey)),
+          ],
+        ),
+      );
+
+  Widget _buildError(UserDetailsProvider prov) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 48, color: Colors.red.shade400),
+              const SizedBox(height: 16),
+              Text(prov.error,
+                  style: const TextStyle(fontSize: 15, color: Colors.red),
+                  textAlign: TextAlign.center),
+              const SizedBox(height: 20),
+              ElevatedButton.icon(
+                icon: const Icon(Icons.refresh, size: 16),
+                label: const Text('Retry'),
+                onPressed: () => prov.fetchUserDetails(widget.userId, widget.myId),
+                style: ElevatedButton.styleFrom(
+                    backgroundColor: _kPrimary, foregroundColor: Colors.white),
+              ),
+            ],
+          ),
+        ),
+      );
+
+  // ── build ────────────────────────────────────────────────────────────────────
+
+  Widget _buildBody(UserDetailsData data) {
+    final p = data.personalDetail;
+    return SingleChildScrollView(
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 860),
+          child: Container(
+            margin: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(6),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.10),
+                  blurRadius: 24,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                _buildHeader(p),
+                const Divider(height: 1, thickness: 1),
+                _buildPersonal(p),
+                const Divider(height: 1, thickness: 1),
+                _buildEducation(p),
+                const Divider(height: 1, thickness: 1),
+                _buildFamily(data.familyDetail),
+                const Divider(height: 1, thickness: 1),
+                _buildLifestyle(data.lifestyle),
+                const Divider(height: 1, thickness: 1),
+                _buildPartner(data.partner),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
         ),
       ),
     );
@@ -677,18 +682,15 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
     final provider = context.watch<UserDetailsProvider>();
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade50,
+      backgroundColor: _kPageBg,
       appBar: AppBar(
-        title: const Text(
-          'User Profile',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        title: const Text('User Profile',
+            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
         centerTitle: true,
         backgroundColor: Colors.white,
-        elevation: 1,
+        foregroundColor: Colors.grey.shade800,
+        elevation: 0,
+        scrolledUnderElevation: 1,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
           onPressed: () => Navigator.pop(context),
@@ -696,67 +698,28 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: () {
-              provider.fetchUserDetails(widget.userId, widget.myId);
-            },
             tooltip: 'Refresh',
+            onPressed: () => provider.fetchUserDetails(widget.userId, widget.myId),
           ),
         ],
       ),
       body: provider.isLoading
-          ? _buildLoadingState()
+          ? _buildLoading()
           : provider.error.isNotEmpty
-          ? _buildErrorState()
-          : provider.userDetails != null
-          ? SingleChildScrollView(
-        child: Column(
-          children: [
-            // Profile Header
-            _buildProfileHeader(
-                provider.userDetails!.personalDetail),
-
-            // Personal Details
-            _buildPersonalDetails(
-                provider.userDetails!.personalDetail),
-
-            // Education & Career
-            _buildEducationCareer(
-                provider.userDetails!.personalDetail),
-
-            // Family Details
-            _buildFamilyDetails(provider.userDetails!.familyDetail),
-
-            // Lifestyle
-            _buildLifestyle(provider.userDetails!.lifestyle),
-
-            // Partner Preference
-            _buildPartnerPreference(provider.userDetails!.partner),
-
-            const SizedBox(height: 20),
-          ],
-        ),
-      )
-          : Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.person_off,
-              size: 48,
-              color: Colors.grey.shade400,
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'No User Data',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w500,
-                color: Colors.grey,
-              ),
-            ),
-          ],
-        ),
-      ),
+              ? _buildError(provider)
+              : provider.userDetails != null
+                  ? _buildBody(provider.userDetails!)
+                  : Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.person_off, size: 48, color: Colors.grey.shade400),
+                          const SizedBox(height: 16),
+                          const Text('No data available',
+                              style: TextStyle(fontSize: 15, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
     );
   }
 }

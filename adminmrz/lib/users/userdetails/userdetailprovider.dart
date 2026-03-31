@@ -11,11 +11,15 @@ class UserDetailsProvider with ChangeNotifier {
   bool _isLoading = false;
   String _error = '';
   int? _userId;
+  bool _isUpdating = false;
+  String _updateError = '';
 
   UserDetailsData? get userDetails => _userDetails;
   bool get isLoading => _isLoading;
   String get error => _error;
   int? get userId => _userId;
+  bool get isUpdating => _isUpdating;
+  String get updateError => _updateError;
 
   Future<void> fetchUserDetails(int userId, int myId) async {
     _isLoading = true;
@@ -38,10 +42,43 @@ class UserDetailsProvider with ChangeNotifier {
     }
   }
 
+  /// Update a single profile field and refresh the local model on success.
+  Future<bool> updateField({
+    required String section,
+    required String field,
+    required String value,
+  }) async {
+    if (_userId == null) return false;
+    _isUpdating = true;
+    _updateError = '';
+    notifyListeners();
+
+    try {
+      final success = await _userDetailsService.updateUserDetail(
+        userId: _userId!,
+        section: section,
+        field: field,
+        value: value,
+      );
+      if (!success) {
+        _updateError = 'Update failed. Please try again.';
+      }
+      _isUpdating = false;
+      notifyListeners();
+      return success;
+    } catch (e) {
+      _updateError = e.toString();
+      _isUpdating = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   void clearData() {
     _userDetails = null;
     _error = '';
     _userId = null;
+    _updateError = '';
     notifyListeners();
   }
 }
