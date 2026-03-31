@@ -33,42 +33,126 @@ class _ChatSidebarState extends State<ChatSidebar> {
   final int senderId = 1;
   StreamSubscription? _conversationSub;
 
+  // Pagination
+  int _page = 1;
+  static const int _pageSize = 20;
+  int _totalUsers = 0;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  bool _isInitialLoading = true;
+  final ScrollController _scrollController = ScrollController();
+  Timer? _searchDebounce;
+
   @override
   void initState() {
     super.initState();
-    fetchUsers();
+    _scrollController.addListener(_onScroll);
+    fetchUsers(reset: true);
   }
 
   @override
   void dispose() {
     _conversationSub?.cancel();
+    _scrollController.dispose();
+    _searchDebounce?.cancel();
     super.dispose();
   }
 
-  Future<void> fetchUsers() async {
-    final response =
-    await http.get(Uri.parse('https://digitallami.com/get.php'));
+  Future<void> fetchUsers({bool reset = false}) async {
+    if (_isLoadingMore && !reset) return;
 
-    if (response.statusCode == 200) {
-      final jsonResponse = jsonDecode(response.body);
+    if (reset) {
+      _page = 1;
+      _hasMore = true;
+      _users = [];
+      _filteredUsers = [];
+      _isInitialLoading = true;
+      _conversationSub?.cancel();
+      _conversationSub = null;
+    }
 
-      _users = jsonResponse["data"];
+    if (!_hasMore && !reset) return;
 
-      // Initialize with current chat provider selected user if exists
-      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-      if (chatProvider.id != null && _users.isNotEmpty) {
-        _selectedChat = _users.firstWhere(
-              (user) => user['id'] == chatProvider.id.toString(),
-          orElse: () => _users[0],
-        );
-      } else if (_users.isNotEmpty) {
-        _selectedChat = _users[0];
+    if (mounted) setState(() => _isLoadingMore = true);
+
+    try {
+      final Map<String, String> queryParams = {
+        'page': _page.toString(),
+        'limit': _pageSize.toString(),
+      };
+      if (_searchQuery.isNotEmpty) {
+        queryParams['search'] = _searchQuery;
       }
 
-      _applyFilters();
+      final uri = Uri.parse('https://digitallami.com/get.php')
+          .replace(queryParameters: queryParams);
+      final response = await http.get(uri);
 
-      listenToConversationChanges();
-      setState(() {});
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        final List<dynamic> newUsers = (jsonResponse["data"] as List?) ?? [];
+
+        // Support totalRecords / total fields from the server
+        int? serverTotal = jsonResponse["totalRecords"] is int
+            ? jsonResponse["totalRecords"] as int
+            : jsonResponse["total"] is int
+                ? jsonResponse["total"] as int
+                : null;
+        serverTotal ??= int.tryParse(
+                jsonResponse["totalRecords"]?.toString() ?? '') ??
+            int.tryParse(jsonResponse["total"]?.toString() ?? '');
+
+        if (reset) {
+          _users = newUsers;
+          _totalUsers = serverTotal ?? newUsers.length;
+        } else {
+          _users = [..._users, ...newUsers];
+          if (serverTotal != null) _totalUsers = serverTotal;
+        }
+
+        // Determine if more pages exist
+        if (serverTotal != null) {
+          _hasMore = _users.length < serverTotal;
+        } else {
+          _hasMore = newUsers.length >= _pageSize;
+        }
+        _page++;
+
+        if (reset) {
+          final chatProvider =
+              Provider.of<ChatProvider>(context, listen: false);
+          if (chatProvider.id != null && _users.isNotEmpty) {
+            _selectedChat = _users.firstWhere(
+              (user) => user['id'] == chatProvider.id.toString(),
+              orElse: () => _users[0],
+            );
+          } else if (_users.isNotEmpty) {
+            _selectedChat = _users[0];
+          }
+          listenToConversationChanges();
+        }
+
+        _applyFilters();
+      }
+    } catch (error) {
+      debugPrint('Error fetching users: $error');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingMore = false;
+          _isInitialLoading = false;
+        });
+      }
+    }
+  }
+
+  void _onScroll() {
+    if (_scrollController.hasClients &&
+        _scrollController.position.pixels >=
+            _scrollController.position.maxScrollExtent - 200 &&
+        !_isLoadingMore &&
+        _hasMore) {
+      fetchUsers();
     }
   }
 
@@ -210,14 +294,15 @@ class _ChatSidebarState extends State<ChatSidebar> {
   }
 
   void _resetFilters() {
+    _searchDebounce?.cancel();
     setState(() {
       _showOnlyPaid = false;
       _showOnlyOnline = false;
       _showWithMatches = false;
       _sortBy = 'recent';
       _searchQuery = "";
-      _applyFilters();
     });
+    fetchUsers(reset: true);
   }
 
   void _updateSelectedChat() {
@@ -294,10 +379,9 @@ class _ChatSidebarState extends State<ChatSidebar> {
                       ? IconButton(
                           icon: const Icon(Icons.clear, size: 16, color: kMuted),
                           onPressed: () {
-                            setState(() {
-                              _searchQuery = "";
-                              _applyFilters();
-                            });
+                            _searchDebounce?.cancel();
+                            setState(() => _searchQuery = "");
+                            fetchUsers(reset: true);
                           },
                         )
                       : null,
@@ -319,8 +403,12 @@ class _ChatSidebarState extends State<ChatSidebar> {
                   isDense: true,
                 ),
                 onChanged: (value) {
-                  _searchQuery = value;
-                  _applyFilters();
+                  setState(() => _searchQuery = value);
+                  _searchDebounce?.cancel();
+                  _searchDebounce = Timer(
+                    const Duration(milliseconds: 400),
+                    () => fetchUsers(reset: true),
+                  );
                 },
               ),
             ),
@@ -444,7 +532,9 @@ class _ChatSidebarState extends State<ChatSidebar> {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                '${_filteredUsers.length} users',
+                _totalUsers > 0
+                    ? '${_filteredUsers.length} / $_totalUsers users'
+                    : '${_filteredUsers.length} users',
                 style: const TextStyle(fontSize: 11, color: kMuted),
               ),
             ),
@@ -454,57 +544,108 @@ class _ChatSidebarState extends State<ChatSidebar> {
 
           // ── LIST ────────────────────────────────────────────────────
           Expanded(
-            child: _filteredUsers.isEmpty
+            child: _isInitialLoading
                 ? Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.person_off, size: 40, color: Colors.grey[300]),
+                        SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: kPrimary,
+                          ),
+                        ),
                         const SizedBox(height: 10),
                         const Text(
-                          'No users found',
+                          'Loading users...',
                           style: TextStyle(color: kMuted, fontSize: 13),
                         ),
-                        if (_showOnlyPaid || _showOnlyOnline || _showWithMatches || _searchQuery.isNotEmpty)
-                          TextButton(
-                            onPressed: _resetFilters,
-                            style: TextButton.styleFrom(foregroundColor: kPrimary),
-                            child: const Text('Clear filters', style: TextStyle(fontSize: 12)),
-                          ),
                       ],
                     ),
                   )
-                : ListView.builder(
-                    itemCount: _filteredUsers.length,
-                    itemBuilder: (context, index) {
-                      var user = _filteredUsers[index];
-                      bool isSelected = _selectedChat == user;
-
-                      return _buildUserRow(
-                        user["name"] ?? "",
-                        user["id"]?.toString() ?? "",
-                        conversationMap[user["id"].toString()]?['lastMessage'] ?? user["chat_message"] ?? "",
-                        int.tryParse(user["matches"].toString()) ?? 0,
-                        user["last_seen_text"] ?? "",
-                        user["is_paid"] ?? false,
-                        user["is_online"] ?? false,
-                        user["profile_picture"] ?? "",
-                        isSelected,
-                        () {
-                          setState(() {
-                            _selectedChat = user;
-                            _updateSelectedChat();
-                          });
-                          // Fetch matched profiles for the newly selected user
-                          final newId = int.tryParse(user["id"].toString()) ?? 0;
-                          if (newId > 0) {
-                            Provider.of<MatchedProfileProvider>(context, listen: false)
-                                .fetchMatchedProfiles(newId);
+                : _filteredUsers.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.person_off,
+                                size: 40, color: Colors.grey[300]),
+                            const SizedBox(height: 10),
+                            const Text(
+                              'No users found',
+                              style: TextStyle(color: kMuted, fontSize: 13),
+                            ),
+                            if (_showOnlyPaid ||
+                                _showOnlyOnline ||
+                                _showWithMatches ||
+                                _searchQuery.isNotEmpty)
+                              TextButton(
+                                onPressed: _resetFilters,
+                                style: TextButton.styleFrom(
+                                    foregroundColor: kPrimary),
+                                child: const Text('Clear filters',
+                                    style: TextStyle(fontSize: 12)),
+                              ),
+                          ],
+                        ),
+                      )
+                    : ListView.builder(
+                        controller: _scrollController,
+                        itemCount:
+                            _filteredUsers.length + (_isLoadingMore ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          // Loading footer
+                          if (index == _filteredUsers.length) {
+                            return Padding(
+                              padding:
+                                  const EdgeInsets.symmetric(vertical: 14),
+                              child: Center(
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: kPrimary,
+                                  ),
+                                ),
+                              ),
+                            );
                           }
+
+                          var user = _filteredUsers[index];
+                          bool isSelected = _selectedChat == user;
+
+                          return _buildUserRow(
+                            user["name"] ?? "",
+                            conversationMap[user["id"].toString()]
+                                    ?['lastMessage'] ??
+                                user["chat_message"] ??
+                                "",
+                            int.tryParse(user["matches"].toString()) ?? 0,
+                            user["last_seen_text"] ?? "",
+                            user["is_paid"] ?? false,
+                            user["is_online"] ?? false,
+                            user["profile_picture"] ?? "",
+                            isSelected,
+                            () {
+                              setState(() {
+                                _selectedChat = user;
+                                _updateSelectedChat();
+                              });
+                              // Fetch matched profiles for the newly selected user
+                              final newId =
+                                  int.tryParse(user["id"].toString()) ?? 0;
+                              if (newId > 0) {
+                                Provider.of<MatchedProfileProvider>(context,
+                                        listen: false)
+                                    .fetchMatchedProfiles(newId);
+                              }
+                            },
+                          );
                         },
-                      );
-                    },
-                  ),
+                      ),
           ),
         ],
       ),

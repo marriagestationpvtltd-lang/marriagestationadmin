@@ -68,6 +68,7 @@ class _ChatWindowState extends State<ChatWindow> {
   // Pagination
   static const int _pageSize = 20;
   int _currentLimit = 20;
+  int? _cachedLimit;
   bool _isLoadingMore = false;
   bool _hasMoreMessages = true;
   int? _prevUserId;
@@ -269,6 +270,28 @@ class _ChatWindowState extends State<ChatWindow> {
     } else {
       Future.delayed(Duration(milliseconds: 100), _scrollToBottom);
     }
+  }
+
+  void _onScrollForPagination() {
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    if (pos.pixels >= pos.maxScrollExtent - 200 && !_isLoadingMore && _hasMoreMessages) {
+      _loadMoreMessages();
+    }
+  }
+
+  void _loadMoreMessages() {
+    if (_isLoadingMore || !_hasMoreMessages) return;
+    setState(() {
+      _isLoadingMore = true;
+      _currentLimit += _pageSize;
+    });
+    // _isLoadingMore is cleared in the StreamBuilder once the new snapshot arrives
+    // (via the _hasMoreMessages/noMore logic). As a safety fallback, clear it after
+    // a short delay so the UI never gets stuck.
+    Future.delayed(const Duration(seconds: 5), () {
+      if (mounted && _isLoadingMore) setState(() => _isLoadingMore = false);
+    });
   }
 
   Future<void> _sendMatchProfile(Map<String, dynamic> profileData) async {
@@ -499,9 +522,18 @@ class _ChatWindowState extends State<ChatWindow> {
     // Rebuild the Firestore stream only when the selected user changes so that
     // StreamBuilder keeps its existing subscription and never flashes a loading
     // spinner while switching conversations.
-    if (chatProvider.id != _cachedReceiverId) {
+    final bool userChanged = chatProvider.id != _cachedReceiverId;
+    final bool limitChanged = _currentLimit != _cachedLimit;
+    if (userChanged) {
       _cachedReceiverId = chatProvider.id;
+      _currentLimit = _pageSize;
+      _hasMoreMessages = true;
       _lastSnapshot = null; // clear stale messages from the previous user
+      // Re-fetch match details for the newly selected user
+      if (chatProvider.id != null) Future.microtask(_fetchMatchDetails);
+    }
+    if (userChanged || limitChanged) {
+      _cachedLimit = _currentLimit;
       _messagesStream = chatProvider.id == null
           ? null
           : _firestore
@@ -509,9 +541,8 @@ class _ChatWindowState extends State<ChatWindow> {
               .where('senderid', whereIn: [senderId.toString(), chatProvider.id.toString()])
               .where('receiverid', whereIn: [senderId.toString(), chatProvider.id.toString()])
               .orderBy('timestamp', descending: true)
+              .limit(_currentLimit)
               .snapshots();
-      // Re-fetch match details for the newly selected user
-      if (chatProvider.id != null) Future.microtask(_fetchMatchDetails);
     }
 
     return Scaffold(
@@ -773,9 +804,12 @@ class _ChatWindowState extends State<ChatWindow> {
                   _lastSnapshot = snapshot.data;
                   // If we received fewer docs than requested, there are no older messages.
                   final bool noMore = snapshot.data!.docs.length < _currentLimit;
-                  if (noMore != !_hasMoreMessages) {
+                  if (noMore != !_hasMoreMessages || _isLoadingMore) {
                     WidgetsBinding.instance.addPostFrameCallback((_) {
-                      if (mounted) setState(() => _hasMoreMessages = !noMore);
+                      if (mounted) setState(() {
+                        _hasMoreMessages = !noMore;
+                        _isLoadingMore = false;
+                      });
                     });
                   }
                 }
