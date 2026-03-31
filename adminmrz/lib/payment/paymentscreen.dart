@@ -303,7 +303,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
               GestureDetector(
                 onTap: () {
                   provider.clearFilters();
-                  provider.fetchPayments();
+                  provider.fetchPayments(forceRefresh: true);
                 },
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -1002,7 +1002,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
         Expanded(
           child: RefreshIndicator(
             color: AppTheme.primary,
-            onRefresh: () => provider.fetchPayments(),
+            onRefresh: () => provider.fetchPayments(forceRefresh: true),
             child: provider.payments.isEmpty
                 ? _buildEmptyState(provider)
                 : ListView.builder(
@@ -1050,7 +1050,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
             TextButton.icon(
               onPressed: () {
                 provider.clearFilters();
-                provider.fetchPayments();
+                provider.fetchPayments(forceRefresh: true);
               },
               icon: const Icon(Icons.clear_all_rounded, size: 16),
               label: const Text('Clear Filters'),

@@ -1,19 +1,28 @@
 import 'dart:convert';
+import 'package:adminmrz/core/app_constants.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../model/MatchedProfile.dart';
 
 class MatchedProfileProvider with ChangeNotifier {
   String _name = '';
-  bool _isloading = false;
+  bool _isLoading = false;
   String _memberid = '';
 
   String get memberid => _memberid;
   String get name => _name;
-  bool get isloading => _isloading;
+  bool get isLoading => _isLoading;
   List<MatchedProfile> _matchedProfiles = [];
 
-  // Getters for the specific fields you want to access
+  // Cache tracking
+  int? _cachedUserId;
+  DateTime? _lastFetchTime;
+
+  bool _isCacheValidFor(int userId) =>
+      _cachedUserId == userId &&
+      _lastFetchTime != null &&
+      DateTime.now().difference(_lastFetchTime!) < AppConstants.cacheDuration;
+
   List<String> get memberiddd =>
       _matchedProfiles.map((profile) => profile.memberid).toList();
   List<int> get ids =>
@@ -41,31 +50,32 @@ class MatchedProfileProvider with ChangeNotifier {
   List<int> get age =>
       _matchedProfiles.map((profile) => profile.age).toList();
 
-  // ADD THIS GETTER for profile pictures
   List<String> get profilePictures =>
       _matchedProfiles.map((profile) => profile.profilePicture).toList();
 
-  // Fetch data and update the list
-  Future<void> fetchMatchedProfiles(int userId) async {
-    _isloading = true;
+  Future<void> fetchMatchedProfiles(int userId, {bool forceRefresh = false}) async {
+    if (!forceRefresh && _isCacheValidFor(userId) && _matchedProfiles.isNotEmpty) return;
+
+    _isLoading = true;
     notifyListeners();
 
     try {
-      final response = await http.post(
-        Uri.parse('https://digitallami.com/match_admin.php'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: json.encode({
-          'user_id': userId,
-        }),
-      );
+      final response = await http
+          .post(
+            Uri.parse('${AppConstants.chatApiUrl}/match_admin.php'),
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: json.encode({
+              'user_id': userId,
+            }),
+          )
+          .timeout(AppConstants.requestTimeout);
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
 
         if (data['data'] != null) {
-          // Convert response to List<MatchedProfile>
           _matchedProfiles = (data['data'] as List)
               .map((profile) => MatchedProfile.fromJson(profile))
               .toList();
@@ -79,19 +89,20 @@ class MatchedProfileProvider with ChangeNotifier {
           _name = 'no';
           _memberid = 'no';
         }
-        _isloading = false;
+        _cachedUserId = userId;
+        _lastFetchTime = DateTime.now();
+        _isLoading = false;
         notifyListeners();
       } else {
         throw Exception('Failed to load matched profiles');
       }
     } catch (e) {
       debugPrint('Error fetching matched profiles: $e');
-      _isloading = false;
+      _isLoading = false;
       notifyListeners();
     }
   }
 
-  // Helper methods
   String getProfilePicture(int index) {
     if (index < 0 || index >= _matchedProfiles.length) return '';
     return _matchedProfiles[index].profilePicture;
@@ -116,6 +127,8 @@ class MatchedProfileProvider with ChangeNotifier {
     _matchedProfiles.clear();
     _name = '';
     _memberid = '';
+    _cachedUserId = null;
+    _lastFetchTime = null;
     notifyListeners();
   }
 }

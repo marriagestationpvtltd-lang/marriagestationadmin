@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'package:adminmrz/core/app_constants.dart';
 import 'package:adminmrz/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -18,14 +20,30 @@ class _DashboardHomeState extends State<DashboardHome> {
   String _error = '';
   final DashboardService _dashboardService = DashboardService();
   final DateFormat _dateFormat = DateFormat('EEEE, MMM d, yyyy');
+  Timer? _refreshTimer;
+  DateTime? _lastFetchTime;
+
+  bool get _isCacheValid =>
+      _lastFetchTime != null &&
+      DateTime.now().difference(_lastFetchTime!) < AppConstants.liveCacheDuration;
 
   @override
   void initState() {
     super.initState();
     _fetchDashboardData();
+    _refreshTimer = Timer.periodic(AppConstants.autoRefreshInterval, (_) {
+      if (mounted) _fetchDashboardData(forceRefresh: true);
+    });
   }
 
-  Future<void> _fetchDashboardData() async {
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _fetchDashboardData({bool forceRefresh = false}) async {
+    if (!forceRefresh && _isCacheValid && _dashboardData != null) return;
     setState(() {
       _isLoading = true;
       _error = '';
@@ -33,7 +51,10 @@ class _DashboardHomeState extends State<DashboardHome> {
     try {
       final response = await _dashboardService.getDashboardData();
       if (response.success) {
-        setState(() => _dashboardData = response.dashboard);
+        setState(() {
+          _dashboardData = response.dashboard;
+          _lastFetchTime = DateTime.now();
+        });
       } else {
         setState(() => _error = 'Failed to load dashboard data');
       }
@@ -890,7 +911,7 @@ class _DashboardHomeState extends State<DashboardHome> {
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
-            onPressed: _fetchDashboardData,
+            onPressed: () => _fetchDashboardData(forceRefresh: true),
             icon: const Icon(Icons.refresh, size: 18),
             label: const Text('Try Again'),
           ),
@@ -985,7 +1006,7 @@ class _DashboardHomeState extends State<DashboardHome> {
                   subtitle: 'Real-time member statistics'),
               const Spacer(),
               OutlinedButton.icon(
-                onPressed: _fetchDashboardData,
+                onPressed: () => _fetchDashboardData(forceRefresh: true),
                 icon: const Icon(Icons.refresh, size: 15),
                 label: const Text('Refresh'),
                 style: OutlinedButton.styleFrom(

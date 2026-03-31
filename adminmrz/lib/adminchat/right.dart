@@ -419,7 +419,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
           Expanded(
             child: Consumer<MatchedProfileProvider>(
               builder: (context, provider, child) {
-                if (provider.isloading) {
+                if (provider.isLoading) {
                   return Center(child: CircularProgressIndicator());
                 }
 

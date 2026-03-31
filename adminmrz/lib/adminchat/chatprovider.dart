@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:adminmrz/core/app_constants.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
@@ -8,8 +10,8 @@ class ChatProvider extends ChangeNotifier {
   List<Map<String, String>> _chatList = [];
   List<Map<String, String>> _userList = [];
 
-  int? id; // Store index 0 ID
-  String? namee; // Store index 0 Name
+  int? id;
+  String? namee;
   bool online = true;
   int? userid;
   String? memberid;
@@ -19,29 +21,57 @@ class ChatProvider extends ChangeNotifier {
   bool ispaid = true;
   bool isonline = true;
 
-  // Add profile picture field
   String? profilePicture;
 
-  // New match-related fields
   int? _matchesCount;
   List<Map<String, dynamic>> _matchedProfiles = [];
   bool _isLoadingMatches = false;
   String? _matchError;
 
-  // Getters for match data
+  // Cache & auto-refresh
+  DateTime? _lastFetchTime;
+  Timer? _refreshTimer;
+
+  bool get _isCacheValid =>
+      _lastFetchTime != null &&
+      DateTime.now().difference(_lastFetchTime!) < AppConstants.liveCacheDuration;
+
   int? get matchesCount => _matchesCount;
   List<Map<String, dynamic>> get matchedProfiles => _matchedProfiles;
   bool get isLoadingMatches => _isLoadingMatches;
   String? get matchError => _matchError;
-
   List<Map<String, String>> get chatList => _chatList;
 
-  // Fetch chat list from API
-  Future<void> fetchChatList() async {
-    final url = Uri.parse('https://digitallami.com/get.php');
+  /// Start auto-refreshing the chat list every [AppConstants.autoRefreshInterval].
+  void startAutoRefresh() {
+    _refreshTimer?.cancel();
+    _refreshTimer = Timer.periodic(AppConstants.autoRefreshInterval, (_) {
+      fetchChatList(forceRefresh: true);
+    });
+  }
+
+  /// Stop the auto-refresh timer.
+  void stopAutoRefresh() {
+    _refreshTimer?.cancel();
+    _refreshTimer = null;
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> fetchChatList({bool forceRefresh = false}) async {
+    if (!forceRefresh && _isCacheValid && _chatList.isNotEmpty) return;
+
+    final url = Uri.parse('${AppConstants.chatApiUrl}/get.php');
 
     try {
-      final response = await http.get(url);
+      final response = await http
+          .get(url)
+          .timeout(AppConstants.requestTimeout);
+
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = json.decode(response.body);
 
@@ -64,15 +94,13 @@ class ChatProvider extends ChangeNotifier {
             id = int.parse(tempList[0]['id'].toString());
             namee = tempList[0]['namee'];
             online = tempList[0]['online'] == 'true';
-            profilePicture = tempList[0]['profile_picture']; // Store profile picture
-
-            // Set matches count for first user
+            profilePicture = tempList[0]['profile_picture'];
             _matchesCount = int.tryParse(tempList[0]['matches'] ?? '0');
-
             myid ??= id;
           }
 
           _chatList = tempList;
+          _lastFetchTime = DateTime.now();
           notifyListeners();
         }
       }
@@ -81,25 +109,23 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  // Fetch matches for a specific user
   Future<void> fetchUserMatches(int userId) async {
     _isLoadingMatches = true;
     _matchError = null;
     notifyListeners();
 
     try {
-      // You'll need to create this API endpoint on your server
-      final url = Uri.parse('https://digitallami.com/get_matches.php?user_id=$userId');
+      final url = Uri.parse('${AppConstants.chatApiUrl}/get_matches.php?user_id=$userId');
 
-      final response = await http.get(url);
+      final response = await http
+          .get(url)
+          .timeout(AppConstants.requestTimeout);
 
       if (response.statusCode == 200) {
         final Map<String, dynamic> responseData = json.decode(response.body);
 
         if (responseData['status'] == 'success' && responseData['data'] is List) {
           _matchedProfiles = List<Map<String, dynamic>>.from(responseData['data']);
-
-          // Update matches count
           if (_matchedProfiles.isNotEmpty) {
             _matchesCount = _matchedProfiles.length;
           }
@@ -121,7 +147,6 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  // Get user by ID
   Map<String, String>? getUserById(int userId) {
     try {
       return _chatList.firstWhere(
@@ -132,7 +157,6 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  // Get matches count for a specific user
   int getMatchesCountForUser(int userId) {
     final user = getUserById(userId);
     if (user != null && user.containsKey('matches')) {
@@ -141,7 +165,6 @@ class ChatProvider extends ChangeNotifier {
     return 0;
   }
 
-  // Check if user is paid
   bool isUserPaid(int userId) {
     final user = getUserById(userId);
     if (user != null && user.containsKey('is_paid')) {
@@ -150,7 +173,6 @@ class ChatProvider extends ChangeNotifier {
     return false;
   }
 
-  // Get users with matches
   List<Map<String, String>> getUsersWithMatches() {
     return _chatList.where((user) {
       int matches = int.tryParse(user['matches'] ?? '0') ?? 0;
@@ -158,57 +180,44 @@ class ChatProvider extends ChangeNotifier {
     }).toList();
   }
 
-  // Get paid users
   List<Map<String, String>> getPaidUsers() {
-    return _chatList.where((user) {
-      return user['is_paid'] == 'true';
-    }).toList();
+    return _chatList.where((user) => user['is_paid'] == 'true').toList();
   }
 
-  // Get online users
   List<Map<String, String>> getOnlineUsers() {
-    return _chatList.where((user) {
-      return user['online'] == 'true';
-    }).toList();
+    return _chatList.where((user) => user['online'] == 'true').toList();
   }
 
-  // Search users
   List<Map<String, String>> searchUsers(String query) {
     if (query.isEmpty) return _chatList;
-
     return _chatList.where((user) {
       return user['namee']?.toLowerCase().contains(query.toLowerCase()) ?? false;
     }).toList();
   }
 
-  // Filter users with multiple criteria
   List<Map<String, String>> filterUsers({
     String? searchQuery,
     bool? paidOnly,
     bool? onlineOnly,
     bool? withMatchesOnly,
-    String? sortBy, // 'name', 'matches', 'last_seen'
+    String? sortBy,
   }) {
     List<Map<String, String>> filtered = List.from(_chatList);
 
-    // Apply search filter
     if (searchQuery != null && searchQuery.isNotEmpty) {
       filtered = filtered.where((user) {
         return user['namee']?.toLowerCase().contains(searchQuery.toLowerCase()) ?? false;
       }).toList();
     }
 
-    // Apply paid filter
     if (paidOnly == true) {
       filtered = filtered.where((user) => user['is_paid'] == 'true').toList();
     }
 
-    // Apply online filter
     if (onlineOnly == true) {
       filtered = filtered.where((user) => user['online'] == 'true').toList();
     }
 
-    // Apply matches filter
     if (withMatchesOnly == true) {
       filtered = filtered.where((user) {
         int matches = int.tryParse(user['matches'] ?? '0') ?? 0;
@@ -216,7 +225,6 @@ class ChatProvider extends ChangeNotifier {
       }).toList();
     }
 
-    // Apply sorting
     if (sortBy != null) {
       switch (sortBy) {
         case 'name':
@@ -226,19 +234,15 @@ class ChatProvider extends ChangeNotifier {
           filtered.sort((a, b) {
             int aMatches = int.tryParse(a['matches'] ?? '0') ?? 0;
             int bMatches = int.tryParse(b['matches'] ?? '0') ?? 0;
-            return bMatches.compareTo(aMatches); // Descending
+            return bMatches.compareTo(aMatches);
           });
           break;
         case 'last_seen':
           filtered.sort((a, b) {
             bool aOnline = a['online'] == 'true';
             bool bOnline = b['online'] == 'true';
-
-            // Online users first
             if (aOnline && !bOnline) return -1;
             if (!aOnline && bOnline) return 1;
-
-            // Then sort by last seen (simplified - you might want better logic)
             return (a['last_seen_text'] ?? '').compareTo(b['last_seen_text'] ?? '');
           });
           break;
@@ -248,7 +252,6 @@ class ChatProvider extends ChangeNotifier {
     return filtered;
   }
 
-  // Clear matches data
   void clearMatches() {
     _matchedProfiles = [];
     _matchesCount = null;
@@ -261,7 +264,6 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Method to update namee from another page
   void updateName(String newName) {
     namee = newName;
     notifyListeners();
@@ -274,8 +276,6 @@ class ChatProvider extends ChangeNotifier {
 
   void updateidd(int newId) {
     id = newId;
-
-    // Update profile picture when changing selected user
     final user = getUserById(newId);
     if (user != null) {
       profilePicture = user['profile_picture'];
@@ -283,7 +283,6 @@ class ChatProvider extends ChangeNotifier {
       ispaid = user['is_paid'] == 'true';
       online = user['online'] == 'true';
     }
-
     notifyListeners();
   }
 
@@ -292,19 +291,16 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // Update paid status
   void updatePaidStatus(bool newStatus) {
     ispaid = newStatus;
     notifyListeners();
   }
 
-  // Update matches count
   void updateMatchesCount(int count) {
     _matchesCount = count;
     notifyListeners();
   }
 
-  // Add method to update profile picture
   void updateProfilePicture(String picture) {
     profilePicture = picture;
     notifyListeners();
