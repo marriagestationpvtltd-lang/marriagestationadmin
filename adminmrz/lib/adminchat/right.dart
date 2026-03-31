@@ -1046,9 +1046,20 @@ class _ProfileCard extends StatelessWidget {
 
                   const SizedBox(height: 2),
 
-                  // Member ID row
+                  // User ID + Member ID row
                   Row(
                     children: [
+                      const Icon(Icons.tag, size: 10,
+                          color: _kMuted),
+                      const SizedBox(width: 3),
+                      Text(
+                        '$profileId',
+                        style: const TextStyle(
+                            fontSize: 9,
+                            color: _kMuted,
+                            fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(width: 6),
                       const Icon(Icons.badge_outlined, size: 10,
                           color: _kMuted),
                       const SizedBox(width: 3),

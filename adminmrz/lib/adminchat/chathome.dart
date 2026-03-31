@@ -624,6 +624,21 @@ class _ChatWindowState extends State<ChatWindow> {
                             color: chatProvider.online ? kOnline : kMuted,
                           ),
                         ),
+                        if (chatProvider.id != null)
+                          Row(
+                            children: [
+                              const Icon(Icons.tag, size: 10, color: kMuted),
+                              const SizedBox(width: 2),
+                              Text(
+                                '${chatProvider.id}',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: kMuted,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
                       ],
                     ),
                   ],
