@@ -341,7 +341,6 @@ class _ChatWindowState extends State<ChatWindow> {
         preferredSize: const Size.fromHeight(60),
         child: Container(
           height: 60,
-          color: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: const BoxDecoration(
             color: Colors.white,
@@ -1203,7 +1202,6 @@ class _ChatWindowState extends State<ChatWindow> {
     const kBorder = Color(0xFFE2E8F0);
 
     return Container(
-      color: Colors.white,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: const BoxDecoration(
         color: Colors.white,
