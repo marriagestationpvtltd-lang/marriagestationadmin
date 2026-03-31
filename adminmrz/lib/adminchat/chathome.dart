@@ -50,7 +50,7 @@ class _ChatWindowState extends State<ChatWindow> {
   File? _selectedImage;
   Uint8List? _selectedImageBytes;
   List<QueryDocumentSnapshot> _filteredMessages = [];
-  html.SpeechRecognition? _webSpeechRecognition;
+  js.JsObject? _webSpeechRecognition;
   FlutterSoundRecorder _recorder = FlutterSoundRecorder();
   final ScrollController _scrollController = ScrollController();
   QuerySnapshot? _lastSnapshot;
@@ -112,82 +112,95 @@ class _ChatWindowState extends State<ChatWindow> {
   }
 
   void _initializeWebSpeech() {
-    if (js.context.hasProperty('webkitSpeechRecognition')) {
-      _webSpeechRecognition = html.SpeechRecognition();
-      _webSpeechRecognition!.continuous = true;
-      _webSpeechRecognition!.interimResults = true;
-      _webSpeechRecognition!.lang = _selectedLanguage;
+    // Use the webkit-prefixed constructor directly so Chrome recognizes the API.
+    // Falling back to the unprefixed constructor for browsers that support it.
+    final dynamic speechClass = js.context.hasProperty('SpeechRecognition')
+        ? js.context['SpeechRecognition']
+        : js.context.hasProperty('webkitSpeechRecognition')
+            ? js.context['webkitSpeechRecognition']
+            : null;
 
-      _webSpeechRecognition!.onResult.listen((event) {
-        if (event.results != null) {
-          String interimTranscript = '';
-          String finalTranscript = '';
+    if (speechClass == null) return;
 
-          final results = js.JsObject.fromBrowserObject(event.results!);
-          final length = results['length'] as int;
-          for (int i = 0; i < length; i++) {
-            final result = results.callMethod('item', [i]) as js.JsObject;
-            final transcript = result.callMethod('item', [0])['transcript'] as String;
-            final isFinal = result['isFinal'] as bool;
-            if (isFinal) {
-              finalTranscript += transcript;
-            } else {
-              interimTranscript += transcript;
-            }
-          }
+    _webSpeechRecognition = js.JsObject(speechClass as js.JsFunction);
+    _webSpeechRecognition!['continuous'] = true;
+    _webSpeechRecognition!['interimResults'] = true;
+    _webSpeechRecognition!['lang'] = _selectedLanguage;
 
-          // Accumulate final transcripts into the base text
-          if (finalTranscript.isNotEmpty) {
-            _textBeforeVoice = _textBeforeVoice + finalTranscript;
-          }
+    _webSpeechRecognition!['onresult'] = js.allowInterop((dynamic event) {
+      final results = js.JsObject.fromBrowserObject(event)['results'];
+      if (results == null) return;
 
-          final displayText = interimTranscript.isNotEmpty
-              ? _textBeforeVoice + interimTranscript
-              : _textBeforeVoice;
+      final resultList = js.JsObject.fromBrowserObject(results);
+      final int length = resultList['length'] as int;
 
-          setState(() {
-            _messageController.text = displayText;
-            _messageController.selection = TextSelection.fromPosition(
-              TextPosition(offset: displayText.length),
-            );
-          });
+      String interimTranscript = '';
+      String finalTranscript = '';
+
+      for (int i = 0; i < length; i++) {
+        final result = js.JsObject.fromBrowserObject(
+            resultList.callMethod('item', [i]));
+        final transcript =
+            js.JsObject.fromBrowserObject(result.callMethod('item', [0]))['transcript'] as String;
+        final isFinal = result['isFinal'] as bool;
+        if (isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
         }
-      });
+      }
 
-      _webSpeechRecognition!.onEnd.listen((event) {
-        setState(() => _isListening = false);
-      });
+      if (finalTranscript.isNotEmpty) {
+        _textBeforeVoice = _textBeforeVoice + finalTranscript;
+      }
 
-      _webSpeechRecognition!.onError.listen((event) {
-        // Reset the text field to what it was before voice input started,
-        // so no partial/stale transcription remains in the field.
-        final resetText = _textBeforeVoice.trimRight();
-        setState(() {
-          _isListening = false;
-          _messageController.text = resetText;
-          _messageController.selection = TextSelection.fromPosition(
-            TextPosition(offset: resetText.length),
-          );
-        });
-        String errorMsg;
-        switch (event.error) {
-          case 'not-allowed':
-          case 'service-not-allowed':
-            errorMsg = 'Microphone access denied. Please allow microphone permission in your browser settings.';
-            break;
-          case 'no-speech':
-            errorMsg = 'No speech detected. Please try again.';
-            break;
-          case 'aborted':
-            return; // user-initiated stop, no message needed
-          default:
-            errorMsg = 'Speech error: ${event.error}';
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMsg)),
+      final displayText = interimTranscript.isNotEmpty
+          ? _textBeforeVoice + interimTranscript
+          : _textBeforeVoice;
+
+      setState(() {
+        _messageController.text = displayText;
+        _messageController.selection = TextSelection.fromPosition(
+          TextPosition(offset: displayText.length),
         );
       });
-    }
+    });
+
+    _webSpeechRecognition!['onend'] = js.allowInterop((dynamic _) {
+      setState(() => _isListening = false);
+    });
+
+    _webSpeechRecognition!['onerror'] = js.allowInterop((dynamic event) {
+      final error =
+          js.JsObject.fromBrowserObject(event)['error'] as String? ?? '';
+      if (error == 'aborted') return; // user-initiated stop
+
+      final resetText = _textBeforeVoice.trimRight();
+      setState(() {
+        _isListening = false;
+        _messageController.text = resetText;
+        _messageController.selection = TextSelection.fromPosition(
+          TextPosition(offset: resetText.length),
+        );
+      });
+
+      String errorMsg;
+      switch (error) {
+        case 'not-allowed':
+        case 'service-not-allowed':
+          errorMsg =
+              'Microphone access denied. Please allow microphone permission in your browser settings.';
+          break;
+        case 'no-speech':
+          errorMsg = 'No speech detected. Please try again.';
+          break;
+        default:
+          errorMsg = 'Speech error: $error';
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMsg)),
+      );
+    });
   }
 
   Future<void> _initializeRecorder() async {
@@ -199,23 +212,19 @@ class _ChatWindowState extends State<ChatWindow> {
 
   void _startListening() {
     if (_webSpeechRecognition != null && !_isListening) {
-      // Save current text as base so transcript is appended, not replaced.
-      // Do NOT call getUserMedia() here — the Web Speech API handles its own
-      // microphone permission internally. Calling getUserMedia first creates a
-      // double permission prompt which causes browsers to report "access denied".
       _textBeforeVoice = _messageController.text;
       if (_textBeforeVoice.isNotEmpty && !_textBeforeVoice.endsWith(' ')) {
         _textBeforeVoice += ' ';
       }
-      _webSpeechRecognition!.lang = _selectedLanguage;
-      _webSpeechRecognition!.start();
+      _webSpeechRecognition!['lang'] = _selectedLanguage;
+      _webSpeechRecognition!.callMethod('start');
       setState(() => _isListening = true);
     }
   }
 
   void _stopListening() {
     if (_isListening && _webSpeechRecognition != null) {
-      _webSpeechRecognition!.stop();
+      _webSpeechRecognition!.callMethod('stop');
       setState(() => _isListening = false);
     }
   }
@@ -1186,7 +1195,7 @@ class _ChatWindowState extends State<ChatWindow> {
                     setState(() {
                       _selectedLanguage = _selectedLanguage == 'en-US' ? 'ne-NP' : 'en-US';
                       if (_webSpeechRecognition != null) {
-                        _webSpeechRecognition!.lang = _selectedLanguage;
+                        _webSpeechRecognition!['lang'] = _selectedLanguage;
                       }
                     });
                   },
