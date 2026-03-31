@@ -1021,8 +1021,8 @@ class _UsersPageState extends State<UsersPage>
     );
   }
 
-  String _formatLastLogin(String lastLogin) {
-    if (lastLogin.isEmpty || lastLogin == 'null') return 'Never';
+  String _formatLastLogin(String? lastLogin) {
+    if (lastLogin == null || lastLogin.isEmpty || lastLogin == 'null') return 'Never';
     try {
       final dt = DateTime.parse(lastLogin);
       final now = DateTime.now();
