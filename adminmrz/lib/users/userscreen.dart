@@ -245,69 +245,76 @@ class _UsersPageState extends State<UsersPage> {
                 ),
               ],
             )
-          : Row(
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── title + meta ──────────────────────────────────────────────
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Manage Members',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 20,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: -0.3,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
+                Row(
+                  children: [
+                    // ── title + meta ──────────────────────────────────────────────
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
-                              borderRadius: AppTheme.radiusSm,
-                            ),
-                            child: Text(
-                              '${provider.totalCount} total',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
+                          const Text(
+                            'Manage Members',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: -0.3,
                             ),
                           ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Marriage Station',
-                            style: TextStyle(
-                              color: Colors.white.withOpacity(0.7),
-                              fontSize: 12,
-                            ),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.2),
+                                  borderRadius: AppTheme.radiusSm,
+                                ),
+                                child: Text(
+                                  '${provider.totalCount} total',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Marriage Station',
+                                style: TextStyle(
+                                  color: Colors.white.withOpacity(0.7),
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ),
-                // ── Refresh button ────────────────────────────────────────────
-                Tooltip(
-                  message: 'Refresh',
-                  child: Material(
-                    color: Colors.white.withOpacity(0.15),
-                    borderRadius: AppTheme.radiusMd,
-                    child: InkWell(
-                      onTap: () => provider.fetchUsers(forceRefresh: true),
-                      borderRadius: AppTheme.radiusMd,
-                      child: const Padding(
-                        padding: EdgeInsets.all(10),
-                        child: Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
+                    ),
+                    // ── Refresh button ────────────────────────────────────────────
+                    Tooltip(
+                      message: 'Refresh',
+                      child: Material(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: AppTheme.radiusMd,
+                        child: InkWell(
+                          onTap: () => provider.fetchUsers(forceRefresh: true),
+                          borderRadius: AppTheme.radiusMd,
+                          child: const Padding(
+                            padding: EdgeInsets.all(10),
+                            child: Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
+                  ],
                 ),
+                // ── Stats grid inside header ──────────────────────────────────
+                _buildStatsGrid(provider, padding: const EdgeInsets.only(top: 12)),
               ],
             ),
     );
@@ -315,7 +322,7 @@ class _UsersPageState extends State<UsersPage> {
 
   // ─── Stats Grid ─────────────────────────────────────────────────────────────
 
-  Widget _buildStatsGrid(UserProvider provider) {
+  Widget _buildStatsGrid(UserProvider provider, {EdgeInsets padding = const EdgeInsets.fromLTRB(12, 14, 12, 4)}) {
     final statusStats = provider.getStatusStats();
     final typeStats = provider.getUserTypeStats();
     final onlineCount = provider.allUsers.where((u) => u.isOnline == 1).length;
@@ -331,7 +338,7 @@ class _UsersPageState extends State<UsersPage> {
     ];
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 14, 12, 4),
+      padding: padding,
       child: LayoutBuilder(
         builder: (context, constraints) {
           const cols = 3;
@@ -1433,9 +1440,6 @@ class _UsersPageState extends State<UsersPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Stats grid
-                        _buildStatsGrid(provider),
-
                         // Select all row
                         _buildSelectAllRow(provider),
 
