@@ -44,7 +44,7 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
       context
           .read<UserDetailsProvider>()
           .fetchUserDetails(widget.userId, widget.myId);
-      // Load documents for this user if not yet initialised
+      // Load documents for this user if not yet initialized
       final docProvider = context.read<DocumentsProvider>();
       if (!docProvider.isInitialized && !docProvider.isLoading) {
         docProvider.fetchDocuments();
