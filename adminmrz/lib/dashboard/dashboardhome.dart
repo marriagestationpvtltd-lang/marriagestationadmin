@@ -1,9 +1,22 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'dashmodel.dart';
 import 'dashservice.dart';
+
+// ─── Design tokens ────────────────────────────────────────────────────────────
+const _kPrimary  = Color(0xFF6366F1);
+const _kEmerald  = Color(0xFF10B981);
+const _kSky      = Color(0xFF0EA5E9);
+const _kViolet   = Color(0xFF8B5CF6);
+const _kAmber    = Color(0xFFF59E0B);
+const _kRose     = Color(0xFFEF4444);
+const _kPink     = Color(0xFFEC4899);
+const _kSlate700 = Color(0xFF334155);
+const _kSlate500 = Color(0xFF64748B);
+
+const _kUnknownLabel = 'Unknown';
+final _kBannerDateFmt = DateFormat('EEEE, MMMM d, yyyy');
 
 class DashboardHome extends StatefulWidget {
   const DashboardHome({super.key});
@@ -17,7 +30,6 @@ class _DashboardHomeState extends State<DashboardHome> {
   bool _isLoading = true;
   String _error = '';
   final DashboardService _dashboardService = DashboardService();
-  final DateFormat _dateFormat = DateFormat('MMM d, yyyy');
 
   @override
   void initState() {
@@ -30,694 +42,575 @@ class _DashboardHomeState extends State<DashboardHome> {
       _isLoading = true;
       _error = '';
     });
-
     try {
       final response = await _dashboardService.getDashboardData();
       if (response.success) {
-        setState(() {
-          _dashboardData = response.dashboard;
-        });
+        setState(() => _dashboardData = response.dashboard);
       } else {
-        setState(() {
-          _error = 'Failed to load dashboard data';
-        });
+        setState(() => _error = 'Failed to load dashboard data');
       }
     } catch (e) {
-      setState(() {
-        _error = 'Error: ${e.toString()}';
-      });
+      setState(() => _error = 'Unable to load dashboard data. Please try again.');
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      setState(() => _isLoading = false);
     }
   }
 
-  Widget _buildStatCard({
-    required String title,
+  // ─── KPI card ───────────────────────────────────────────────────────────────
+  Widget _buildKpiCard({
+    required String label,
     required String value,
     required IconData icon,
     required Color color,
-    String? subTitle,
-    double iconSize = 28,
+    String? subtitle,
   }) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        border: Border(top: BorderSide(color: color, width: 3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: color, size: iconSize),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.10),
+              borderRadius: BorderRadius.circular(8),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    value,
-                    style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                    ),
-                  ),
-                  if (subTitle != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      subTitle,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ],
-                ],
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w700,
+              color: _kSlate700,
+              height: 1,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: _kSlate500,
+            ),
+          ),
+          if (subtitle != null) ...[
+            const SizedBox(height: 2),
+            Text(
+              subtitle,
+              style: TextStyle(
+                fontSize: 11,
+                color: _kSlate500.withOpacity(0.65),
               ),
             ),
           ],
-        ),
+        ],
       ),
     );
   }
 
-  Widget _buildSection({
-    required String title,
-    required Widget child,
-    Widget? trailing,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  // ─── Section header ─────────────────────────────────────────────────────────
+  Widget _buildSectionHeader(String title, {VoidCallback? onRefresh}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: _kSlate700,
+              letterSpacing: -0.2,
+            ),
+          ),
+          const Spacer(),
+          if (onRefresh != null)
+            GestureDetector(
+              onTap: onRefresh,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: _kPrimary.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.refresh_rounded, size: 13, color: _kPrimary),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Refresh',
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: _kPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ─── User KPI row ────────────────────────────────────────────────────────────
+  Widget _buildUserStatsRow() {
+    final u = _dashboardData?.users;
+    if (u == null) return const SizedBox.shrink();
+    return Row(
       children: [
-        Padding(
-          padding: const EdgeInsets.only(bottom: 16),
-          child: Row(
+        Expanded(child: _buildKpiCard(label: 'Total Members', value: '${u.total}', icon: Icons.people_alt_rounded, color: _kPrimary)),
+        const SizedBox(width: 14),
+        Expanded(child: _buildKpiCard(label: 'Active Users', value: '${u.active}', icon: Icons.check_circle_rounded, color: _kEmerald)),
+        const SizedBox(width: 14),
+        Expanded(child: _buildKpiCard(label: 'Online Now', value: '${u.online}', icon: Icons.wifi_rounded, color: _kSky)),
+        const SizedBox(width: 14),
+        Expanded(child: _buildKpiCard(label: 'Verified', value: '${u.verified}', icon: Icons.verified_rounded, color: _kViolet)),
+      ],
+    );
+  }
+
+  // ─── Revenue KPI row ─────────────────────────────────────────────────────────
+  Widget _buildRevenueStatsRow() {
+    final p = _dashboardData?.payments;
+    if (p == null) return const SizedBox.shrink();
+    return Row(
+      children: [
+        Expanded(child: _buildKpiCard(label: 'Total Revenue', value: p.totalEarning, icon: Icons.account_balance_wallet_rounded, color: _kEmerald)),
+        const SizedBox(width: 14),
+        Expanded(child: _buildKpiCard(label: "Today's Revenue", value: p.todayEarning, icon: Icons.today_rounded, color: _kAmber, subtitle: 'earned today')),
+        const SizedBox(width: 14),
+        Expanded(child: _buildKpiCard(label: 'Monthly Revenue', value: p.thisMonthEarning, icon: Icons.calendar_month_rounded, color: _kSky, subtitle: 'this month')),
+        const SizedBox(width: 14),
+        Expanded(child: _buildKpiCard(label: 'Total Sales', value: '${p.totalSold}', icon: Icons.shopping_bag_rounded, color: _kRose)),
+      ],
+    );
+  }
+
+  // ─── Best-selling package card ───────────────────────────────────────────────
+  Widget _buildBestPackageCard() {
+    final pkg = _dashboardData?.payments.bestSellingPackage;
+    if (pkg == null) return const SizedBox.shrink();
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: _kPrimary.withOpacity(0.28),
+            blurRadius: 18,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: Color(0xFF333333),
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.star_rounded, color: Colors.white, size: 18),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  '🏆  Top Seller',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
                 ),
               ),
-              if (trailing != null) trailing,
             ],
           ),
-        ),
-        child,
-      ],
-    );
-  }
-
-  Widget _buildUserStats() {
-    final users = _dashboardData?.users;
-    if (users == null) return const SizedBox.shrink();
-
-    return GridView.count(
-      crossAxisCount: 4,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 2.2,
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
-      children: [
-        _buildStatCard(
-          title: 'Total Users',
-          value: users.total.toString(),
-          icon: Icons.people_outline,
-          color: Color(0xFF667eea),
-        ),
-        _buildStatCard(
-          title: 'Active Users',
-          value: users.active.toString(),
-          icon: Icons.check_circle_outline,
-          color: Colors.green,
-        ),
-        _buildStatCard(
-          title: 'Online Now',
-          value: users.online.toString(),
-          icon: Icons.circle,
-          color: Colors.green,
-        ),
-        _buildStatCard(
-          title: 'Verified',
-          value: users.verified.toString(),
-          icon: Icons.verified_outlined,
-          color: Colors.blue,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPaymentStats() {
-    final payments = _dashboardData?.payments;
-    if (payments == null) return const SizedBox.shrink();
-
-    return GridView.count(
-      crossAxisCount: 4,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      childAspectRatio: 2.2,
-      crossAxisSpacing: 16,
-      mainAxisSpacing: 16,
-      children: [
-        _buildStatCard(
-          title: 'Total Revenue',
-          value: payments.totalEarning,
-          icon: Icons.attach_money_outlined,
-          color: Colors.green,
-        ),
-        _buildStatCard(
-          title: 'Today\'s Revenue',
-          value: payments.todayEarning,
-          icon: Icons.today_outlined,
-          color: Colors.green,
-          subTitle: 'earned today',
-        ),
-        _buildStatCard(
-          title: 'Monthly Revenue',
-          value: payments.thisMonthEarning,
-          icon: Icons.bar_chart_outlined,
-          color: Colors.green,
-          subTitle: 'this month',
-        ),
-        _buildStatCard(
-          title: 'Total Sales',
-          value: payments.totalSold.toString(),
-          icon: Icons.shopping_cart_outlined,
-          color: Colors.orange,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildPackageStats() {
-    final payments = _dashboardData?.payments;
-    if (payments == null) return const SizedBox.shrink();
-
-    final bestPackage = payments.bestSellingPackage;
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.amber.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(
-                Icons.star_outline,
-                size: 36,
-                color: Colors.amber,
-              ),
+          const SizedBox(height: 20),
+          const Text(
+            'Best Selling Package',
+            style: TextStyle(fontSize: 11, color: Colors.white70, fontWeight: FontWeight.w500),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            pkg.name,
+            style: const TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: Colors.white,
             ),
-            const SizedBox(width: 20),
-            Expanded(
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 6),
+          Text(
+            '${pkg.total} sales',
+            style: const TextStyle(fontSize: 13, color: Colors.white70),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Payment methods card ────────────────────────────────────────────────────
+  Widget _buildPaymentMethodsCard() {
+    final p = _dashboardData?.payments;
+    if (p == null || p.byMethod.isEmpty) return const SizedBox.shrink();
+
+    final palette = [_kPrimary, _kEmerald, _kAmber, _kSky, _kViolet, _kRose];
+    return _buildCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _cardTitle('Payment Methods', Icons.credit_card_rounded, _kPrimary),
+          const SizedBox(height: 16),
+          ...p.byMethod.asMap().entries.map((e) {
+            final color = palette[e.key % palette.length];
+            final pct   = p.totalSold > 0 ? e.value.total / p.totalSold : 0.0;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'Best Selling Package',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
-                      fontWeight: FontWeight.w500,
-                    ),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 7,
+                            height: 7,
+                            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                          ),
+                          const SizedBox(width: 7),
+                          Text(
+                            e.value.paidby,
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: _kSlate700),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        '${e.value.total}  (${(pct * 100).toStringAsFixed(0)}%)',
+                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: color),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    bestPackage.name,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${bestPackage.total} sales',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
+                  const SizedBox(height: 5),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: pct,
+                      backgroundColor: color.withOpacity(0.10),
+                      valueColor: AlwaysStoppedAnimation<Color>(color),
+                      minHeight: 5,
                     ),
                   ),
                 ],
               ),
-            ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.amber.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.trending_up,
-                    size: 16,
-                    color: Colors.amber,
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Top Seller',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.amber.shade700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+            );
+          }).toList(),
+        ],
       ),
     );
   }
 
-  Widget _buildUserDistribution() {
-    final users = _dashboardData?.users;
-    if (users == null) return const SizedBox.shrink();
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'User Distribution',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF333333),
-              ),
-            ),
-            const SizedBox(height: 20),
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              childAspectRatio: 3,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
+  // ─── User-distribution row ───────────────────────────────────────────────────
+  Widget _buildUserDistributionRow() {
+    final u = _dashboardData?.users;
+    if (u == null) return const SizedBox.shrink();
+    final total = u.total;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: _buildCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // User Type Distribution
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.blue.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.category_outlined,
-                            size: 18,
-                            color: Colors.blue.shade700,
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'User Types',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      ...users.byType.map((type) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                type.usertype.toUpperCase(),
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              Text(
-                                '${type.total} users',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.blue.shade700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ],
-                  ),
-                ),
-                // Gender Distribution
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.pink.shade50,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.female_outlined,
-                            size: 18,
-                            color: Colors.pink.shade700,
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Gender',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w600,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      ...users.byGender.map((gender) {
-                        return Padding(
-                          padding: const EdgeInsets.only(bottom: 8),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                gender.gender,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              Text(
-                                '${gender.total} users',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: Colors.pink.shade700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
-                    ],
+                _cardTitle('User Types', Icons.category_rounded, _kPrimary),
+                const SizedBox(height: 14),
+                ...u.byType.map(
+                  (t) => _buildDistributionRow(
+                    t.usertype.isEmpty ? _kUnknownLabel : t.usertype,
+                    t.total,
+                    total,
+                    _kPrimary,
                   ),
                 ),
               ],
             ),
-          ],
+          ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildPaymentMethodDistribution() {
-    final payments = _dashboardData?.payments;
-    if (payments == null || payments.byMethod.isEmpty) return const SizedBox.shrink();
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Payment Methods',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF333333),
-              ),
-            ),
-            const SizedBox(height: 16),
-            ...payments.byMethod.map((method) {
-              final percentage = payments.totalSold > 0
-                  ? (method.total / payments.totalSold * 100)
-                  : 0;
-
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          method.paidby,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.black87,
-                          ),
-                        ),
-                        Text(
-                          '${method.total} payments (${percentage.toStringAsFixed(1)}%)',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.green,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    LinearProgressIndicator(
-                      value: percentage / 100,
-                      backgroundColor: Colors.green.shade100,
-                      valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
-                      minHeight: 8,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ],
-                ),
-              );
-            }).toList(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildAddressInfo() {
-    final address = _dashboardData?.permanentAddress;
-    if (address == null) return const SizedBox.shrink();
-
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'User Address Information',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF333333),
-              ),
-            ),
-            const SizedBox(height: 20),
-            GridView.count(
-              crossAxisCount: 2,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              childAspectRatio: 2.5,
-              crossAxisSpacing: 16,
-              mainAxisSpacing: 16,
+        const SizedBox(width: 14),
+        Expanded(
+          child: _buildCard(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildStatCard(
-                  title: 'Users with Address',
-                  value: address.totalWithAddress.toString(),
-                  icon: Icons.location_on_outlined,
-                  color: Colors.purple,
-                  iconSize: 24,
-                ),
-                _buildStatCard(
-                  title: 'Residential Status',
-                  value: address.byResidentialStatus.length.toString(),
-                  icon: Icons.home_outlined,
-                  color: Colors.blue,
-                  iconSize: 24,
-                  subTitle: 'types',
+                _cardTitle('Gender', Icons.people_rounded, _kPink),
+                const SizedBox(height: 14),
+                ...u.byGender.map(
+                  (g) => _buildDistributionRow(
+                    g.gender.isEmpty ? _kUnknownLabel : g.gender,
+                    g.total,
+                    total,
+                    _kPink,
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 20),
-            if (address.byCountry.isNotEmpty) ...[
-              const Text(
-                'Top Countries',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.black87,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: address.byCountry.map((country) {
-                  return Chip(
-                    label: Text('${country.country} (${country.total})'),
-                    backgroundColor: Colors.blue.shade50,
-                    labelStyle: TextStyle(color: Colors.blue.shade800),
-                  );
-                }).toList(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDistributionRow(String label, int count, int total, Color color) {
+    final pct = total > 0 ? count / total : 0.0;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(label, style: const TextStyle(fontSize: 12, color: _kSlate500)),
+              Text(
+                '$count',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color),
               ),
             ],
-          ],
-        ),
+          ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: pct,
+              backgroundColor: color.withOpacity(0.08),
+              valueColor: AlwaysStoppedAnimation<Color>(color.withOpacity(0.65)),
+              minHeight: 4,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildRecentActivity() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Recent Activity',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: Color(0xFF333333),
-              ),
-            ),
+  // ─── Geographic card ─────────────────────────────────────────────────────────
+  Widget _buildGeographicCard() {
+    final addr = _dashboardData?.permanentAddress;
+    if (addr == null) return const SizedBox.shrink();
+    return _buildCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _cardTitle('Geographic Data', Icons.public_rounded, _kViolet),
+              const Spacer(),
+              _miniStat('With Address', '${addr.totalWithAddress}', _kViolet),
+              const SizedBox(width: 20),
+              _miniStat('Res. Types', '${addr.byResidentialStatus.length}', _kSky),
+            ],
+          ),
+          if (addr.byCountry.isNotEmpty) ...[
             const SizedBox(height: 16),
-            const ListTile(
-              leading: CircleAvatar(
-                backgroundColor: Colors.green,
-                child: Icon(Icons.person_add, size: 18, color: Colors.white),
-              ),
-              title: Text('New user registration'),
-              subtitle: Text('John Doe registered today'),
-              trailing: Text('2 min ago'),
+            const Text(
+              'Top Countries',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: _kSlate500),
             ),
-            const Divider(),
-            const ListTile(
-              leading: CircleAvatar(
-                backgroundColor: Colors.blue,
-                child: Icon(Icons.payment, size: 18, color: Colors.white),
-              ),
-              title: Text('Payment received'),
-              subtitle: Text('Silver package purchased'),
-              trailing: Text('10 min ago'),
-            ),
-            const Divider(),
-            const ListTile(
-              leading: CircleAvatar(
-                backgroundColor: Colors.orange,
-                child: Icon(Icons.verified, size: 18, color: Colors.white),
-              ),
-              title: Text('Document approved'),
-              subtitle: Text('User profile verified'),
-              trailing: Text('1 hour ago'),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: addr.byCountry.map((c) {
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: _kPrimary.withOpacity(0.07),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: _kPrimary.withOpacity(0.14)),
+                  ),
+                  child: Text(
+                    '${c.country}  ${c.total}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: _kPrimary,
+                    ),
+                  ),
+                );
+              }).toList(),
             ),
           ],
-        ),
+        ],
       ),
     );
   }
 
+  // ─── Welcome banner ──────────────────────────────────────────────────────────
+  Widget _buildWelcomeBanner() {
+    final hour = DateTime.now().hour;
+    final greeting = hour < 12 ? 'Good Morning' : hour < 17 ? 'Good Afternoon' : 'Good Evening';
+    final dateStr  = _kBannerDateFmt.format(DateTime.now());
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 22),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF4F46E5), Color(0xFF6366F1)],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: const Color(0xFF6366F1).withOpacity(0.30),
+            blurRadius: 22,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$greeting! 👋',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'Marriage Station Admin Dashboard',
+                  style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.80)),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  dateStr,
+                  style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.60)),
+                ),
+              ],
+            ),
+          ),
+          const Icon(
+            Icons.admin_panel_settings_rounded,
+            size: 56,
+            color: Colors.white10,
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ─── Shared helpers ──────────────────────────────────────────────────────────
+  Widget _buildCard({required Widget child}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: child,
+    );
+  }
+
+  Widget _cardTitle(String title, IconData icon, Color color) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(7),
+          ),
+          child: Icon(icon, color: color, size: 15),
+        ),
+        const SizedBox(width: 9),
+        Text(
+          title,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: _kSlate700,
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _miniStat(String label, String value, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          value,
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: color),
+        ),
+        Text(label, style: const TextStyle(fontSize: 10, color: _kSlate500)),
+      ],
+    );
+  }
+
+  // ─── Loading / error states ──────────────────────────────────────────────────
   Widget _buildLoadingState() {
-    return Center(
+    return const Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const CircularProgressIndicator(
-            color: Color(0xFF667eea),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            'Loading dashboard data...',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey.shade600,
+          SizedBox(
+            width: 32,
+            height: 32,
+            child: CircularProgressIndicator(
+              color: _kPrimary,
+              strokeWidth: 2.5,
             ),
+          ),
+          SizedBox(height: 14),
+          Text(
+            'Loading dashboard...',
+            style: TextStyle(fontSize: 13, color: _kSlate500),
           ),
         ],
       ),
@@ -729,27 +622,31 @@ class _DashboardHomeState extends State<DashboardHome> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.error_outline,
-            size: 64,
-            color: Colors.red,
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: const BoxDecoration(
+              color: Color(0xFFFEF2F2),
+              shape: BoxShape.circle,
+            ),
+            child: const Icon(Icons.error_outline_rounded, size: 36, color: _kRose),
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 14),
           Text(
             _error,
-            style: const TextStyle(
-              fontSize: 16,
-              color: Colors.red,
-            ),
+            style: const TextStyle(fontSize: 13, color: _kSlate500),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 18),
           ElevatedButton.icon(
             onPressed: _fetchDashboardData,
-            icon: const Icon(Icons.refresh),
+            icon: const Icon(Icons.refresh_rounded, size: 15),
             label: const Text('Retry'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Color(0xFF667eea),
+              backgroundColor: _kPrimary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 11),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
           ),
         ],
@@ -757,94 +654,62 @@ class _DashboardHomeState extends State<DashboardHome> {
     );
   }
 
+  // ─── Main content ────────────────────────────────────────────────────────────
   Widget _buildDashboardContent() {
     return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Welcome Header
-          Container(
-            margin: const EdgeInsets.only(bottom: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Welcome to Admin Dashboard',
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.grey.shade800,
-                  ),
+          // Welcome banner
+          _buildWelcomeBanner(),
+          const SizedBox(height: 24),
+
+          // User KPIs
+          _buildSectionHeader('User Statistics', onRefresh: _fetchDashboardData),
+          _buildUserStatsRow(),
+          const SizedBox(height: 22),
+
+          // Revenue KPIs
+          _buildSectionHeader('Revenue Overview'),
+          _buildRevenueStatsRow(),
+          const SizedBox(height: 22),
+
+          // Best package + Payment methods (side by side)
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionHeader('Package Performance'),
+                    _buildBestPackageCard(),
+                  ],
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  _dateFormat.format(DateTime.now()),
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.grey.shade600,
-                  ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildSectionHeader('Payment Methods'),
+                    _buildPaymentMethodsCard(),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
+          const SizedBox(height: 22),
 
-          // Quick Stats
-          _buildSection(
-            title: 'Quick Stats',
-            trailing: IconButton(
-              onPressed: _fetchDashboardData,
-              icon: const Icon(Icons.refresh, color: Color(0xFF667eea)),
-              tooltip: 'Refresh',
-            ),
-            child: _buildUserStats(),
-          ),
+          // User analytics (types + gender)
+          _buildSectionHeader('User Analytics'),
+          _buildUserDistributionRow(),
+          const SizedBox(height: 22),
 
-          const SizedBox(height: 24),
-
-          // Payment Overview
-          _buildSection(
-            title: 'Revenue Overview',
-            child: _buildPaymentStats(),
-          ),
-
-          SizedBox(height: 24),
-
-          // Best Selling Package
-          _buildSection(
-            title: 'Package Performance',
-            child: _buildPackageStats(),
-          ),
-
-          const SizedBox(height: 24),
-
-          // User Distribution
-          _buildSection(
-            title: 'User Analytics',
-            child: _buildUserDistribution(),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Payment Methods
-          _buildSection(
-            title: 'Payment Analytics',
-            child: _buildPaymentMethodDistribution(),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Address Information
-          _buildSection(
-            title: 'Geographic Data',
-            child: _buildAddressInfo(),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Recent Activity
-          _buildRecentActivity(),
-
-          const SizedBox(height: 40),
+          // Geographic
+          _buildSectionHeader('Geographic Data'),
+          _buildGeographicCard(),
+          const SizedBox(height: 32),
         ],
       ),
     );
@@ -852,10 +717,8 @@ class _DashboardHomeState extends State<DashboardHome> {
 
   @override
   Widget build(BuildContext context) {
-    return _isLoading
-        ? _buildLoadingState()
-        : _error.isNotEmpty
-        ? _buildErrorState()
-        : _buildDashboardContent();
+    if (_isLoading) return _buildLoadingState();
+    if (_error.isNotEmpty) return _buildErrorState();
+    return _buildDashboardContent();
   }
 }
