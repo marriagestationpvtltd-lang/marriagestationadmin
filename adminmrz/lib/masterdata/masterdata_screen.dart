@@ -38,28 +38,28 @@ class _MasterDataScreenState extends State<MasterDataScreen>
       getEndpoint: '/admin/religion/getReligion',
       insertUpdateEndpoint: '/admin/religion/insertUpdateReligion',
       toggleEndpoint: '/admin/religion/activeInactiveReligion',
-      valueKey: 'value',
+      valueKey: 'name',
     ),
     _MasterDataCategory(
       label: 'Diet',
       getEndpoint: '/admin/diet/getDiet',
       insertUpdateEndpoint: '/admin/diet/insertUpdateDiet',
       toggleEndpoint: '/admin/diet/activeInactiveDiet',
-      valueKey: 'value',
+      valueKey: 'name',
     ),
     _MasterDataCategory(
       label: 'Marital Status',
       getEndpoint: '/admin/maritalStatus/getMaritalStatus',
       insertUpdateEndpoint: '/admin/maritalStatus/insertUpdateMaritalStatus',
       toggleEndpoint: '/admin/maritalStatus/activeInactiveMaritalStatus',
-      valueKey: 'value',
+      valueKey: 'name',
     ),
     _MasterDataCategory(
       label: 'Occupation',
       getEndpoint: '/admin/occupation/getOccupation',
       insertUpdateEndpoint: '/admin/occupation/insertUpdateOccupation',
       toggleEndpoint: '/admin/occupation/activeInactiveOccupation',
-      valueKey: 'value',
+      valueKey: 'name',
     ),
     _MasterDataCategory(
       label: 'Annual Income',
@@ -73,7 +73,7 @@ class _MasterDataScreenState extends State<MasterDataScreen>
       getEndpoint: '/admin/education/getEducation',
       insertUpdateEndpoint: '/admin/education/insertUpdateEducation',
       toggleEndpoint: '/admin/education/activeInactiveEducation',
-      valueKey: 'value',
+      valueKey: 'name',
     ),
     _MasterDataCategory(
       label: 'Height',
@@ -94,7 +94,7 @@ class _MasterDataScreenState extends State<MasterDataScreen>
       getEndpoint: '/admin/employmentType/getEmploymentType',
       insertUpdateEndpoint: '/admin/employmentType/insertUpdateEmploymentType',
       toggleEndpoint: '/admin/employmentType/activeInactiveEmploymentType',
-      valueKey: 'value',
+      valueKey: 'name',
     ),
     _MasterDataCategory(
       label: 'Community',
@@ -229,7 +229,7 @@ class _MasterDataTabViewState extends State<_MasterDataTabView>
             _items = records
                 .map((r) => _MasterDataItem(
                       id: r['id'] is int ? r['id'] : int.tryParse(r['id']?.toString() ?? '') ?? 0,
-                      value: r[vk]?.toString() ?? r['value']?.toString() ?? r['name']?.toString() ?? '',
+                      value: r[vk]?.toString() ?? r['name']?.toString() ?? r['value']?.toString() ?? '',
                       isActive: r['isActive'] is int ? r['isActive'] : int.tryParse(r['isActive']?.toString() ?? '') ?? 1,
                     ))
                 .toList();

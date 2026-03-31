@@ -70,7 +70,6 @@ class DocumentsProvider with ChangeNotifier {
         if (status == 200 || status?.toString() == '200') {
           final List<dynamic> data = responseData['recordList'] ?? [];
           _documents = data
-              .where((u) => u['isVerified'] != null)
               .map((u) => Document(
                     userId: u['id'] is int ? u['id'] : int.tryParse(u['id']?.toString() ?? '') ?? 0,
                     email: u['email']?.toString() ?? '',
@@ -79,9 +78,9 @@ class DocumentsProvider with ChangeNotifier {
                     gender: u['gender']?.toString() ?? '',
                     status: u['isVerified'] == 1
                         ? 'approved'
-                        : u['isVerified'] == 0
-                            ? 'rejected'
-                            : 'pending',
+                        : u['isVerified'] == null
+                            ? 'pending'
+                            : 'rejected',
                     isVerified: u['isVerified'] is int ? u['isVerified'] : 0,
                     documentId: u['id'] is int ? u['id'] : int.tryParse(u['id']?.toString() ?? '') ?? 0,
                     documentType: 'Identity',
