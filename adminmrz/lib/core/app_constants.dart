@@ -1,6 +1,16 @@
+import 'package:flutter/foundation.dart';
+
 class AppConstants {
-  static const String apiBaseUrl = 'https://digitallami.com/api';
-  static const String chatApiUrl = 'https://digitallami.com';
+  // On Flutter Web the app is served through Firebase Hosting, which rewrites
+  // these paths to the `proxy` Cloud Function. The function forwards requests
+  // to https://digitallami.com, adding the CORS headers that the browser
+  // requires. On non-web platforms (Android / iOS) we call the server directly.
+  static const String apiBaseUrl =
+      kIsWeb ? '/api' : 'https://digitallami.com/api';
+  static const String chatApiUrl =
+      kIsWeb ? '' : 'https://digitallami.com';
+  static const String api2BaseUrl =
+      kIsWeb ? '/Api2' : 'https://digitallami.com/Api2';
 
   static const Duration requestTimeout = Duration(seconds: 15);
 
@@ -13,3 +23,4 @@ class AppConstants {
   /// How often the dashboard and chat list auto-refresh.
   static const Duration autoRefreshInterval = Duration(seconds: 30);
 }
+

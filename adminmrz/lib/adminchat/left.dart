@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 
 import 'package:adminmrz/adminchat/services/MatchedProfileService.dart';
+import 'package:adminmrz/core/app_constants.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -48,7 +49,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
 
   Future<void> fetchUsers() async {
     final response =
-    await http.get(Uri.parse('https://digitallami.com/get.php'));
+    await http.get(Uri.parse('${AppConstants.chatApiUrl}/get.php'));
 
     if (response.statusCode == 200) {
       final jsonResponse = jsonDecode(response.body);
