@@ -655,6 +655,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
   // ── USER ROW ────────────────────────────────────────────────────────
   Widget _buildUserRow(
     String name,
+    String userId,
     String chatMessage,
     int matches,
     String lastSeen,
@@ -741,6 +742,21 @@ class _ChatSidebarState extends State<ChatSidebar> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (userId.isNotEmpty)
+                    Row(
+                      children: [
+                        const Icon(Icons.tag, size: 10, color: kMuted),
+                        const SizedBox(width: 2),
+                        Text(
+                          userId,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: kMuted,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
                   const SizedBox(height: 2),
                   Text(
                     isOnline ? "Online" : lastSeen,
