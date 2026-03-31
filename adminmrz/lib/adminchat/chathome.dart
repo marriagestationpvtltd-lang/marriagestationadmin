@@ -56,6 +56,10 @@ class _ChatWindowState extends State<ChatWindow> {
   QuerySnapshot? _lastSnapshot;
   String? _lastUploadedImageUrl;
 
+  // Voice typing state
+  String _selectedLanguage = 'en-US'; // 'en-US' or 'ne-NP'
+  String _textBeforeVoice = ''; // text already in field before listening started
+
   // Match-related data
   Map<String, dynamic>? _matchDetails;
   bool _isLoadingMatchDetails = false;
@@ -68,6 +72,9 @@ class _ChatWindowState extends State<ChatWindow> {
     _initializeRecorder();
     _printFirebaseConfig();
     _fetchMatchDetails();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FocusScope.of(context).requestFocus(_messageFocusNode);
+    });
   }
 
   void _printFirebaseConfig() {
@@ -109,16 +116,39 @@ class _ChatWindowState extends State<ChatWindow> {
       _webSpeechRecognition = html.SpeechRecognition();
       _webSpeechRecognition!.continuous = true;
       _webSpeechRecognition!.interimResults = true;
-      _webSpeechRecognition!.lang = 'en-US';
+      _webSpeechRecognition!.lang = _selectedLanguage;
 
       _webSpeechRecognition!.onResult.listen((event) {
-        if (event.results!.isNotEmpty) {
-          var result = event.results!.last;
-          String transcript = js.JsObject.fromBrowserObject(result)[0]['transcript'] as String;
+        if (event.results != null) {
+          String interimTranscript = '';
+          String finalTranscript = '';
+
+          final results = js.JsObject.fromBrowserObject(event.results!);
+          final length = results['length'] as int;
+          for (int i = 0; i < length; i++) {
+            final result = results.callMethod('item', [i]) as js.JsObject;
+            final transcript = result.callMethod('item', [0])['transcript'] as String;
+            final isFinal = result['isFinal'] as bool;
+            if (isFinal) {
+              finalTranscript += transcript;
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+
+          // Accumulate final transcripts into the base text
+          if (finalTranscript.isNotEmpty) {
+            _textBeforeVoice = _textBeforeVoice + finalTranscript;
+          }
+
+          final displayText = interimTranscript.isNotEmpty
+              ? _textBeforeVoice + interimTranscript
+              : _textBeforeVoice;
+
           setState(() {
-            _messageController.text = transcript;
+            _messageController.text = displayText;
             _messageController.selection = TextSelection.fromPosition(
-              TextPosition(offset: _messageController.text.length),
+              TextPosition(offset: displayText.length),
             );
           });
         }
@@ -148,6 +178,12 @@ class _ChatWindowState extends State<ChatWindow> {
     if (_webSpeechRecognition != null && !_isListening) {
       try {
         await html.window.navigator.getUserMedia(audio: true);
+        // Save current text as base so transcript is appended, not replaced
+        _textBeforeVoice = _messageController.text;
+        if (_textBeforeVoice.isNotEmpty && !_textBeforeVoice.endsWith(' ')) {
+          _textBeforeVoice += ' ';
+        }
+        _webSpeechRecognition!.lang = _selectedLanguage;
         _webSpeechRecognition!.start();
         setState(() => _isListening = true);
       } catch (e) {
@@ -1123,7 +1159,45 @@ class _ChatWindowState extends State<ChatWindow> {
                 icon: Icon(Icons.attach_file, color: Colors.blue, size: 20),
                 onPressed: _pickImage,
               ),
+              // Language selector button
+              Tooltip(
+                message: _selectedLanguage == 'en-US' ? 'Switch to Nepali' : 'Switch to English',
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedLanguage = _selectedLanguage == 'en-US' ? 'ne-NP' : 'en-US';
+                      if (_webSpeechRecognition != null) {
+                        _webSpeechRecognition!.lang = _selectedLanguage;
+                      }
+                    });
+                  },
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    margin: EdgeInsets.symmetric(horizontal: 2),
+                    decoration: BoxDecoration(
+                      color: _isListening
+                          ? (_selectedLanguage == 'ne-NP' ? Colors.red.shade50 : Colors.blue.shade50)
+                          : Colors.grey.shade100,
+                      border: Border.all(
+                        color: _selectedLanguage == 'ne-NP' ? Colors.red.shade300 : Colors.blue.shade300,
+                        width: 1,
+                      ),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      _selectedLanguage == 'en-US' ? 'EN' : 'ने',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: _selectedLanguage == 'ne-NP' ? Colors.red.shade700 : Colors.blue.shade700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // Mic button
               IconButton(
+                tooltip: _isListening ? 'Stop voice typing' : 'Start voice typing',
                 icon: Icon(
                   _isListening ? Icons.mic_off : Icons.mic,
                   color: _isListening ? Colors.red : Colors.blue,
@@ -1138,7 +1212,9 @@ class _ChatWindowState extends State<ChatWindow> {
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => _sendMessage(),
                   decoration: InputDecoration(
-                    hintText: "Type a message",
+                    hintText: _selectedLanguage == 'ne-NP'
+                        ? "सन्देश टाइप गर्नुहोस्"
+                        : "Type a message",
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
                     contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
                   ),
@@ -1237,6 +1313,11 @@ class _ChatWindowState extends State<ChatWindow> {
 
     String messageText = _messageController.text.trim();
 
+    // Clear immediately so the UI feels instant
+    _messageController.clear();
+    _textBeforeVoice = '';
+    FocusScope.of(context).requestFocus(_messageFocusNode);
+
     try {
       await _firestore.collection('adminchat').add({
         'message': messageText,
@@ -1273,10 +1354,15 @@ class _ChatWindowState extends State<ChatWindow> {
         'lastTimestamp': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      _messageController.clear();
-      FocusScope.of(context).requestFocus(_messageFocusNode);
-
     } catch (e) {
+      // Restore message text so user doesn't lose their content
+      if (_messageController.text.isEmpty) {
+        _messageController.text = messageText;
+        _messageController.selection = TextSelection.fromPosition(
+          TextPosition(offset: messageText.length),
+        );
+        _textBeforeVoice = messageText;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Failed to send message")),
       );
