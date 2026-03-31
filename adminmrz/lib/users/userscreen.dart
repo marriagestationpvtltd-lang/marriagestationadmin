@@ -208,32 +208,35 @@ class _UsersPageState extends State<UsersPage> {
     final bool hasPhone = cleanedPhone.isNotEmpty;
     final bool isEmailVerified = user.emailVerified == 1;
     final bool isPhoneVerified = user.phoneVerified == 1;
+    final Color genderAccentColor = isFemale ? const Color(0xFFE91E8C) : const Color(0xFF1976D2);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
       elevation: isSelected ? 3 : 1,
-      shadowColor: Colors.black12,
+      shadowColor: Colors.black.withOpacity(0.08),
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         side: isSelected
             ? BorderSide(color: Colors.blue.shade400, width: 1.5)
-            : BorderSide.none,
+            : BorderSide(color: Colors.grey.shade100),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => _navigateToUser(user),
         child: Container(
           decoration: BoxDecoration(
+            color: Colors.white,
             border: Border(left: BorderSide(color: statusColor, width: 4)),
           ),
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Row 1: checkbox + avatar + name + badges ─────────────────
+              // ── Row 1: checkbox + avatar + name/contact + badges ─────────
               Row(
-                crossAxisAlignment: CrossAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Checkbox
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () => provider.toggleUserSelection(user.id),
@@ -244,6 +247,7 @@ class _UsersPageState extends State<UsersPage> {
                         value: isSelected,
                         onChanged: (_) => provider.toggleUserSelection(user.id),
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        activeColor: Colors.blue.shade600,
                         shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(4)),
                       ),
@@ -251,57 +255,132 @@ class _UsersPageState extends State<UsersPage> {
                   ),
                   const SizedBox(width: 10),
 
-                  // Avatar
+                  // Profile photo
                   GestureDetector(
                     onTap: () => _navigateToUser(user),
-                    child: Container(
-                      width: 46,
-                      height: 46,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: isFemale
-                            ? Colors.pink.shade50
-                            : Colors.blue.shade50,
-                        border: Border.all(
-                          color: isFemale
-                              ? Colors.pink.shade200
-                              : Colors.blue.shade200,
+                    child: Stack(
+                      children: [
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            gradient: LinearGradient(
+                              colors: isFemale
+                                  ? [Colors.pink.shade100, Colors.pink.shade50]
+                                  : [Colors.blue.shade100, Colors.blue.shade50],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            border: Border.all(
+                              color: genderAccentColor.withOpacity(0.35),
+                              width: 2,
+                            ),
+                          ),
+                          child: ClipOval(
+                            child: user.hasProfilePicture
+                                ? Image.network(
+                                    user.profilePicture!,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) =>
+                                        _avatarIcon(isFemale),
+                                  )
+                                : _avatarIcon(isFemale),
+                          ),
                         ),
-                      ),
-                      child: user.hasProfilePicture
-                          ? ClipOval(
-                              child: Image.network(
-                                user.profilePicture!,
-                                fit: BoxFit.cover,
-                                errorBuilder: (_, __, ___) =>
-                                    _avatarIcon(isFemale),
+                        // Online indicator dot
+                        if (user.isOnline == 1)
+                          Positioned(
+                            bottom: 1,
+                            right: 1,
+                            child: Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                color: Colors.green.shade500,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                    color: Colors.white, width: 1.5),
                               ),
-                            )
-                          : _avatarIcon(isFemale),
+                            ),
+                          ),
+                      ],
                     ),
                   ),
                   const SizedBox(width: 10),
 
-                  // Name + ID
+                  // Name + contact info
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
+                        // Full name
                         Text(
                           user.fullName,
                           style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
                             color: Color(0xFF1A1A2E),
+                            letterSpacing: 0.1,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 2),
-                        Text(
-                          '#${user.id} · ${user.gender}',
-                          style: TextStyle(
-                              fontSize: 11, color: Colors.grey.shade500),
+                        // ID + Gender
+                        Row(
+                          children: [
+                            Text(
+                              '#${user.id}',
+                              style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.blue.shade400,
+                                  fontWeight: FontWeight.w600),
+                            ),
+                            Text(
+                              ' · ${user.gender}',
+                              style: TextStyle(
+                                  fontSize: 11, color: Colors.grey.shade500),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        // Email
+                        Row(
+                          children: [
+                            Icon(Icons.email_outlined,
+                                size: 11, color: Colors.grey.shade400),
+                            const SizedBox(width: 3),
+                            Expanded(
+                              child: Text(
+                                user.email.isNotEmpty ? user.email : '—',
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.grey.shade600),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            _miniVerifiedDot(isEmailVerified),
+                          ],
+                        ),
+                        const SizedBox(height: 2),
+                        // Phone
+                        Row(
+                          children: [
+                            Icon(Icons.phone_outlined,
+                                size: 11, color: Colors.grey.shade400),
+                            const SizedBox(width: 3),
+                            Expanded(
+                              child: Text(
+                                hasPhone ? cleanedPhone : '—',
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.grey.shade600),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (hasPhone) _miniVerifiedDot(isPhoneVerified),
+                          ],
                         ),
                       ],
                     ),
@@ -311,6 +390,7 @@ class _UsersPageState extends State<UsersPage> {
                   // Status + Plan badges
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       _badge(user.formattedStatus, statusColor),
                       const SizedBox(height: 4),
@@ -318,96 +398,18 @@ class _UsersPageState extends State<UsersPage> {
                         user.usertype.toUpperCase(),
                         user.usertype.toLowerCase() == 'paid'
                             ? const Color(0xFF6C63FF)
-                            : Colors.grey,
+                            : Colors.grey.shade500,
                       ),
                     ],
                   ),
                 ],
               ),
 
-              const SizedBox(height: 10),
-              Divider(height: 1, thickness: 0.8, color: Colors.grey.shade200),
-              const SizedBox(height: 8),
-
-              // ── Row 2: Email row ─────────────────────────────────────────
-              Row(
-                children: [
-                  Icon(Icons.email_outlined,
-                      size: 13, color: Colors.grey.shade500),
-                  const SizedBox(width: 5),
-                  Expanded(
-                    child: Text(
-                      user.email.isNotEmpty ? user.email : '—',
-                      style: TextStyle(
-                          fontSize: 12, color: Colors.grey.shade700),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  _verifiedBadge(isEmailVerified),
-                  if (!isEmailVerified) ...[
-                    const SizedBox(width: 5),
-                    _sendVerifyBtn(context, 'Email'),
-                  ],
-                  const SizedBox(width: 6),
-                  if (user.email.isNotEmpty)
-                    _commBtn(
-                      icon: Icons.send_outlined,
-                      tooltip: 'Send Email',
-                      color: Colors.orange,
-                      onTap: () => _launchEmail(user.email),
-                    ),
-                ],
-              ),
-
+              const SizedBox(height: 9),
+              Divider(height: 1, thickness: 0.8, color: Colors.grey.shade100),
               const SizedBox(height: 7),
 
-              // ── Row 3: Phone row ─────────────────────────────────────────
-              Row(
-                children: [
-                  Icon(Icons.phone_outlined,
-                      size: 13, color: Colors.grey.shade500),
-                  const SizedBox(width: 5),
-                  Expanded(
-                    child: Text(
-                      hasPhone ? cleanedPhone : '—',
-                      style: TextStyle(
-                          fontSize: 12, color: Colors.grey.shade700),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  _verifiedBadge(isPhoneVerified),
-                  if (!isPhoneVerified) ...[
-                    const SizedBox(width: 5),
-                    _sendVerifyBtn(context, 'Phone'),
-                  ],
-                  if (hasPhone) ...[
-                    const SizedBox(width: 6),
-                    _commBtn(
-                      icon: Icons.chat_rounded,
-                      tooltip: 'WhatsApp',
-                      color: const Color(0xFF25D366),
-                      onTap: () => _launchWhatsApp(cleanedPhone),
-                    ),
-                    const SizedBox(width: 4),
-                    _commBtn(
-                      icon: Icons.videocam_rounded,
-                      tooltip: 'Viber',
-                      color: const Color(0xFF7360F2),
-                      onTap: () => _launchViber(cleanedPhone),
-                    ),
-                  ],
-                ],
-              ),
-
-              const SizedBox(height: 8),
-              Divider(height: 1, thickness: 0.8, color: Colors.grey.shade200),
-              const SizedBox(height: 8),
-
-              // ── Row 4: Info chips ────────────────────────────────────────
+              // ── Row 2: Info chips ────────────────────────────────────────
               Wrap(
                 spacing: 5,
                 runSpacing: 5,
@@ -445,23 +447,43 @@ class _UsersPageState extends State<UsersPage> {
                 ],
               ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 7),
+              Divider(height: 1, thickness: 0.8, color: Colors.grey.shade100),
+              const SizedBox(height: 7),
 
-              // ── Row 5: Action buttons ────────────────────────────────────
+              // ── Row 3: Action buttons (contact LEFT · admin RIGHT) ────────
               Row(
-                mainAxisAlignment: MainAxisAlignment.end,
                 children: [
-                  _actionIconBtn(
-                    Icons.visibility_outlined,
-                    'View Profile',
-                    Colors.blue,
-                    () => _navigateToUser(user),
-                  ),
-                  const SizedBox(width: 5),
+                  // Contact buttons
+                  if (hasPhone) ...[
+                    _actionIconBtn(
+                      Icons.chat_rounded,
+                      'WhatsApp',
+                      const Color(0xFF25D366),
+                      () => _launchWhatsApp(cleanedPhone),
+                    ),
+                    const SizedBox(width: 5),
+                    _actionIconBtn(
+                      Icons.videocam_rounded,
+                      'Viber',
+                      const Color(0xFF7360F2),
+                      () => _launchViber(cleanedPhone),
+                    ),
+                    const SizedBox(width: 5),
+                  ],
+                  if (user.email.isNotEmpty)
+                    _actionIconBtn(
+                      Icons.email_outlined,
+                      'Send Email',
+                      Colors.orange,
+                      () => _launchEmail(user.email),
+                    ),
+                  const Spacer(),
+                  // Admin actions
                   _actionIconBtn(
                     Icons.chat_bubble_outline,
                     'Direct Chat',
-                    Colors.green,
+                    Colors.teal,
                     () {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -471,22 +493,13 @@ class _UsersPageState extends State<UsersPage> {
                       );
                     },
                   ),
-                  if (hasPhone) ...[
-                    const SizedBox(width: 5),
-                    _actionIconBtn(
-                      Icons.message_rounded,
-                      'WhatsApp',
-                      const Color(0xFF25D366),
-                      () => _launchWhatsApp(cleanedPhone),
-                    ),
-                    const SizedBox(width: 5),
-                    _actionIconBtn(
-                      Icons.video_call_outlined,
-                      'Viber',
-                      const Color(0xFF7360F2),
-                      () => _launchViber(cleanedPhone),
-                    ),
-                  ],
+                  const SizedBox(width: 5),
+                  _actionIconBtn(
+                    Icons.visibility_outlined,
+                    'View Profile',
+                    Colors.blue,
+                    () => _navigateToUser(user),
+                  ),
                 ],
               ),
             ],
@@ -497,10 +510,30 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Widget _avatarIcon(bool isFemale) {
-    return Icon(
-      isFemale ? Icons.face_2 : Icons.person,
-      size: 22,
-      color: isFemale ? Colors.pink : Colors.blue,
+    return Center(
+      child: Icon(
+        isFemale ? Icons.face_2 : Icons.person,
+        size: 24,
+        color: isFemale ? Colors.pink.shade300 : Colors.blue.shade300,
+      ),
+    );
+  }
+
+  Widget _miniVerifiedDot(bool isVerified) {
+    return Container(
+      width: 14,
+      height: 14,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: isVerified
+            ? Colors.green.withOpacity(0.15)
+            : Colors.red.withOpacity(0.12),
+      ),
+      child: Icon(
+        isVerified ? Icons.check : Icons.close,
+        size: 9,
+        color: isVerified ? Colors.green.shade600 : Colors.red.shade400,
+      ),
     );
   }
 
@@ -826,39 +859,169 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  // ─── Header bar (replaces AppBar — avoids duplicate "Members" title) ─────
+  // ─── Top section: title + search + stats + filters ───────────────────────
 
-  Widget _buildHeaderBar(UserProvider provider) {
+  Widget _buildTopSection(UserProvider provider) {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.fromLTRB(16, 12, 12, 8),
-      child: Row(
+      child: Column(
         children: [
-          if (provider.totalCount > 0) ...[
-            _statPill('Total', provider.totalCount, Colors.blue),
-            const SizedBox(width: 6),
-            _statPill('Shown', provider.filteredCount, Colors.teal),
-            if (provider.selectedCount > 0) ...[
-              const SizedBox(width: 6),
-              _statPill('Selected', provider.selectedCount, Colors.purple),
-            ],
-          ],
-          const Spacer(),
-          Tooltip(
-            message: 'Refresh',
-            child: InkWell(
-              onTap: () => provider.fetchUsers(),
-              borderRadius: BorderRadius.circular(8),
-              child: Container(
-                padding: const EdgeInsets.all(7),
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade100,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.shade200),
+          // Row 1: Title + Search bar + Refresh
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 12, 8),
+            child: Row(
+              children: [
+                // Title
+                const Text(
+                  'Members',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A1A2E),
+                    letterSpacing: -0.2,
+                  ),
                 ),
-                child: Icon(Icons.refresh_rounded,
-                    size: 18, color: Colors.grey.shade600),
-              ),
+                const SizedBox(width: 16),
+                // Search bar (takes remaining space)
+                Expanded(
+                  child: TextField(
+                    controller: _searchController,
+                    decoration: InputDecoration(
+                      hintText: 'Search by name, email, phone or ID…',
+                      hintStyle: TextStyle(
+                          fontSize: 13, color: Colors.grey.shade400),
+                      prefixIcon: Icon(Icons.search_rounded,
+                          color: Colors.grey.shade400, size: 18),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide:
+                            BorderSide(color: Colors.grey.shade200),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide:
+                            BorderSide(color: Colors.grey.shade200),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        borderSide: BorderSide(
+                            color: Colors.blue.shade300, width: 1.5),
+                      ),
+                      filled: true,
+                      fillColor: Colors.grey.shade50,
+                      contentPadding: const EdgeInsets.symmetric(
+                          vertical: 9, horizontal: 12),
+                      isDense: true,
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear_rounded,
+                                  size: 16),
+                              onPressed: () {
+                                _searchController.clear();
+                                provider.setSearchQuery('');
+                              },
+                            )
+                          : null,
+                    ),
+                    onChanged: (v) => provider.setSearchQuery(v),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // Refresh button
+                Tooltip(
+                  message: 'Refresh',
+                  child: InkWell(
+                    onTap: () => provider.fetchUsers(),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(8),
+                        border:
+                            Border.all(color: Colors.grey.shade200),
+                      ),
+                      child: Icon(Icons.refresh_rounded,
+                          size: 18, color: Colors.grey.shade600),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Row 2: Stats + vertical divider + filter chips
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.fromLTRB(16, 0, 12, 10),
+            child: Row(
+              children: [
+                // Stat pills
+                if (provider.totalCount > 0) ...[
+                  _statPill('Total', provider.totalCount, Colors.blue),
+                  const SizedBox(width: 6),
+                  _statPill(
+                      'Shown', provider.filteredCount, Colors.teal),
+                  if (provider.selectedCount > 0) ...[
+                    const SizedBox(width: 6),
+                    _statPill('Selected', provider.selectedCount,
+                        Colors.purple),
+                  ],
+                  const SizedBox(width: 12),
+                  Container(
+                      width: 1, height: 22, color: Colors.grey.shade200),
+                  const SizedBox(width: 12),
+                ],
+                // Select-all chip
+                _selectAllChip(provider),
+                const SizedBox(width: 8),
+                Container(
+                    width: 1, height: 22, color: Colors.grey.shade300),
+                const SizedBox(width: 8),
+                // Status filter chips
+                ...[
+                  ('all', 'All'),
+                  ('approved', 'Approved'),
+                  ('pending', 'Pending'),
+                  ('rejected', 'Rejected'),
+                  ('not_uploaded', 'Not Uploaded'),
+                ].expand((e) {
+                  final (key, label) = e;
+                  return [
+                    _filterChip(
+                      label,
+                      provider.statusFilter == key,
+                      _statusColor(key),
+                      () => provider.setStatusFilter(key),
+                    ),
+                    const SizedBox(width: 6),
+                  ];
+                }),
+                Container(
+                    width: 1, height: 22, color: Colors.grey.shade300),
+                const SizedBox(width: 6),
+                // Plan filter chips
+                ...[
+                  ('all', 'All Plans'),
+                  ('paid', 'Paid'),
+                  ('free', 'Free'),
+                ].expand((e) {
+                  final (key, label) = e;
+                  return [
+                    _filterChip(
+                      label,
+                      provider.userTypeFilter == key,
+                      _planColor(key),
+                      () => provider.setUserTypeFilter(key),
+                    ),
+                    const SizedBox(width: 6),
+                  ];
+                }),
+                if (provider.statusFilter != 'all' ||
+                    provider.userTypeFilter != 'all')
+                  _filterChip(
+                      '✕ Clear', true, Colors.red, provider.clearFilters),
+              ],
             ),
           ),
         ],
@@ -908,57 +1071,8 @@ class _UsersPageState extends State<UsersPage> {
     // title already shown in dashboard.dart's top bar.
     return Column(
       children: [
-        // ── Header: stats + refresh ───────────────────────────────────────
-        _buildHeaderBar(provider),
-
-        // ── Search bar ───────────────────────────────────────────────────
-        Container(
-          color: Colors.white,
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-          child: TextField(
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: 'Search by name, email, phone or ID…',
-              hintStyle:
-                  TextStyle(fontSize: 14, color: Colors.grey.shade400),
-              prefixIcon: Icon(Icons.search_rounded,
-                  color: Colors.grey.shade400, size: 20),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: Colors.grey.shade200),
-              ),
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: Colors.grey.shade200),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(10),
-                borderSide:
-                    BorderSide(color: Colors.blue.shade300, width: 1.5),
-              ),
-              filled: true,
-              fillColor: Colors.grey.shade50,
-              contentPadding: const EdgeInsets.symmetric(
-                  vertical: 10, horizontal: 14),
-              isDense: true,
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear_rounded, size: 18),
-                      onPressed: () {
-                        _searchController.clear();
-                        provider.setSearchQuery('');
-                      },
-                    )
-                  : null,
-            ),
-            onChanged: (v) {
-              provider.setSearchQuery(v);
-            },
-          ),
-        ),
-
-        // ── Filter chips ─────────────────────────────────────────────────
-        _buildFilterRow(provider),
+        // ── Top section: title + search + stats + filters ─────────────────
+        _buildTopSection(provider),
 
         Divider(height: 1, thickness: 1, color: Colors.grey.shade200),
 
