@@ -309,9 +309,9 @@ class _ChatSidebarState extends State<ChatSidebar> {
     if (_selectedChat != null) {
       final chatProvider = Provider.of<ChatProvider>(context, listen: false);
       chatProvider.updateName(_selectedChat!["name"]);
-      chatProvider.updateonline(_selectedChat!["is_online"]);
+      chatProvider.updateonline(_selectedChat!["is_online"] == true);
       chatProvider.updateidd(int.tryParse(_selectedChat!["id"]) ?? 0);
-      chatProvider.updatePaidStatus(_selectedChat!["is_paid"] ?? false);
+      chatProvider.updatePaidStatus(_selectedChat!["is_paid"] == true);
     }
   }
 
