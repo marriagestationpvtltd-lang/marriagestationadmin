@@ -111,6 +111,16 @@ class Payment {
 
   String get fullName => '$firstName $lastName';
 
+  String get invoiceNumber => 'INV-${id.toString().padLeft(6, '0')}';
+
+  String get displayInitials {
+    if (firstName.isNotEmpty && lastName.isNotEmpty) {
+      return '${firstName[0]}${lastName[0]}'.toUpperCase();
+    }
+    if (fullName.isNotEmpty) return fullName[0].toUpperCase();
+    return '?';
+  }
+
   double get numericPrice {
     try {
       return double.parse(packagePrice.replaceAll('Rs ', '').trim());
