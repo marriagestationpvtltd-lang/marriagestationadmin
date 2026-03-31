@@ -8,7 +8,12 @@ import 'package:url_launcher/url_launcher.dart';
 import 'model/usermodel.dart';
 
 class UsersPage extends StatefulWidget {
-  const UsersPage({Key? key}) : super(key: key);
+  /// Called when admin taps "Direct Chat" on a member card.
+  /// The [userId] is the member's ID. DashboardPage should switch to the
+  /// Chat tab and open that user's conversation.
+  final void Function(int userId)? onOpenChat;
+
+  const UsersPage({Key? key, this.onOpenChat}) : super(key: key);
 
   @override
   State<UsersPage> createState() => _UsersPageState();
@@ -60,6 +65,20 @@ class _UsersPageState extends State<UsersPage> {
   String _cleanPhone(String? phone) {
     if (phone == null || phone.isEmpty || phone == 'null') return '';
     return phone.replaceAll(RegExp(r'[^\d+]'), '');
+  }
+
+  /// Normalises a profile-picture path that may be either a full URL or a
+  /// server-relative path (e.g. "/uploads/photo.jpg").  The chat section uses
+  /// https://digitallami.com/get.php which returns full URLs; the admin API
+  /// may return relative paths – we handle both here.
+  static const _kImgBase = 'https://digitallami.com';
+
+  String? _normaliseImageUrl(String? raw) {
+    if (raw == null || raw.isEmpty || raw == 'null') return null;
+    if (raw.startsWith('http://') || raw.startsWith('https://')) return raw;
+    // Relative path: prepend domain
+    final path = raw.startsWith('/') ? raw : '/$raw';
+    return '$_kImgBase$path';
   }
 
   Future<void> _launchWhatsApp(String phone) async {
@@ -280,7 +299,7 @@ class _UsersPageState extends State<UsersPage> {
                           child: ClipOval(
                             child: user.hasProfilePicture
                                 ? Image.network(
-                                    user.profilePicture!,
+                                    _normaliseImageUrl(user.profilePicture)!,
                                     fit: BoxFit.cover,
                                     errorBuilder: (_, __, ___) =>
                                         _avatarIcon(isFemale),
@@ -288,22 +307,23 @@ class _UsersPageState extends State<UsersPage> {
                                 : _avatarIcon(isFemale),
                           ),
                         ),
-                        // Online indicator dot
-                        if (user.isOnline == 1)
-                          Positioned(
-                            bottom: 1,
-                            right: 1,
-                            child: Container(
-                              width: 12,
-                              height: 12,
-                              decoration: BoxDecoration(
-                                color: Colors.green.shade500,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                    color: Colors.white, width: 1.5),
-                              ),
+                        // Online/Offline indicator dot (always visible, like chat section)
+                        Positioned(
+                          bottom: 1,
+                          right: 1,
+                          child: Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: user.isOnline == 1
+                                  ? Colors.green.shade500
+                                  : Colors.grey.shade400,
+                              shape: BoxShape.circle,
+                              border: Border.all(
+                                  color: Colors.white, width: 1.5),
                             ),
                           ),
+                        ),
                       ],
                     ),
                   ),
@@ -485,12 +505,16 @@ class _UsersPageState extends State<UsersPage> {
                     'Direct Chat',
                     Colors.teal,
                     () {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Opening chat…'),
-                          duration: Duration(seconds: 1),
-                        ),
-                      );
+                      if (widget.onOpenChat != null) {
+                        widget.onOpenChat!(user.id);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Opening chat…'),
+                            duration: Duration(seconds: 1),
+                          ),
+                        );
+                      }
                     },
                   ),
                   const SizedBox(width: 5),
@@ -866,22 +890,11 @@ class _UsersPageState extends State<UsersPage> {
       color: Colors.white,
       child: Column(
         children: [
-          // Row 1: Title + Search bar + Refresh
+          // Row 1: Search bar + Refresh (title shown in dashboard topbar)
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 12, 8),
             child: Row(
               children: [
-                // Title
-                const Text(
-                  'Members',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1A1A2E),
-                    letterSpacing: -0.2,
-                  ),
-                ),
-                const SizedBox(width: 16),
                 // Search bar (takes remaining space)
                 Expanded(
                   child: TextField(
