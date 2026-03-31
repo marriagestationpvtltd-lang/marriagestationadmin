@@ -91,10 +91,12 @@ class Package {
     }
   }
 
+  static final _durationRegExp = RegExp(r'(\d+)');
+
   /// Duration in months parsed from the [duration] string (e.g. '3 Month' → 3).
   int get durationInMonths {
     if (duration == null) return 0;
-    final match = RegExp(r'(\d+)').firstMatch(duration.toString());
+    final match = _durationRegExp.firstMatch(duration.toString());
     return match != null ? int.tryParse(match.group(1) ?? '') ?? 0 : 0;
   }
 }

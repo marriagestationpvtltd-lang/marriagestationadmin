@@ -101,6 +101,7 @@ class User {
   String get status {
     if (isActive == 0) return 'rejected';
     if (isVerified == null) return 'pending';
+    if (isVerified == 0) return 'rejected';
     if (isVerified == 1) return 'approved';
     return 'not_uploaded';
   }
