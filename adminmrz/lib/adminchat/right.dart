@@ -94,14 +94,13 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
     final userId = chatProvider.id;
     if (userId != null && userId != _lastFetchedUserId) {
       _lastFetchedUserId = userId;
-      // Reset so the user must press "Show Match" again for the new user
-      if (mounted) {
-        setState(() => _matchesLoaded = false);
-      }
-      Provider.of<MatchedProfileProvider>(context, listen: false)
-          .clearData();
-      // Fetch Firestore share history
+      _matchesLoaded = true;
+      final matchProvider =
+          Provider.of<MatchedProfileProvider>(context, listen: false);
+      matchProvider.clearData();
+      // Fetch Firestore share history and matched profiles automatically
       _loadSharedProfilesForUser(userId.toString());
+      matchProvider.fetchMatchedProfiles(userId);
     }
   }
 
