@@ -10,13 +10,15 @@ class DocumentsProvider with ChangeNotifier {
   List<Document> _documents = [];
   bool _isLoading = false;
   String? _error;
-
   bool _isActionLoading = false;
+  bool _isInitialized = false;
 
   List<Document> get documents => _documents;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isActionLoading => _isActionLoading;
+  bool get isInitialized => _isInitialized;
+
   void clearError() {
     _error = null;
     notifyListeners();
@@ -31,6 +33,9 @@ class DocumentsProvider with ChangeNotifier {
 
   List<Document> get rejectedDocuments =>
       _documents.where((doc) => doc.isRejected).toList();
+
+  List<Document> documentsForUser(int userId) =>
+      _documents.where((doc) => doc.userId == userId).toList();
 
   Future<bool> fetchDocuments() async {
     _isLoading = true;
@@ -66,6 +71,7 @@ class DocumentsProvider with ChangeNotifier {
           final List<dynamic> data = responseData['data'] ?? [];
           _documents = data.map((doc) => Document.fromJson(doc)).toList();
           _isLoading = false;
+          _isInitialized = true;
           notifyListeners();
           return true;
         } else {
