@@ -1,20 +1,21 @@
 class PackageListResponse {
   final bool success;
-  final int count;
+  final int totalRecords;
   final List<Package> data;
 
   PackageListResponse({
     required this.success,
-    required this.count,
+    required this.totalRecords,
     required this.data,
   });
 
   factory PackageListResponse.fromJson(Map<String, dynamic> json) {
+    final status = json['status'];
+    final success = status == 200 || status?.toString() == '200';
     return PackageListResponse(
-      success: json['success'] ?? false,
-      count: json['count'] ?? 0,
-      data: List<Package>.from(
-          (json['data'] ?? []).map((x) => Package.fromJson(x))),
+      success: success,
+      totalRecords: json['totalRecords'] is int ? json['totalRecords'] : int.tryParse(json['totalRecords']?.toString() ?? '') ?? 0,
+      data: List<Package>.from((json['recordList'] ?? []).map((x) => Package.fromJson(x))),
     );
   }
 }
@@ -22,25 +23,31 @@ class PackageListResponse {
 class Package {
   final int id;
   final String name;
-  final String duration;
-  final String description;
-  final String price;
+  final int isActive;
+  final String? createdDate;
+  final String? baseAmount;
+  final dynamic facility;
+  final dynamic duration;
 
   Package({
     required this.id,
     required this.name,
-    required this.duration,
-    required this.description,
-    required this.price,
+    required this.isActive,
+    this.createdDate,
+    this.baseAmount,
+    this.facility,
+    this.duration,
   });
 
   factory Package.fromJson(Map<String, dynamic> json) {
     return Package(
-      id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()) ?? 0,
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '') ?? 0,
       name: json['name']?.toString() ?? '',
-      duration: json['duration']?.toString() ?? '',
-      description: json['description']?.toString() ?? '',
-      price: json['price']?.toString() ?? '',
+      isActive: json['isActive'] is int ? json['isActive'] : int.tryParse(json['isActive']?.toString() ?? '') ?? 1,
+      createdDate: json['createdDate']?.toString(),
+      baseAmount: json['baseAmount']?.toString(),
+      facility: json['facility'],
+      duration: json['duration'],
     );
   }
 
@@ -48,35 +55,25 @@ class Package {
     return {
       'id': id,
       'name': name,
-      'duration': duration,
-      'description': description,
-      'price': price,
+      'isActive': isActive,
+      if (baseAmount != null) 'baseAmount': baseAmount,
+      if (facility != null) 'facility': facility,
+      if (duration != null) 'duration': duration,
     };
   }
 
   Map<String, dynamic> toCreateJson() {
     return {
       'name': name,
-      'duration': duration.replaceAll(' Month', '').trim(),
-      'description': description,
-      'price': price.replaceAll('Rs ', '').replaceAll(',', '').trim(),
+      if (baseAmount != null) 'baseAmount': baseAmount,
+      if (facility != null) 'facility': facility,
+      if (duration != null) 'duration': duration,
     };
   }
 
-  // Extract numeric duration (e.g., "90 Month" -> 90)
-  int get durationInMonths {
-    try {
-      return int.parse(duration.replaceAll(' Month', '').trim());
-    } catch (e) {
-      return 0;
-    }
-  }
-
-  // Extract numeric price (e.g., "Rs 300.00" -> 300.0)
   double get numericPrice {
     try {
-      return double.parse(
-          price.replaceAll('Rs ', '').replaceAll(',', '').trim());
+      return double.parse(baseAmount?.replaceAll('Rs ', '').replaceAll(',', '').trim() ?? '0');
     } catch (e) {
       return 0.0;
     }
@@ -95,10 +92,15 @@ class CreatePackageResponse {
   });
 
   factory CreatePackageResponse.fromJson(Map<String, dynamic> json) {
+    final status = json['status'];
     return CreatePackageResponse(
-      success: json['success'] ?? false,
+      success: status == 200 || status?.toString() == '200',
       message: json['message']?.toString() ?? '',
-      packageId: json['package_id'] is int ? json['package_id'] : 0,
+      packageId: json['recordList'] is List && (json['recordList'] as List).isNotEmpty
+          ? (json['recordList'][0]['id'] is int
+              ? json['recordList'][0]['id'] as int
+              : int.tryParse(json['recordList'][0]['id']?.toString() ?? '') ?? 0)
+          : 0,
     );
   }
 }

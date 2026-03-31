@@ -9,7 +9,7 @@ class Document {
   final int documentId;
   final String documentType;
   final String documentIdNumber;
-  final String photo;
+  final String? photo;
 
   Document({
     required this.userId,
@@ -22,7 +22,7 @@ class Document {
     required this.documentId,
     required this.documentType,
     required this.documentIdNumber,
-    required this.photo,
+    this.photo,
   });
 
   factory Document.fromJson(Map<String, dynamic> json) {
@@ -37,12 +37,12 @@ class Document {
       documentId: json['document_id'] ?? 0,
       documentType: json['documenttype'] ?? '',
       documentIdNumber: json['documentidnumber'] ?? '',
-      photo: json['photo'] ?? '',
+      photo: json['photo']?.toString(),
     );
   }
 
   String get fullName => '$firstName $lastName';
-  String get fullPhotoUrl => photo;
+  String get fullPhotoUrl => photo ?? '';
   bool get isPending => status == 'pending';
   bool get isApproved => status == 'approved';
   bool get isRejected => status == 'rejected';

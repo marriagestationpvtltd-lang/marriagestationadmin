@@ -1,5 +1,5 @@
 class AppConstants {
-  static const String apiBaseUrl = 'https://digitallami.com/api9';
+  static const String apiBaseUrl = 'https://digitallami.com/api';
   static const String chatApiUrl = 'https://digitallami.com';
 
   static const Duration requestTimeout = Duration(seconds: 15);
