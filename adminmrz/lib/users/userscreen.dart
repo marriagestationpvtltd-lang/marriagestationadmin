@@ -322,12 +322,12 @@ class _UsersPageState extends State<UsersPage> {
     final verifiedCount = provider.allUsers.where((u) => u.isVerified == 1).length;
 
     final stats = [
-      _StatItem('Total', provider.totalCount, Icons.people_alt_rounded, AppTheme.primaryGradient),
-      _StatItem('Verified', verifiedCount, Icons.verified_rounded, AppTheme.greenGradient),
-      _StatItem('Pending', statusStats['pending'] ?? 0, Icons.pending_rounded, AppTheme.blueGradient),
-      _StatItem('Approved', statusStats['approved'] ?? 0, Icons.check_circle_rounded, const LinearGradient(colors: [Color(0xFF43A047), Color(0xFF2E7D32)], begin: Alignment.topLeft, end: Alignment.bottomRight)),
-      _StatItem('Paid', typeStats['paid'] ?? 0, Icons.workspace_premium_rounded, AppTheme.goldGradient),
-      _StatItem('Online', onlineCount, Icons.circle, AppTheme.purpleGradient),
+      _StatItem('Total', provider.totalCount, Icons.people_alt_rounded, AppTheme.primaryGradient, 'all'),
+      _StatItem('Verified', verifiedCount, Icons.verified_rounded, AppTheme.greenGradient, 'verified'),
+      _StatItem('Pending', statusStats['pending'] ?? 0, Icons.pending_rounded, AppTheme.blueGradient, 'pending'),
+      _StatItem('Approved', statusStats['approved'] ?? 0, Icons.check_circle_rounded, const LinearGradient(colors: [Color(0xFF43A047), Color(0xFF2E7D32)], begin: Alignment.topLeft, end: Alignment.bottomRight), 'approved'),
+      _StatItem('Paid', typeStats['paid'] ?? 0, Icons.workspace_premium_rounded, AppTheme.goldGradient, 'paid'),
+      _StatItem('Online', onlineCount, Icons.circle, AppTheme.purpleGradient, 'online'),
     ];
 
     return Padding(
@@ -348,7 +348,7 @@ class _UsersPageState extends State<UsersPage> {
                       .map((s) => Expanded(
                             child: Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 4),
-                              child: _buildStatCard(s),
+                              child: _buildStatCard(s, provider),
                             ),
                           ))
                       .toList(),
@@ -361,58 +361,88 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  Widget _buildStatCard(_StatItem item) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        gradient: item.gradient,
+  Widget _buildStatCard(_StatItem item, UserProvider provider) {
+    final isActive = provider.statFilter == item.filterKey;
+    const double _activeIconOpacity = 0.35;
+    const double _inactiveIconOpacity = 0.20;
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: AppTheme.radiusMd,
+      child: InkWell(
+        onTap: () => provider.setStatFilter(item.filterKey),
         borderRadius: AppTheme.radiusMd,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.10),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: BoxDecoration(
+            gradient: item.gradient,
+            borderRadius: AppTheme.radiusMd,
+            border: isActive
+                ? Border.all(color: Colors.white, width: 2.5)
+                : Border.all(color: Colors.transparent, width: 2.5),
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                      color: Colors.white.withOpacity(0.45),
+                      blurRadius: 10,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 0),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
+                : [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.10),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(item.icon, size: 14, color: Colors.white),
-          ),
-          const SizedBox(width: 7),
-          Flexible(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  item.count.toString(),
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    height: 1.1,
-                  ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(isActive ? _activeIconOpacity : _inactiveIconOpacity),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                Text(
-                  item.label,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.white.withOpacity(0.85),
-                    fontWeight: FontWeight.w500,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+                child: Icon(item.icon, size: 14, color: Colors.white),
+              ),
+              const SizedBox(width: 7),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      item.count.toString(),
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        height: 1.1,
+                      ),
+                    ),
+                    Text(
+                      item.label,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.white.withOpacity(0.85),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1466,6 +1496,7 @@ class _StatItem {
   final int count;
   final IconData icon;
   final Gradient gradient;
+  final String filterKey;
 
-  const _StatItem(this.label, this.count, this.icon, this.gradient);
+  const _StatItem(this.label, this.count, this.icon, this.gradient, this.filterKey);
 }

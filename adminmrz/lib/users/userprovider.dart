@@ -17,6 +17,7 @@ class UserProvider with ChangeNotifier {
   String _statusFilter = 'all';
   String _userTypeFilter = 'all';
   String _genderFilter = 'all';
+  String _statFilter = 'all'; // quick-filter from stat cards
   bool _isSelectAll = false;
 
   // Cache tracking
@@ -37,6 +38,7 @@ class UserProvider with ChangeNotifier {
   String get statusFilter => _statusFilter;
   String get userTypeFilter => _userTypeFilter;
   String get genderFilter => _genderFilter;
+  String get statFilter => _statFilter;
   Set<int> get selectedUserIds => _selectedUserIds;
   bool get isSelectAll => _isSelectAll;
   int get selectedCount => _selectedUserIds.length;
@@ -265,6 +267,12 @@ class UserProvider with ChangeNotifier {
     ) ?? false;
   }
 
+  void setStatFilter(String key) {
+    // Tapping the active card (or 'all') clears the quick-filter
+    _statFilter = _statFilter == key ? 'all' : key;
+    _applyFilters();
+  }
+
   void setSearchQuery(String query) {
     _searchQuery = query.toLowerCase();
     _applyFilters();
@@ -308,6 +316,27 @@ class UserProvider with ChangeNotifier {
       filtered = filtered.where((user) => user.gender == _genderFilter).toList();
     }
 
+    // ── Quick-filter from stat cards ────────────────────────────────────────
+    switch (_statFilter) {
+      case 'verified':
+        filtered = filtered.where((u) => u.isVerified == 1).toList();
+        break;
+      case 'pending':
+        filtered = filtered.where((u) => u.status == 'pending').toList();
+        break;
+      case 'approved':
+        filtered = filtered.where((u) => u.status == 'approved').toList();
+        break;
+      case 'paid':
+        filtered = filtered.where((u) => u.usertype == 'paid').toList();
+        break;
+      case 'online':
+        filtered = filtered.where((u) => u.isOnline == 1).toList();
+        break;
+      default:
+        break; // 'all' — no extra filter
+    }
+
     _filteredUsers = filtered;
     notifyListeners();
   }
@@ -317,6 +346,7 @@ class UserProvider with ChangeNotifier {
     _statusFilter = 'all';
     _userTypeFilter = 'all';
     _genderFilter = 'all';
+    _statFilter = 'all';
     _applyFilters();
   }
 
