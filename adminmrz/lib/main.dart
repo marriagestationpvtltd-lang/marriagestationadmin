@@ -1,5 +1,4 @@
 import 'package:adminmrz/payment/paymentprovider.dart';
-import 'package:adminmrz/theme/app_theme.dart';
 import 'package:adminmrz/users/userprovider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_web_plugins/flutter_web_plugins.dart';
@@ -13,7 +12,7 @@ import 'document/docprovider/docservice.dart';
 import 'firebase_options.dart';
 import 'package/packageProvider.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, kDebugMode;
 import 'dart:js' as js;
 import 'dart:html' as html;
 
@@ -51,8 +50,17 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (context) => MatchedProfileProvider()),
       ],
       child: MaterialApp(
-        title: 'Marriage Station Admin',
-        theme: AppTheme.themeData,
+        title: 'Admin Panel',
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+          scaffoldBackgroundColor: const Color(0xFFf8f9fa),
+          appBarTheme: const AppBarTheme(
+            backgroundColor: Colors.white,
+            foregroundColor: Colors.black,
+            elevation: 0,
+            centerTitle: true,
+          ),
+        ),
         debugShowCheckedModeBanner: false,
         home: Consumer<AuthProvider>(
           builder: (context, authProvider, _) {

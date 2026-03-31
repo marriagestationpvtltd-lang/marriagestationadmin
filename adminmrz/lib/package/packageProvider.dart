@@ -1,4 +1,3 @@
-import 'package:adminmrz/core/app_constants.dart';
 import 'package:adminmrz/package/packagemodel.dart';
 import 'package:adminmrz/package/packageservice.dart';
 import 'package:flutter/material.dart';
@@ -11,13 +10,6 @@ class PackageProvider with ChangeNotifier {
   bool _isLoading = false;
   String _error = '';
   String _searchQuery = '';
-
-  // Cache tracking
-  DateTime? _lastFetchTime;
-
-  bool get _isCacheValid =>
-      _lastFetchTime != null &&
-      DateTime.now().difference(_lastFetchTime!) < AppConstants.cacheDuration;
 
   List<Package> get packages => _filteredPackages;
   List<Package> get allPackages => _packages;
@@ -36,9 +28,7 @@ class PackageProvider with ChangeNotifier {
     }).toList();
   }
 
-  Future<void> fetchPackages({bool forceRefresh = false}) async {
-    if (!forceRefresh && _isCacheValid && _packages.isNotEmpty) return;
-
+  Future<void> fetchPackages() async {
     _isLoading = true;
     _error = '';
     notifyListeners();
@@ -46,7 +36,6 @@ class PackageProvider with ChangeNotifier {
     try {
       final response = await _packageService.getPackages();
       _packages = response.data;
-      _lastFetchTime = DateTime.now();
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -66,7 +55,7 @@ class PackageProvider with ChangeNotifier {
 
     try {
       final package = Package(
-        id: 0,
+        id: 0, // Will be assigned by server
         name: name,
         duration: '$duration Month',
         description: description,
@@ -76,7 +65,8 @@ class PackageProvider with ChangeNotifier {
       final response = await _packageService.createPackage(package);
 
       if (response.success) {
-        await fetchPackages(forceRefresh: true);
+        // Refresh packages list
+        await fetchPackages();
         return true;
       } else {
         _error = response.message;
@@ -99,6 +89,7 @@ class PackageProvider with ChangeNotifier {
       final success = await _packageService.updatePackage(package);
 
       if (success) {
+        // Update local list
         final index = _packages.indexWhere((p) => p.id == package.id);
         if (index != -1) {
           _packages[index] = package;
@@ -126,6 +117,7 @@ class PackageProvider with ChangeNotifier {
       final success = await _packageService.deletePackage(packageId);
 
       if (success) {
+        // Remove from local list
         _packages.removeWhere((p) => p.id == packageId);
         notifyListeners();
         return true;

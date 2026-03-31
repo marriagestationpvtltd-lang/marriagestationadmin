@@ -1,4 +1,4 @@
-import 'package:adminmrz/theme/app_theme.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -17,7 +17,7 @@ class _DashboardHomeState extends State<DashboardHome> {
   bool _isLoading = true;
   String _error = '';
   final DashboardService _dashboardService = DashboardService();
-  final DateFormat _dateFormat = DateFormat('EEEE, MMM d, yyyy');
+  final DateFormat _dateFormat = DateFormat('MMM d, yyyy');
 
   @override
   void initState() {
@@ -25,100 +25,698 @@ class _DashboardHomeState extends State<DashboardHome> {
     _fetchDashboardData();
   }
 
-  Future<void> _fetchDashboardData({bool forceRefresh = false}) async {
-    if (!forceRefresh && _dashboardData != null) return;
+  Future<void> _fetchDashboardData() async {
     setState(() {
       _isLoading = true;
       _error = '';
     });
+
     try {
       final response = await _dashboardService.getDashboardData();
-      setState(() {
-        _dashboardData = response.data;
-      });
+      if (response.success) {
+        setState(() {
+          _dashboardData = response.dashboard;
+        });
+      } else {
+        setState(() {
+          _error = 'Failed to load dashboard data';
+        });
+      }
     } catch (e) {
-      setState(() => _error = 'Error: ${e.toString()}');
+      setState(() {
+        _error = 'Error: ${e.toString()}';
+      });
     } finally {
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
-  Widget _buildKpiCard({
+  Widget _buildStatCard({
     required String title,
     required String value,
     required IconData icon,
-    required LinearGradient gradient,
-    String? subtitle,
+    required Color color,
+    String? subTitle,
+    double iconSize = 28,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.cardBg,
-        borderRadius: AppTheme.radiusMd,
-        boxShadow: AppTheme.cardShadow,
-        border: Border.all(color: AppTheme.borderLight),
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 5,
-            decoration: BoxDecoration(
-              gradient: gradient,
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(12),
-                topRight: Radius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: color, size: iconSize),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    value,
+                    style: TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
+                  if (subTitle != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      subTitle,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(20),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: gradient,
-                    borderRadius: AppTheme.radiusSm,
-                    boxShadow: AppTheme.primaryShadow,
-                  ),
-                  child: Icon(icon, color: Colors.white, size: 22),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSection({
+    required String title,
+    required Widget child,
+    Widget? trailing,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(bottom: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF333333),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
+              ),
+              if (trailing != null) trailing,
+            ],
+          ),
+        ),
+        child,
+      ],
+    );
+  }
+
+  Widget _buildUserStats() {
+    final users = _dashboardData?.users;
+    if (users == null) return const SizedBox.shrink();
+
+    return GridView.count(
+      crossAxisCount: 4,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      childAspectRatio: 2.2,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      children: [
+        _buildStatCard(
+          title: 'Total Users',
+          value: users.total.toString(),
+          icon: Icons.people_outline,
+          color: Color(0xFF667eea),
+        ),
+        _buildStatCard(
+          title: 'Active Users',
+          value: users.active.toString(),
+          icon: Icons.check_circle_outline,
+          color: Colors.green,
+        ),
+        _buildStatCard(
+          title: 'Online Now',
+          value: users.online.toString(),
+          icon: Icons.circle,
+          color: Colors.green,
+        ),
+        _buildStatCard(
+          title: 'Verified',
+          value: users.verified.toString(),
+          icon: Icons.verified_outlined,
+          color: Colors.blue,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPaymentStats() {
+    final payments = _dashboardData?.payments;
+    if (payments == null) return const SizedBox.shrink();
+
+    return GridView.count(
+      crossAxisCount: 4,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      childAspectRatio: 2.2,
+      crossAxisSpacing: 16,
+      mainAxisSpacing: 16,
+      children: [
+        _buildStatCard(
+          title: 'Total Revenue',
+          value: payments.totalEarning,
+          icon: Icons.attach_money_outlined,
+          color: Colors.green,
+        ),
+        _buildStatCard(
+          title: 'Today\'s Revenue',
+          value: payments.todayEarning,
+          icon: Icons.today_outlined,
+          color: Colors.green,
+          subTitle: 'earned today',
+        ),
+        _buildStatCard(
+          title: 'Monthly Revenue',
+          value: payments.thisMonthEarning,
+          icon: Icons.bar_chart_outlined,
+          color: Colors.green,
+          subTitle: 'this month',
+        ),
+        _buildStatCard(
+          title: 'Total Sales',
+          value: payments.totalSold.toString(),
+          icon: Icons.shopping_cart_outlined,
+          color: Colors.orange,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildPackageStats() {
+    final payments = _dashboardData?.payments;
+    if (payments == null) return const SizedBox.shrink();
+
+    final bestPackage = payments.bestSellingPackage;
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.star_outline,
+                size: 36,
+                color: Colors.amber,
+              ),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Best Selling Package',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    bestPackage.name,
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${bestPackage.total} sales',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.amber.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.trending_up,
+                    size: 16,
+                    color: Colors.amber,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Top Seller',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: Colors.amber.shade700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUserDistribution() {
+    final users = _dashboardData?.users;
+    if (users == null) return const SizedBox.shrink();
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'User Distribution',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF333333),
+              ),
+            ),
+            const SizedBox(height: 20),
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              childAspectRatio: 3,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              children: [
+                // User Type Distribution
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        value,
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w800,
-                          color: AppTheme.textPrimary,
-                          height: 1.0,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        title,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          color: AppTheme.textSecondary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      if (subtitle != null)
-                        Text(
-                          subtitle,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppTheme.textMuted,
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.category_outlined,
+                            size: 18,
+                            color: Colors.blue.shade700,
                           ),
-                        ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'User Types',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      ...users.byType.map((type) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                type.usertype.toUpperCase(),
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              Text(
+                                '${type.total} users',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.blue.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
+                    ],
+                  ),
+                ),
+                // Gender Distribution
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.pink.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.female_outlined,
+                            size: 18,
+                            color: Colors.pink.shade700,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Gender',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      ...users.byGender.map((gender) {
+                        return Padding(
+                          padding: const EdgeInsets.only(bottom: 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                gender.gender,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              Text(
+                                '${gender.total} users',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.pink.shade700,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }).toList(),
                     ],
                   ),
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPaymentMethodDistribution() {
+    final payments = _dashboardData?.payments;
+    if (payments == null || payments.byMethod.isEmpty) return const SizedBox.shrink();
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Payment Methods',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF333333),
+              ),
+            ),
+            const SizedBox(height: 16),
+            ...payments.byMethod.map((method) {
+              final percentage = payments.totalSold > 0
+                  ? (method.total / payments.totalSold * 100)
+                  : 0;
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          method.paidby,
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black87,
+                          ),
+                        ),
+                        Text(
+                          '${method.total} payments (${percentage.toStringAsFixed(1)}%)',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.green,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    LinearProgressIndicator(
+                      value: percentage / 100,
+                      backgroundColor: Colors.green.shade100,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                      minHeight: 8,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAddressInfo() {
+    final address = _dashboardData?.permanentAddress;
+    if (address == null) return const SizedBox.shrink();
+
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'User Address Information',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF333333),
+              ),
+            ),
+            const SizedBox(height: 20),
+            GridView.count(
+              crossAxisCount: 2,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              childAspectRatio: 2.5,
+              crossAxisSpacing: 16,
+              mainAxisSpacing: 16,
+              children: [
+                _buildStatCard(
+                  title: 'Users with Address',
+                  value: address.totalWithAddress.toString(),
+                  icon: Icons.location_on_outlined,
+                  color: Colors.purple,
+                  iconSize: 24,
+                ),
+                _buildStatCard(
+                  title: 'Residential Status',
+                  value: address.byResidentialStatus.length.toString(),
+                  icon: Icons.home_outlined,
+                  color: Colors.blue,
+                  iconSize: 24,
+                  subTitle: 'types',
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            if (address.byCountry.isNotEmpty) ...[
+              const Text(
+                'Top Countries',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.black87,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: address.byCountry.map((country) {
+                  return Chip(
+                    label: Text('${country.country} (${country.total})'),
+                    backgroundColor: Colors.blue.shade50,
+                    labelStyle: TextStyle(color: Colors.blue.shade800),
+                  );
+                }).toList(),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildRecentActivity() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Recent Activity',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF333333),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const ListTile(
+              leading: CircleAvatar(
+                backgroundColor: Colors.green,
+                child: Icon(Icons.person_add, size: 18, color: Colors.white),
+              ),
+              title: Text('New user registration'),
+              subtitle: Text('John Doe registered today'),
+              trailing: Text('2 min ago'),
+            ),
+            const Divider(),
+            const ListTile(
+              leading: CircleAvatar(
+                backgroundColor: Colors.blue,
+                child: Icon(Icons.payment, size: 18, color: Colors.white),
+              ),
+              title: Text('Payment received'),
+              subtitle: Text('Silver package purchased'),
+              trailing: Text('10 min ago'),
+            ),
+            const Divider(),
+            const ListTile(
+              leading: CircleAvatar(
+                backgroundColor: Colors.orange,
+                child: Icon(Icons.verified, size: 18, color: Colors.white),
+              ),
+              title: Text('Document approved'),
+              subtitle: Text('User profile verified'),
+              trailing: Text('1 hour ago'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLoadingState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const CircularProgressIndicator(
+            color: Color(0xFF667eea),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            'Loading dashboard data...',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey.shade600,
             ),
           ),
         ],
@@ -126,115 +724,127 @@ class _DashboardHomeState extends State<DashboardHome> {
     );
   }
 
-  Widget _buildRecentUsersTable(List<RecentUser> users) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppTheme.cardBg,
-        borderRadius: AppTheme.radiusMd,
-        boxShadow: AppTheme.cardShadow,
-        border: Border.all(color: AppTheme.borderLight),
+  Widget _buildErrorState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Icon(
+            Icons.error_outline,
+            size: 64,
+            color: Colors.red,
+          ),
+          const SizedBox(height: 20),
+          Text(
+            _error,
+            style: const TextStyle(
+              fontSize: 16,
+              color: Colors.red,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: _fetchDashboardData,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Retry'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Color(0xFF667eea),
+            ),
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildDashboardContent() {
+    return SingleChildScrollView(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-            child: Row(
+          // Welcome Header
+          Container(
+            margin: const EdgeInsets.only(bottom: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 4,
-                  height: 20,
-                  decoration: BoxDecoration(
-                    gradient: AppTheme.primaryGradient,
-                    borderRadius: BorderRadius.circular(2),
+                Text(
+                  'Welcome to Admin Dashboard',
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.grey.shade800,
                   ),
                 ),
-                const SizedBox(width: 10),
-                const Text(
-                  'Recent Registrations',
+                const SizedBox(height: 8),
+                Text(
+                  _dateFormat.format(DateTime.now()),
                   style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppTheme.textPrimary,
+                    fontSize: 14,
+                    color: Colors.grey.shade600,
                   ),
                 ),
               ],
             ),
           ),
-          const Divider(height: 1, color: AppTheme.borderLight),
-          if (users.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(
-                child: Text('No recent users', style: TextStyle(color: AppTheme.textMuted)),
-              ),
-            )
-          else
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: DataTable(
-                headingRowColor: WidgetStateProperty.all(AppTheme.scaffoldBg),
-                columns: const [
-                  DataColumn(label: Text('ID', style: TextStyle(fontWeight: FontWeight.w600))),
-                  DataColumn(label: Text('Name', style: TextStyle(fontWeight: FontWeight.w600))),
-                  DataColumn(label: Text('Email', style: TextStyle(fontWeight: FontWeight.w600))),
-                  DataColumn(label: Text('Gender', style: TextStyle(fontWeight: FontWeight.w600))),
-                  DataColumn(label: Text('Status', style: TextStyle(fontWeight: FontWeight.w600))),
-                  DataColumn(label: Text('Joined', style: TextStyle(fontWeight: FontWeight.w600))),
-                ],
-                rows: users.map((user) {
-                  final isActive = user.isActive == 1;
-                  return DataRow(cells: [
-                    DataCell(Text('#${user.id}')),
-                    DataCell(Text(user.fullName.isEmpty ? '—' : user.fullName)),
-                    DataCell(Text(user.email ?? '—')),
-                    DataCell(
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: user.gender?.toLowerCase() == 'female'
-                              ? const Color(0xFFFCE4EC)
-                              : const Color(0xFFE3F2FD),
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          user.gender ?? '—',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: user.gender?.toLowerCase() == 'female'
-                                ? const Color(0xFFC2185B)
-                                : const Color(0xFF1565C0),
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ),
-                    DataCell(
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: isActive ? AppTheme.successLight : AppTheme.errorLight,
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Text(
-                          isActive ? 'Active' : 'Inactive',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: isActive ? AppTheme.success : AppTheme.error,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                    ),
-                    DataCell(Text(
-                      user.createdDate != null && user.createdDate!.length >= 10
-                          ? user.createdDate!.substring(0, 10)
-                          : user.createdDate ?? '—',
-                    )),
-                  ]);
-                }).toList(),
-              ),
+
+          // Quick Stats
+          _buildSection(
+            title: 'Quick Stats',
+            trailing: IconButton(
+              onPressed: _fetchDashboardData,
+              icon: const Icon(Icons.refresh, color: Color(0xFF667eea)),
+              tooltip: 'Refresh',
             ),
+            child: _buildUserStats(),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Payment Overview
+          _buildSection(
+            title: 'Revenue Overview',
+            child: _buildPaymentStats(),
+          ),
+
+          SizedBox(height: 24),
+
+          // Best Selling Package
+          _buildSection(
+            title: 'Package Performance',
+            child: _buildPackageStats(),
+          ),
+
+          const SizedBox(height: 24),
+
+          // User Distribution
+          _buildSection(
+            title: 'User Analytics',
+            child: _buildUserDistribution(),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Payment Methods
+          _buildSection(
+            title: 'Payment Analytics',
+            child: _buildPaymentMethodDistribution(),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Address Information
+          _buildSection(
+            title: 'Geographic Data',
+            child: _buildAddressInfo(),
+          ),
+
+          const SizedBox(height: 24),
+
+          // Recent Activity
+          _buildRecentActivity(),
+
+          const SizedBox(height: 40),
         ],
       ),
     );
@@ -242,119 +852,10 @@ class _DashboardHomeState extends State<DashboardHome> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator(color: AppTheme.primary));
-    }
-
-    if (_error.isNotEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.error_outline, size: 48, color: AppTheme.error),
-            const SizedBox(height: 16),
-            Text(_error, style: const TextStyle(color: AppTheme.error)),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: () => _fetchDashboardData(forceRefresh: true),
-              icon: const Icon(Icons.refresh),
-              label: const Text('Retry'),
-              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primary),
-            ),
-          ],
-        ),
-      );
-    }
-
-    final data = _dashboardData;
-    if (data == null) {
-      return const Center(child: Text('No data available'));
-    }
-
-    return RefreshIndicator(
-      color: AppTheme.primary,
-      onRefresh: () => _fetchDashboardData(forceRefresh: true),
-      child: SingleChildScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Date header
-            Row(
-              children: [
-                const Icon(Icons.calendar_today_outlined, size: 16, color: AppTheme.textSecondary),
-                const SizedBox(width: 8),
-                Text(
-                  _dateFormat.format(DateTime.now()),
-                  style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-                ),
-                const Spacer(),
-                OutlinedButton.icon(
-                  onPressed: () => _fetchDashboardData(forceRefresh: true),
-                  icon: const Icon(Icons.refresh, size: 16),
-                  label: const Text('Refresh'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppTheme.primary,
-                    side: const BorderSide(color: AppTheme.primary),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            // KPI Grid
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final crossAxisCount = constraints.maxWidth > 800 ? 4 : 2;
-                return GridView.count(
-                  crossAxisCount: crossAxisCount,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  crossAxisSpacing: 16,
-                  mainAxisSpacing: 16,
-                  childAspectRatio: 1.6,
-                  children: [
-                    _buildKpiCard(
-                      title: "Today's Registrations",
-                      value: data.todayRegistration.toString(),
-                      icon: Icons.person_add_outlined,
-                      gradient: AppTheme.primaryGradient,
-                      subtitle: 'New members today',
-                    ),
-                    _buildKpiCard(
-                      title: 'Monthly Registrations',
-                      value: data.monthlyRegistration.toString(),
-                      icon: Icons.group_add_outlined,
-                      gradient: AppTheme.blueGradient,
-                      subtitle: 'This month',
-                    ),
-                    _buildKpiCard(
-                      title: "Today's Proposals",
-                      value: data.todayProposal.toString(),
-                      icon: Icons.favorite_outline,
-                      gradient: AppTheme.goldGradient,
-                      subtitle: 'Sent today',
-                    ),
-                    _buildKpiCard(
-                      title: 'Monthly Proposals',
-                      value: data.monthlyProposal.toString(),
-                      icon: Icons.favorite_border,
-                      gradient: AppTheme.greenGradient,
-                      subtitle: 'This month',
-                    ),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 24),
-
-            // Recent Users Table
-            _buildRecentUsersTable(data.recentUsers),
-            const SizedBox(height: 24),
-          ],
-        ),
-      ),
-    );
+    return _isLoading
+        ? _buildLoadingState()
+        : _error.isNotEmpty
+        ? _buildErrorState()
+        : _buildDashboardContent();
   }
 }

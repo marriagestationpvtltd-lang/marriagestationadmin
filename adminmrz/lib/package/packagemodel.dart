@@ -1,22 +1,20 @@
 class PackageListResponse {
   final bool success;
-  final int totalRecords;
+  final int count;
   final List<Package> data;
 
   PackageListResponse({
     required this.success,
-    required this.totalRecords,
+    required this.count,
     required this.data,
   });
 
   factory PackageListResponse.fromJson(Map<String, dynamic> json) {
-    // api9 returns: { success, count, data: [...] }
-    final success = json['success'] == true;
-    final count = json['count'] is int ? json['count'] : int.tryParse(json['count']?.toString() ?? '') ?? 0;
     return PackageListResponse(
-      success: success,
-      totalRecords: count,
-      data: List<Package>.from((json['data'] ?? []).map((x) => Package.fromJson(x))),
+      success: json['success'] ?? false,
+      count: json['count'] ?? 0,
+      data: List<Package>.from(
+          (json['data'] ?? []).map((x) => Package.fromJson(x))),
     );
   }
 }
@@ -24,37 +22,25 @@ class PackageListResponse {
 class Package {
   final int id;
   final String name;
-  final int isActive;
-  final String? createdDate;
-  final String? baseAmount;
-  final dynamic facility;
-  final dynamic duration;
+  final String duration;
   final String description;
   final String price;
 
   Package({
     required this.id,
     required this.name,
-    this.isActive = 1,
-    this.createdDate,
-    this.baseAmount,
-    this.facility,
-    this.duration,
-    this.description = '',
-    this.price = '',
+    required this.duration,
+    required this.description,
+    required this.price,
   });
 
   factory Package.fromJson(Map<String, dynamic> json) {
     return Package(
-      id: json['id'] is int ? json['id'] : int.tryParse(json['id']?.toString() ?? '') ?? 0,
+      id: json['id'] is int ? json['id'] : int.tryParse(json['id'].toString()) ?? 0,
       name: json['name']?.toString() ?? '',
-      isActive: json['isActive'] is int ? json['isActive'] : int.tryParse(json['isActive']?.toString() ?? '') ?? 1,
-      createdDate: json['createdDate']?.toString(),
-      baseAmount: json['baseAmount']?.toString(),
-      facility: json['facility'],
-      duration: json['duration'],
+      duration: json['duration']?.toString() ?? '',
       description: json['description']?.toString() ?? '',
-      price: json['price']?.toString() ?? json['baseAmount']?.toString() ?? '',
+      price: json['price']?.toString() ?? '',
     );
   }
 
@@ -62,43 +48,38 @@ class Package {
     return {
       'id': id,
       'name': name,
-      'isActive': isActive,
+      'duration': duration,
       'description': description,
-      if (price.isNotEmpty) 'price': price,
-      if (baseAmount != null) 'baseAmount': baseAmount,
-      if (facility != null) 'facility': facility,
-      if (duration != null) 'duration': duration,
+      'price': price,
     };
   }
 
   Map<String, dynamic> toCreateJson() {
     return {
       'name': name,
+      'duration': duration.replaceAll(' Month', '').trim(),
       'description': description,
-      if (price.isNotEmpty) 'price': price,
-      if (baseAmount != null) 'baseAmount': baseAmount,
-      if (facility != null) 'facility': facility,
-      if (duration != null) 'duration': duration,
+      'price': price.replaceAll('Rs ', '').replaceAll(',', '').trim(),
     };
   }
 
-  /// Numeric price parsed from [price] or [baseAmount].
-  double get numericPrice {
-    final raw = price.isNotEmpty ? price : (baseAmount ?? '');
+  // Extract numeric duration (e.g., "90 Month" -> 90)
+  int get durationInMonths {
     try {
-      return double.parse(raw.replaceAll('Rs ', '').replaceAll(',', '').trim());
+      return int.parse(duration.replaceAll(' Month', '').trim());
     } catch (e) {
-      return 0.0;
+      return 0;
     }
   }
 
-  static final _durationRegExp = RegExp(r'(\d+)');
-
-  /// Duration in months parsed from the [duration] string (e.g. '3 Month' → 3).
-  int get durationInMonths {
-    if (duration == null) return 0;
-    final match = _durationRegExp.firstMatch(duration.toString());
-    return match != null ? int.tryParse(match.group(1) ?? '') ?? 0 : 0;
+  // Extract numeric price (e.g., "Rs 300.00" -> 300.0)
+  double get numericPrice {
+    try {
+      return double.parse(
+          price.replaceAll('Rs ', '').replaceAll(',', '').trim());
+    } catch (e) {
+      return 0.0;
+    }
   }
 }
 
@@ -114,15 +95,10 @@ class CreatePackageResponse {
   });
 
   factory CreatePackageResponse.fromJson(Map<String, dynamic> json) {
-    // api9 returns: { success, message, data: { id: ... } }
     return CreatePackageResponse(
-      success: json['success'] == true,
+      success: json['success'] ?? false,
       message: json['message']?.toString() ?? '',
-      packageId: json['data'] is Map
-          ? (json['data']['id'] is int
-              ? json['data']['id'] as int
-              : int.tryParse(json['data']['id']?.toString() ?? '') ?? 0)
-          : 0,
+      packageId: json['package_id'] is int ? json['package_id'] : 0,
     );
   }
 }
