@@ -376,47 +376,42 @@ class _ChatSidebarState extends State<ChatSidebar> {
 
   @override
   Widget build(BuildContext context) {
-    const kPrimary = Color(0xFFD81B60);
-    const kPrimaryLight = Color(0xFFFCE4EC);
-    const kText = Color(0xFF1E293B);
-    const kMuted = Color(0xFF64748B);
-    const kBorder = Color(0xFFE2E8F0);
-
     final chatProvider = Provider.of<ChatProvider>(context);
+    final c = ChatColors.of(context);
 
     return Container(
       width: 280,
-      color: Colors.white,
+      color: c.sidebar,
       child: Column(
         children: [
           // ── HEADER ──────────────────────────────────────────────────
           Container(
             height: 56,
-            color: Colors.white,
+            color: c.sidebar,
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                const Text(
+                Text(
                   'Conversations',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w700,
-                    color: kText,
+                    color: c.text,
                   ),
                 ),
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: kPrimaryLight,
+                    color: c.primaryLight,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     '${_filteredUsers.length}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: kPrimary,
+                      color: c.primary,
                     ),
                   ),
                 ),
@@ -432,11 +427,11 @@ class _ChatSidebarState extends State<ChatSidebar> {
               child: TextField(
                 decoration: InputDecoration(
                   hintText: "Search conversations...",
-                  hintStyle: const TextStyle(fontSize: 12, color: kMuted),
-                  prefixIcon: const Icon(Icons.search, size: 18, color: kMuted),
+                  hintStyle: TextStyle(fontSize: 12, color: c.muted),
+                  prefixIcon: Icon(Icons.search, size: 18, color: c.muted),
                   suffixIcon: _searchQuery.isNotEmpty
                       ? IconButton(
-                          icon: const Icon(Icons.clear, size: 16, color: kMuted),
+                          icon: Icon(Icons.clear, size: 16, color: c.muted),
                           onPressed: () {
                             _searchDebounce?.cancel();
                             setState(() => _searchQuery = "");
@@ -446,18 +441,18 @@ class _ChatSidebarState extends State<ChatSidebar> {
                       : null,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(20),
-                    borderSide: const BorderSide(color: kBorder, width: 1),
+                    borderSide: BorderSide(color: c.border, width: 1),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(20),
-                    borderSide: const BorderSide(color: kBorder, width: 1),
+                    borderSide: BorderSide(color: c.border, width: 1),
                   ),
                   focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(20),
-                    borderSide: const BorderSide(color: kPrimary, width: 1),
+                    borderSide: BorderSide(color: c.primary, width: 1),
                   ),
                   filled: true,
-                  fillColor: const Color(0xFFF8FAFC),
+                  fillColor: c.searchFill,
                   contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
                   isDense: true,
                 ),
@@ -494,9 +489,9 @@ class _ChatSidebarState extends State<ChatSidebar> {
                             _applyFilters();
                           });
                         },
-                        selectedColor: kPrimaryLight,
-                        checkmarkColor: kPrimary,
-                        side: const BorderSide(color: kBorder),
+                        selectedColor: c.primaryLight,
+                        checkmarkColor: c.primary,
+                        side: BorderSide(color: c.border),
                       ),
                       const SizedBox(width: 6),
                       FilterChip(
@@ -511,9 +506,9 @@ class _ChatSidebarState extends State<ChatSidebar> {
                             _applyFilters();
                           });
                         },
-                        selectedColor: kPrimaryLight,
-                        checkmarkColor: kPrimary,
-                        side: const BorderSide(color: kBorder),
+                        selectedColor: c.primaryLight,
+                        checkmarkColor: c.primary,
+                        side: BorderSide(color: c.border),
                       ),
                       const SizedBox(width: 6),
                       FilterChip(
@@ -528,24 +523,25 @@ class _ChatSidebarState extends State<ChatSidebar> {
                             _applyFilters();
                           });
                         },
-                        selectedColor: kPrimaryLight,
-                        checkmarkColor: kPrimary,
-                        side: const BorderSide(color: kBorder),
+                        selectedColor: c.primaryLight,
+                        checkmarkColor: c.primary,
+                        side: BorderSide(color: c.border),
                       ),
                       const SizedBox(width: 6),
                       Container(
                         height: 28,
                         padding: const EdgeInsets.symmetric(horizontal: 8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF8FAFC),
+                          color: c.searchFill,
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: kBorder),
+                          border: Border.all(color: c.border),
                         ),
                         child: DropdownButton<String>(
                           value: _sortBy,
                           underline: const SizedBox(),
-                          icon: const Icon(Icons.sort, size: 14, color: kMuted),
-                          style: const TextStyle(fontSize: 10, color: kText),
+                          icon: Icon(Icons.sort, size: 14, color: c.muted),
+                          style: TextStyle(fontSize: 10, color: c.text),
+                          dropdownColor: c.sidebar,
                           items: const [
                             DropdownMenuItem(value: 'recent', child: Text('Recent')),
                             DropdownMenuItem(value: 'name', child: Text('Name')),
@@ -574,7 +570,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
                       icon: const Icon(Icons.clear_all, size: 14),
                       label: const Text('Clear', style: TextStyle(fontSize: 11)),
                       style: TextButton.styleFrom(
-                        foregroundColor: kPrimary,
+                        foregroundColor: c.primary,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                         minimumSize: Size.zero,
@@ -594,12 +590,12 @@ class _ChatSidebarState extends State<ChatSidebar> {
                 _totalUsers > 0
                     ? '${_filteredUsers.length} / $_totalUsers users'
                     : '${_filteredUsers.length} users',
-                style: const TextStyle(fontSize: 11, color: kMuted),
+                style: TextStyle(fontSize: 11, color: c.muted),
               ),
             ),
           ),
 
-          Container(height: 1, color: kBorder),
+          Container(height: 1, color: c.border),
 
           // ── LIST ────────────────────────────────────────────────────
           Expanded(
@@ -613,13 +609,13 @@ class _ChatSidebarState extends State<ChatSidebar> {
                           height: 24,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: kPrimary,
+                            color: c.primary,
                           ),
                         ),
                         const SizedBox(height: 10),
-                        const Text(
+                        Text(
                           'Loading users...',
-                          style: TextStyle(color: kMuted, fontSize: 13),
+                          style: TextStyle(color: c.muted, fontSize: 13),
                         ),
                       ],
                     ),
@@ -632,9 +628,9 @@ class _ChatSidebarState extends State<ChatSidebar> {
                             Icon(Icons.person_off,
                                 size: 40, color: Colors.grey[300]),
                             const SizedBox(height: 10),
-                            const Text(
+                            Text(
                               'No users found',
-                              style: TextStyle(color: kMuted, fontSize: 13),
+                              style: TextStyle(color: c.muted, fontSize: 13),
                             ),
                             if (_showOnlyPaid ||
                                 _showOnlyOnline ||
@@ -643,7 +639,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
                               TextButton(
                                 onPressed: _resetFilters,
                                 style: TextButton.styleFrom(
-                                    foregroundColor: kPrimary),
+                                    foregroundColor: c.primary),
                                 child: const Text('Clear filters',
                                     style: TextStyle(fontSize: 12)),
                               ),
@@ -666,7 +662,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
                                   height: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: kPrimary,
+                                    color: c.primary,
                                   ),
                                 ),
                               ),
@@ -725,19 +721,15 @@ class _ChatSidebarState extends State<ChatSidebar> {
     bool isSelected,
     VoidCallback onTap,
   ) {
-    const kPrimary = Color(0xFFD81B60);
-    const kPrimaryLight = Color(0xFFFCE4EC);
-    const kText = Color(0xFF1E293B);
-    const kMuted = Color(0xFF64748B);
-    const kOnline = Color(0xFF22C55E);
+    final c = ChatColors.of(context);
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFFFFF1F5) : Colors.white,
+          color: isSelected ? c.selectedRow : c.sidebar,
           border: isSelected
-              ? const Border(left: BorderSide(color: kPrimary, width: 3))
+              ? Border(left: BorderSide(color: c.primary, width: 3))
               : null,
         ),
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
@@ -747,7 +739,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
               children: [
                 CircleAvatar(
                   radius: 20,
-                  backgroundColor: const Color(0xFFF1F5F9),
+                  backgroundColor: c.cardBg,
                   backgroundImage: profileImage.isNotEmpty
                       ? NetworkImage(profileImage)
                       : null,
@@ -762,9 +754,9 @@ class _ChatSidebarState extends State<ChatSidebar> {
                     width: 10,
                     height: 10,
                     decoration: BoxDecoration(
-                      color: isOnline ? kOnline : const Color(0xFFCBD5E1),
+                      color: isOnline ? c.online : c.border,
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 2),
+                      border: Border.all(color: c.sidebar, width: 2),
                     ),
                   ),
                 ),
@@ -778,7 +770,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
                       decoration: BoxDecoration(
                         color: Colors.amber,
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 1.5),
+                        border: Border.all(color: c.sidebar, width: 1.5),
                       ),
                       child: const Icon(Icons.star, size: 8, color: Colors.white),
                     ),
@@ -797,7 +789,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
                     style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
-                      color: isPaid ? kPrimary : kText,
+                      color: isPaid ? c.primary : c.text,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -805,13 +797,13 @@ class _ChatSidebarState extends State<ChatSidebar> {
                   if (userId.isNotEmpty)
                     Row(
                       children: [
-                        const Icon(Icons.tag, size: 10, color: kMuted),
+                        Icon(Icons.tag, size: 10, color: c.muted),
                         const SizedBox(width: 2),
                         Text(
                           userId,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 10,
-                            color: kMuted,
+                            color: c.muted,
                             fontWeight: FontWeight.w500,
                           ),
                         ),
@@ -822,13 +814,13 @@ class _ChatSidebarState extends State<ChatSidebar> {
                     isOnline ? "Online" : lastSeen,
                     style: TextStyle(
                       fontSize: 11,
-                      color: isOnline ? kOnline : kMuted,
+                      color: isOnline ? c.online : c.muted,
                     ),
                   ),
                   if (chatMessage.isNotEmpty)
                     Text(
                       chatMessage,
-                      style: const TextStyle(fontSize: 11, color: kMuted),
+                      style: TextStyle(fontSize: 11, color: c.muted),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -840,20 +832,20 @@ class _ChatSidebarState extends State<ChatSidebar> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: kPrimaryLight,
+                  color: c.primaryLight,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.favorite, color: kPrimary, size: 10),
+                    Icon(Icons.favorite, color: c.primary, size: 10),
                     const SizedBox(width: 2),
                     Text(
                       '$matches',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10,
                         fontWeight: FontWeight.w600,
-                        color: kPrimary,
+                        color: c.primary,
                       ),
                     ),
                   ],
