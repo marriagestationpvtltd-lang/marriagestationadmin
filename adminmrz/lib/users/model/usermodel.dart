@@ -12,12 +12,13 @@ class UserListResponse {
   });
 
   factory UserListResponse.fromJson(Map<String, dynamic> json) {
-    final status = json['status'];
-    final success = status == 200 || status?.toString() == '200';
+    // api9 returns: { success, count, data: [...] }
+    final success = json['success'] == true;
+    final count = json['count'] is int ? json['count'] : int.tryParse(json['count']?.toString() ?? '') ?? 0;
     return UserListResponse(
       success: success,
-      totalRecords: json['totalRecords'] is int ? json['totalRecords'] : int.tryParse(json['totalRecords']?.toString() ?? '') ?? 0,
-      data: List<User>.from((json['recordList'] ?? []).map((x) => User.fromJson(x))),
+      totalRecords: count,
+      data: List<User>.from((json['data'] ?? []).map((x) => User.fromJson(x))),
     );
   }
 }

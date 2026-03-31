@@ -11,17 +11,13 @@ class DashboardService {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
 
-    final headers = <String, String>{
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
-
     final response = await http
-        .post(
-          Uri.parse('$_baseUrl/admin/dashboard/getDashboardData'),
-          headers: headers,
-          body: json.encode({}),
+        .get(
+          Uri.parse('$_baseUrl/get_dashboard.php'),
+          headers: {
+            'Accept': 'application/json',
+            if (token != null) 'Authorization': 'Bearer $token',
+          },
         )
         .timeout(AppConstants.requestTimeout);
 

@@ -11,7 +11,6 @@ class PaymentService {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
     return {
-      'Content-Type': 'application/json',
       'Accept': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
     };
@@ -19,10 +18,9 @@ class PaymentService {
 
   Future<PaymentHistoryResponse> getPaymentHistory({int startIndex = 0, int fetchRecord = 50}) async {
     final response = await http
-        .post(
-          Uri.parse('$_baseUrl/admin/payment/getPayment'),
+        .get(
+          Uri.parse('$_baseUrl/get_payments.php'),
           headers: await _authHeaders(),
-          body: json.encode({'startIndex': startIndex, 'fetchRecord': fetchRecord}),
         )
         .timeout(AppConstants.requestTimeout);
 
@@ -42,21 +40,15 @@ class PaymentService {
     int startIndex = 0,
     int fetchRecord = 50,
   }) async {
-    final Map<String, dynamic> body = {
-      'startIndex': startIndex,
-      'fetchRecord': fetchRecord,
-    };
-    if (startDate != null) body['startDate'] = startDate.toIso8601String().split('T')[0];
-    if (endDate != null) body['endDate'] = endDate.toIso8601String().split('T')[0];
-    if (paymentMethod != null && paymentMethod.isNotEmpty) body['paymentMethod'] = paymentMethod;
-    if (status != null && status.isNotEmpty) body['status'] = status;
+    final params = <String, String>{};
+    if (startDate != null) params['start_date'] = startDate.toIso8601String().split('T')[0];
+    if (endDate != null) params['end_date'] = endDate.toIso8601String().split('T')[0];
+    if (paymentMethod != null && paymentMethod.isNotEmpty) params['payment_method'] = paymentMethod;
+    if (status != null && status.isNotEmpty) params['status'] = status;
 
+    final uri = Uri.parse('$_baseUrl/get_payments.php').replace(queryParameters: params.isEmpty ? null : params);
     final response = await http
-        .post(
-          Uri.parse('$_baseUrl/admin/payment/getPayment'),
-          headers: await _authHeaders(),
-          body: json.encode(body),
-        )
+        .get(uri, headers: await _authHeaders())
         .timeout(AppConstants.requestTimeout);
 
     if (response.statusCode == 200) {
@@ -70,15 +62,18 @@ class PaymentService {
   Future<bool> insertPayment(Map<String, dynamic> paymentData) async {
     final response = await http
         .post(
-          Uri.parse('$_baseUrl/admin/payment/insertPayment'),
-          headers: await _authHeaders(),
+          Uri.parse('$_baseUrl/insert_payment.php'),
+          headers: {
+            ...await _authHeaders(),
+            'Content-Type': 'application/json',
+          },
           body: json.encode(paymentData),
         )
         .timeout(AppConstants.requestTimeout);
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      return data['status'] == 200;
+      return data['success'] == true;
     } else {
       throw Exception('Failed to insert payment: ${response.statusCode}');
     }

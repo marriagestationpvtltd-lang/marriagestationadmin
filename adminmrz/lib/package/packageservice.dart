@@ -11,6 +11,15 @@ class PackageService {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
     return {
+      'Accept': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  Future<Map<String, String>> _jsonAuthHeaders() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('token');
+    return {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
@@ -19,10 +28,9 @@ class PackageService {
 
   Future<PackageListResponse> getPackages({int startIndex = 0, int fetchRecord = 50}) async {
     final response = await http
-        .post(
-          Uri.parse('$_baseUrl/admin/package/getpackage'),
+        .get(
+          Uri.parse('$_baseUrl/get_packages.php'),
           headers: await _authHeaders(),
-          body: json.encode({'startIndex': startIndex, 'fetchRecord': fetchRecord}),
         )
         .timeout(AppConstants.requestTimeout);
 
@@ -37,8 +45,8 @@ class PackageService {
   Future<CreatePackageResponse> createPackage(Package package) async {
     final response = await http
         .post(
-          Uri.parse('$_baseUrl/admin/package/insertPackage'),
-          headers: await _authHeaders(),
+          Uri.parse('$_baseUrl/create_package.php'),
+          headers: await _jsonAuthHeaders(),
           body: json.encode({
             'name': package.name,
             'baseAmount': package.baseAmount,
@@ -59,15 +67,15 @@ class PackageService {
   Future<bool> updatePackage(Package package) async {
     final response = await http
         .post(
-          Uri.parse('$_baseUrl/admin/package/updatePackage'),
-          headers: await _authHeaders(),
+          Uri.parse('$_baseUrl/update_package.php'),
+          headers: await _jsonAuthHeaders(),
           body: json.encode(package.toJson()),
         )
         .timeout(AppConstants.requestTimeout);
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      return data['status'] == 200;
+      return data['success'] == true;
     } else {
       throw Exception('Failed to update package: ${response.statusCode}');
     }
@@ -76,15 +84,15 @@ class PackageService {
   Future<bool> deletePackage(int packageId) async {
     final response = await http
         .post(
-          Uri.parse('$_baseUrl/admin/package/deletePackage'),
-          headers: await _authHeaders(),
+          Uri.parse('$_baseUrl/delete_package.php'),
+          headers: await _jsonAuthHeaders(),
           body: json.encode({'id': packageId}),
         )
         .timeout(AppConstants.requestTimeout);
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      return data['status'] == 200;
+      return data['success'] == true;
     } else {
       throw Exception('Failed to delete package: ${response.statusCode}');
     }
@@ -93,15 +101,15 @@ class PackageService {
   Future<bool> toggleActivePackage(int packageId) async {
     final response = await http
         .post(
-          Uri.parse('$_baseUrl/admin/package/activeInactivePackage'),
-          headers: await _authHeaders(),
+          Uri.parse('$_baseUrl/toggle_package.php'),
+          headers: await _jsonAuthHeaders(),
           body: json.encode({'id': packageId}),
         )
         .timeout(AppConstants.requestTimeout);
 
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
-      return data['status'] == 200;
+      return data['success'] == true;
     } else {
       throw Exception('Failed to toggle package status: ${response.statusCode}');
     }

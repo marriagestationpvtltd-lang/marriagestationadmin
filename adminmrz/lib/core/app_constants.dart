@@ -1,12 +1,12 @@
 import 'package:flutter/foundation.dart';
 
 class AppConstants {
+  // The real admin backend lives at https://digitallami.com/api9 (PHP files).
   // On Flutter Web the app is served through Firebase Hosting, which rewrites
-  // these paths to the `proxy` Cloud Function. The function forwards requests
-  // to https://digitallami.com, adding the CORS headers that the browser
-  // requires. On non-web platforms (Android / iOS) we call the server directly.
+  // /api9/** to the `proxy` Cloud Function so the browser can reach the API
+  // without CORS errors. On native platforms we call the server directly.
   static const String apiBaseUrl =
-      kIsWeb ? '/api' : 'https://digitallami.com/api';
+      kIsWeb ? '/api9' : 'https://digitallami.com/api9';
   static const String chatApiUrl =
       kIsWeb ? '' : 'https://digitallami.com';
   static const String api2BaseUrl =

@@ -22,7 +22,7 @@
       "**/node_modules/**"
     ],
     "rewrites": [
-      { "source": "/api/**",                "function": "proxy" },
+      { "source": "/api9/**",               "function": "proxy" },
       { "source": "/Api2/**",               "function": "proxy" },
       { "source": "/get.php",               "function": "proxy" },
       { "source": "/get_match_details.php", "function": "proxy" },
