@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:adminmrz/adminchat/services/pushservice.dart';
 import 'package:adminmrz/settings/call_settings_provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -58,6 +59,8 @@ class _CallScreenState extends State<CallScreen> {
   late AudioPlayer _ringtonePlayer;
   bool _isPlayingRingtone = false;
   Timer? _ringtoneRepeatTimer;
+
+  StreamSubscription<DocumentSnapshot>? _callSignalSubscription;
 
   // ================= INIT =================
   @override
@@ -154,6 +157,37 @@ class _CallScreenState extends State<CallScreen> {
         );
       }
 
+      // ================= FIRESTORE SIGNAL =================
+      // Write the call signal so the user app can acknowledge rejection in real-time.
+      if (widget.isOutgoingCall) {
+        await FirebaseFirestore.instance
+            .collection('call_signals')
+            .doc(_channel)
+            .set({
+          'status': 'ringing',
+          'callerId': widget.currentUserId,
+          'receiverId': widget.otherUserId,
+          'type': 'audio',
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+
+        // Listen for rejection from the user's app.
+        _callSignalSubscription = FirebaseFirestore.instance
+            .collection('call_signals')
+            .doc(_channel)
+            .snapshots()
+            .listen(
+          (snap) async {
+            if (!mounted || _ending) return;
+            final data = snap.data();
+            if (data != null && data['status'] == 'rejected') {
+              await _endCall();
+            }
+          },
+          onError: (_) {/* Firestore errors are non-fatal; timeout will still fire */},
+        );
+      }
+
       // ================= AGORA =================
       _engine = createAgoraRtcEngine();
 
@@ -237,6 +271,18 @@ class _CallScreenState extends State<CallScreen> {
     try {
       _callTimer?.cancel();
       _timeoutTimer?.cancel();
+
+      await _callSignalSubscription?.cancel();
+      _callSignalSubscription = null;
+
+      // Clean up the Firestore call signal document.
+      if (widget.isOutgoingCall) {
+        FirebaseFirestore.instance
+            .collection('call_signals')
+            .doc(_channel)
+            .delete()
+            .catchError((_) {});
+      }
 
       await _stopRingtone();
 
@@ -336,6 +382,7 @@ class _CallScreenState extends State<CallScreen> {
     _callTimer?.cancel();
     _timeoutTimer?.cancel();
     _ringtoneRepeatTimer?.cancel();
+    _callSignalSubscription?.cancel();
 
     try {
       _engine.leaveChannel();
