@@ -9,6 +9,7 @@ import 'adminchat/services/MatchedProfileService.dart';
 import 'auth/dashboard.dart';
 import 'auth/login.dart';
 import 'auth/service.dart';
+import 'dashboard/dashprovider.dart';
 import 'document/docprovider/docservice.dart';
 import 'firebase_options.dart';
 import 'package/packageProvider.dart';
@@ -49,6 +50,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => PaymentProvider()),
         ChangeNotifierProvider(create: (context) => ChatProvider()),
         ChangeNotifierProvider(create: (context) => MatchedProfileProvider()),
+        ChangeNotifierProvider(create: (_) => DashboardProvider()),
       ],
       child: MaterialApp(
         title: 'Marriage Station Admin',

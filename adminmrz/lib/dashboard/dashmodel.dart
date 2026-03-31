@@ -9,7 +9,7 @@ class DashboardResponse {
 
   factory DashboardResponse.fromJson(Map<String, dynamic> json) {
     return DashboardResponse(
-      success: json['success'] ?? false,
+      success: json['success'] == true || json['success'] == 1,
       dashboard: DashboardData.fromJson(json['dashboard'] ?? {}),
     );
   }
@@ -62,13 +62,13 @@ class UserStats {
 
   factory UserStats.fromJson(Map<String, dynamic> json) {
     return UserStats(
-      total: json['total'] is int ? json['total'] : 0,
-      todayRegistered: json['today_registered'] is int ? json['today_registered'] : 0,
-      thisMonthRegistered: json['this_month_registered'] is int ? json['this_month_registered'] : 0,
-      verified: json['verified'] is int ? json['verified'] : 0,
-      unverified: json['unverified'] is int ? json['unverified'] : 0,
-      active: json['active'] is int ? json['active'] : 0,
-      online: json['online'] is int ? json['online'] : 0,
+      total: _parseInt(json['total']),
+      todayRegistered: _parseInt(json['today_registered']),
+      thisMonthRegistered: _parseInt(json['this_month_registered']),
+      verified: _parseInt(json['verified']),
+      unverified: _parseInt(json['unverified']),
+      active: _parseInt(json['active']),
+      online: _parseInt(json['online']),
       byType: List<TypeCount>.from(
         (json['by_type'] ?? []).map((x) => TypeCount.fromJson(x)),
       ),
@@ -79,6 +79,12 @@ class UserStats {
         (json['by_pageno'] ?? []).map((x) => PageCount.fromJson(x)),
       ),
     );
+  }
+
+  static int _parseInt(dynamic value) {
+    if (value is int) return value;
+    if (value is String) return int.tryParse(value) ?? 0;
+    return 0;
   }
 }
 
@@ -94,7 +100,7 @@ class TypeCount {
   factory TypeCount.fromJson(Map<String, dynamic> json) {
     return TypeCount(
       usertype: json['usertype']?.toString() ?? '',
-      total: json['total'] is int ? json['total'] : 0,
+      total: UserStats._parseInt(json['total']),
     );
   }
 }
@@ -111,7 +117,7 @@ class GenderCount {
   factory GenderCount.fromJson(Map<String, dynamic> json) {
     return GenderCount(
       gender: json['gender']?.toString() ?? '',
-      total: json['total'] is int ? json['total'] : 0,
+      total: UserStats._parseInt(json['total']),
     );
   }
 }
@@ -127,8 +133,8 @@ class PageCount {
 
   factory PageCount.fromJson(Map<String, dynamic> json) {
     return PageCount(
-      pageno: json['pageno'] is int ? json['pageno'] : 0,
-      total: json['total'] is int ? json['total'] : 0,
+      pageno: UserStats._parseInt(json['pageno']),
+      total: UserStats._parseInt(json['total']),
     );
   }
 }
@@ -150,7 +156,7 @@ class AddressStats {
 
   factory AddressStats.fromJson(Map<String, dynamic> json) {
     return AddressStats(
-      totalWithAddress: json['total_with_address'] is int ? json['total_with_address'] : 0,
+      totalWithAddress: UserStats._parseInt(json['total_with_address']),
       byCountry: List<CountryCount>.from(
         (json['by_country'] ?? []).map((x) => CountryCount.fromJson(x)),
       ),
@@ -179,7 +185,7 @@ class CountryCount {
   factory CountryCount.fromJson(Map<String, dynamic> json) {
     return CountryCount(
       country: json['country']?.toString() ?? '',
-      total: json['total'] is int ? json['total'] : 0,
+      total: UserStats._parseInt(json['total']),
     );
   }
 }
@@ -196,7 +202,7 @@ class StateCount {
   factory StateCount.fromJson(Map<String, dynamic> json) {
     return StateCount(
       state: json['state']?.toString() ?? '',
-      total: json['total'] is int ? json['total'] : 0,
+      total: UserStats._parseInt(json['total']),
     );
   }
 }
@@ -213,24 +219,25 @@ class CityCount {
   factory CityCount.fromJson(Map<String, dynamic> json) {
     return CityCount(
       city: json['city']?.toString() ?? '',
-      total: json['total'] is int ? json['total'] : 0,
+      total: UserStats._parseInt(json['total']),
     );
   }
 }
 
 class ResidentialStatusCount {
-  final String residentalstatus;
+  final String residentialStatus;
   final int total;
 
   ResidentialStatusCount({
-    required this.residentalstatus,
+    required this.residentialStatus,
     required this.total,
   });
 
   factory ResidentialStatusCount.fromJson(Map<String, dynamic> json) {
     return ResidentialStatusCount(
-      residentalstatus: json['residentalstatus']?.toString() ?? '',
-      total: json['total'] is int ? json['total'] : 0,
+      residentialStatus: json['residential_status']?.toString() ??
+          json['residentalstatus']?.toString() ?? '',
+      total: UserStats._parseInt(json['total']),
     );
   }
 }
@@ -272,9 +279,9 @@ class PaymentStats {
     }
 
     return PaymentStats(
-      totalSold: json['total_sold'] is int ? json['total_sold'] : 0,
-      activePackages: json['active_packages'] is int ? json['active_packages'] : 0,
-      expiredPackages: json['expired_packages'] is int ? json['expired_packages'] : 0,
+      totalSold: UserStats._parseInt(json['total_sold']),
+      activePackages: UserStats._parseInt(json['active_packages']),
+      expiredPackages: UserStats._parseInt(json['expired_packages']),
       totalEarning: json['total_earning']?.toString() ?? 'Rs 0.00',
       todayEarning: json['today_earning']?.toString() ?? 'Rs 0.00',
       thisMonthEarning: json['this_month_earning']?.toString() ?? 'Rs 0.00',
@@ -306,7 +313,7 @@ class PaymentMethodCount {
   factory PaymentMethodCount.fromJson(Map<String, dynamic> json) {
     return PaymentMethodCount(
       paidby: json['paidby']?.toString() ?? '',
-      total: json['total'] is int ? json['total'] : 0,
+      total: UserStats._parseInt(json['total']),
     );
   }
 }
@@ -323,7 +330,7 @@ class BestSellingPackage {
   factory BestSellingPackage.fromJson(Map<String, dynamic> json) {
     return BestSellingPackage(
       name: json['name']?.toString() ?? '',
-      total: json['total'] is int ? json['total'] : 0,
+      total: UserStats._parseInt(json['total']),
     );
   }
 }
