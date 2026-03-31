@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'dart:async';
 
+import 'package:adminmrz/core/app_constants.dart';
 import 'callmanager.dart';
 
 
@@ -17,7 +18,7 @@ class NotificationService {
 
 
   // Your existing PHP API endpoint
-  static const String _notificationUrl = 'https://digitallami.com/Api2/send_notification.php';
+  static const String _notificationUrl = '${AppConstants.api2BaseUrl}/send_notification.php';
 
   // Stream for call responses (listen in outgoing call screen)
   static final StreamController<Map<String, dynamic>> _callResponseController = StreamController.broadcast();

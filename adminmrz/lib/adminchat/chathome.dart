@@ -1,5 +1,6 @@
 import 'package:adminmrz/adminchat/services/pushservice.dart';
 import 'package:adminmrz/adminchat/video_call_page.dart';
+import 'package:adminmrz/core/app_constants.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
@@ -83,7 +84,7 @@ class _ChatWindowState extends State<ChatWindow> {
 
     try {
       final response = await http.get(
-          Uri.parse('https://digitallami.com/get_match_details.php?user_id=${chatProvider.id}')
+          Uri.parse('${AppConstants.chatApiUrl}/get_match_details.php?user_id=${chatProvider.id}')
       );
 
       if (response.statusCode == 200) {

@@ -1,9 +1,10 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
+import 'package:adminmrz/core/app_constants.dart';
 import 'detailmodel.dart';
 
 class UserDetailsService {
-  static const String _baseUrl = 'https://digitallami.com/Api2';
+  static const String _baseUrl = AppConstants.api2BaseUrl;
 
   Future<UserDetailsResponse> getUserDetails(int userId, int myId) async {
     try {
