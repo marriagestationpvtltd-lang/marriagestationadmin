@@ -4,6 +4,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:just_audio/just_audio.dart';
@@ -81,6 +82,11 @@ class _ChatWindowState extends State<ChatWindow> {
   // Active call overlay
   OverlayEntry? _callOverlayEntry;
 
+  // Typing indicator state
+  Timer? _typingTimer;
+  StreamSubscription<DocumentSnapshot>? _typingSubscription;
+  bool _userIsTyping = false;
+
   @override
   void initState() {
     super.initState();
@@ -90,6 +96,9 @@ class _ChatWindowState extends State<ChatWindow> {
     _scrollController.addListener(_onScrollForPagination);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FocusScope.of(context).requestFocus(_messageFocusNode);
+      // Set up typing listener for the initially selected user.
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      if (chatProvider.id != null) _setupTypingListener(chatProvider.id!);
     });
   }
 
@@ -121,6 +130,127 @@ class _ChatWindowState extends State<ChatWindow> {
         _isLoadingMatchDetails = false;
       });
     }
+  }
+
+  // ── TYPING INDICATOR ────────────────────────────────────────────────────
+
+  /// Subscribe to the selected user's typing status in Firestore.
+  void _setupTypingListener(int userId) {
+    _typingSubscription?.cancel();
+    _typingSubscription = _firestore
+        .collection('typing_status')
+        .doc(userId.toString())
+        .snapshots()
+        .listen((snap) {
+      if (!mounted) return;
+      if (!snap.exists) {
+        setState(() => _userIsTyping = false);
+        return;
+      }
+      final data = snap.data() as Map<String, dynamic>;
+      final bool isTyping = data['isTyping'] == true;
+      final String? typingTo = data['typingTo']?.toString();
+      // Only show if user is typing TO admin ('1').
+      setState(() => _userIsTyping = isTyping && typingTo == senderId.toString());
+    });
+  }
+
+  /// Update admin's typing status in Firestore.
+  void _updateAdminTypingStatus(String text, String receiverId) {
+    _typingTimer?.cancel();
+    final isTyping = text.isNotEmpty;
+    _firestore.collection('typing_status').doc(senderId.toString()).set({
+      'isTyping': isTyping,
+      'typingTo': receiverId,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    if (isTyping) {
+      // Auto-clear after 3 seconds of no new keystrokes.
+      _typingTimer = Timer(const Duration(seconds: 3), () {
+        _clearAdminTypingStatus();
+      });
+    }
+  }
+
+  /// Clear admin's typing status (on send, user switch, or dispose).
+  void _clearAdminTypingStatus() {
+    _typingTimer?.cancel();
+    _firestore.collection('typing_status').doc(senderId.toString()).set({
+      'isTyping': false,
+      'typingTo': '',
+      'updatedAt': FieldValue.serverTimestamp(),
+    }).catchError((_) {});
+  }
+
+  // ── SEEN STATUS ─────────────────────────────────────────────────────────
+
+  /// Batch-mark all unread incoming messages as seen by admin.
+  void _markIncomingMessagesAsSeen(List<QueryDocumentSnapshot> messages) {
+    final batch = _firestore.batch();
+    bool hasPending = false;
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    if (chatProvider.id == null) return;
+    final String userId = chatProvider.id.toString();
+    for (final doc in messages) {
+      final data = doc.data() as Map<String, dynamic>;
+      if (data['senderid'] == userId &&
+          data['receiverid'] == senderId.toString() &&
+          data['seen'] != true) {
+        batch.update(doc.reference, {
+          'seen': true,
+          'seenAt': FieldValue.serverTimestamp(),
+        });
+        hasPending = true;
+      }
+    }
+    if (hasPending) batch.commit().catchError((_) {});
+  }
+
+  // ── CALL HISTORY ─────────────────────────────────────────────────────────
+
+  /// Save a call history message to the `adminchat` collection.
+  Future<void> _saveCallHistory(
+      String receiverId, String callType, String status, int durationSeconds) async {
+    try {
+      final String label = _callLabel(callType, status, durationSeconds);
+      await _firestore.collection('adminchat').add({
+        'message': label,
+        'senderid': senderId.toString(),
+        'receiverid': receiverId,
+        'timestamp': FieldValue.serverTimestamp(),
+        'type': 'call',
+        'callType': callType,
+        'callStatus': status,
+        'callDuration': durationSeconds,
+        'seen': false,
+      });
+
+      final String conversationId =
+          getConversationId(senderId.toString(), receiverId);
+      await _firestore
+          .collection('conversations')
+          .doc(conversationId)
+          .set({
+        'participants': [senderId.toString(), receiverId],
+        'lastMessage': label,
+        'lastTimestamp': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (_) {}
+  }
+
+  String _callLabel(String callType, String status, int seconds) {
+    final bool isVideo = callType == 'video';
+    if (status == 'missed') {
+      return isVideo ? '📹 Missed Video Call' : '📞 Missed Call';
+    }
+    final String dur = _formatCallDuration(seconds);
+    return isVideo ? '📹 Video Call • $dur' : '📞 Audio Call • $dur';
+  }
+
+  String _formatCallDuration(int seconds) {
+    final m = seconds ~/ 60;
+    final s = (seconds % 60).toString().padLeft(2, '0');
+    return '$m:$s';
   }
 
   void _initializeWebSpeech() {
@@ -346,6 +476,11 @@ class _ChatWindowState extends State<ChatWindow> {
     final userName = chatProvider.namee.toString();
     final isMinimizedNotifier = ValueNotifier<bool>(false);
 
+    void onCallEnded(String callType, String status, int durationSeconds) {
+      _removeCallOverlay();
+      _saveCallHistory(userId, callType, status, durationSeconds);
+    }
+
     _callOverlayEntry = OverlayEntry(
       builder: (ctx) => ValueListenableBuilder<bool>(
         valueListenable: isMinimizedNotifier,
@@ -358,6 +493,7 @@ class _ChatWindowState extends State<ChatWindow> {
                   otherUserName: userName,
                   onMinimize: () => isMinimizedNotifier.value = true,
                   onEnd: _removeCallOverlay,
+                  onCallEnded: onCallEnded,
                 )
               : CallScreen(
                   currentUserId: '1',
@@ -366,6 +502,7 @@ class _ChatWindowState extends State<ChatWindow> {
                   otherUserName: userName,
                   onMinimize: () => isMinimizedNotifier.value = true,
                   onEnd: _removeCallOverlay,
+                  onCallEnded: onCallEnded,
                 );
 
           return Stack(
@@ -531,6 +668,11 @@ class _ChatWindowState extends State<ChatWindow> {
       _lastSnapshot = null; // clear stale messages from the previous user
       // Re-fetch match details for the newly selected user
       if (chatProvider.id != null) Future.microtask(_fetchMatchDetails);
+      // Reset user-typing state and subscribe to new user's typing status.
+      _userIsTyping = false;
+      if (chatProvider.id != null) Future.microtask(() => _setupTypingListener(chatProvider.id!));
+      // Clear admin typing status for the previous user.
+      Future.microtask(_clearAdminTypingStatus);
     }
     if (userChanged || limitChanged) {
       _cachedLimit = _currentLimit;
@@ -645,14 +787,18 @@ class _ChatWindowState extends State<ChatWindow> {
                           margin: const EdgeInsets.only(right: 4),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: chatProvider.online ? kOnline : kMuted,
+                            color: _userIsTyping ? kPrimary : (chatProvider.online ? kOnline : kMuted),
                           ),
                         ),
                         Text(
-                          chatProvider.online ? "Online" : "Offline",
+                          _userIsTyping
+                              ? "typing..."
+                              : (chatProvider.online ? "Online" : "Offline"),
                           style: TextStyle(
                             fontSize: 11,
-                            color: chatProvider.online ? kOnline : kMuted,
+                            color: _userIsTyping
+                                ? kPrimary
+                                : (chatProvider.online ? kOnline : kMuted),
                           ),
                         ),
                         if (chatProvider.id != null)
@@ -818,6 +964,10 @@ class _ChatWindowState extends State<ChatWindow> {
                       });
                     });
                   }
+                  // Mark incoming messages as seen by admin.
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) _markIncomingMessagesAsSeen(snapshot.data!.docs);
+                  });
                 }
 
                 if (messages.isEmpty) {
@@ -908,6 +1058,10 @@ class _ChatWindowState extends State<ChatWindow> {
                         data['type'],
                         data.containsKey('profileData') ? data['profileData'] : null,
                         data.containsKey('imageUrl') ? data['imageUrl'] : null,
+                        data['seen'] == true,
+                        data['callType']?.toString(),
+                        data['callStatus']?.toString(),
+                        (data['callDuration'] as num?)?.toInt() ?? 0,
                       ),
                     );
                   },
@@ -1167,10 +1321,22 @@ class _ChatWindowState extends State<ChatWindow> {
   }
 
   Widget _buildChatBubble(String message, bool isSentByMe, DateTime timestamp,
-      [String? type, Map<String, dynamic>? profileData, String? imageUrl]) {
+      [String? type,
+      Map<String, dynamic>? profileData,
+      String? imageUrl,
+      bool seen = false,
+      String? callType,
+      String? callStatus,
+      int callDuration = 0]) {
     const kPrimary = Color(0xFFD81B60);
     const kText = Color(0xFF1E293B);
     const kMuted = Color(0xFF64748B);
+
+    // ── Call history bubble ──────────────────────────────────────────────
+    if (type == 'call') {
+      return _buildCallBubble(
+          callType ?? 'audio', callStatus ?? 'missed', callDuration, isSentByMe, timestamp);
+    }
 
     if (type == 'image' && imageUrl != null) {
       return Align(
@@ -1212,9 +1378,18 @@ class _ChatWindowState extends State<ChatWindow> {
             ),
             Padding(
               padding: const EdgeInsets.only(right: 6, left: 6),
-              child: Text(
-                DateFormat('hh:mm a').format(timestamp),
-                style: const TextStyle(fontSize: 10, color: kMuted),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    DateFormat('hh:mm a').format(timestamp),
+                    style: const TextStyle(fontSize: 10, color: kMuted),
+                  ),
+                  if (isSentByMe) ...[
+                    const SizedBox(width: 3),
+                    _buildSeenTick(seen),
+                  ],
+                ],
               ),
             ),
           ],
@@ -1555,9 +1730,18 @@ class _ChatWindowState extends State<ChatWindow> {
             ),
             Padding(
               padding: const EdgeInsets.only(right: 8, left: 8, bottom: 2),
-              child: Text(
-                DateFormat('hh:mm a').format(timestamp),
-                style: const TextStyle(fontSize: 10, color: kMuted),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    DateFormat('hh:mm a').format(timestamp),
+                    style: const TextStyle(fontSize: 10, color: kMuted),
+                  ),
+                  if (isSentByMe) ...[
+                    const SizedBox(width: 3),
+                    _buildSeenTick(seen),
+                  ],
+                ],
               ),
             ),
           ],
@@ -1605,10 +1789,87 @@ class _ChatWindowState extends State<ChatWindow> {
             ),
             Padding(
               padding: const EdgeInsets.only(right: 8, left: 8, bottom: 2),
-              child: Text(
-                DateFormat('hh:mm a').format(timestamp),
-                style: const TextStyle(fontSize: 10, color: kMuted),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    DateFormat('hh:mm a').format(timestamp),
+                    style: const TextStyle(fontSize: 10, color: kMuted),
+                  ),
+                  if (isSentByMe) ...[
+                    const SizedBox(width: 3),
+                    _buildSeenTick(seen),
+                  ],
+                ],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Single tick (sent) or double tick (seen) indicator for admin-sent messages.
+  Widget _buildSeenTick(bool seen) {
+    const kPrimary = Color(0xFFD81B60);
+    const kMuted = Color(0xFF94A3B8);
+    if (seen) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: const [
+          Icon(Icons.done_all, size: 13, color: kPrimary),
+        ],
+      );
+    }
+    return const Icon(Icons.done, size: 13, color: kMuted);
+  }
+
+  /// Call history message bubble.
+  Widget _buildCallBubble(
+      String callType, String status, int durationSeconds, bool isSentByMe, DateTime timestamp) {
+    const kPrimary = Color(0xFFD81B60);
+    const kMuted = Color(0xFF64748B);
+    final bool isMissed = status == 'missed';
+    final bool isVideo = callType == 'video';
+    final Color color = isMissed ? Colors.red : kPrimary;
+    final String label = isMissed
+        ? (isVideo ? 'Missed Video Call' : 'Missed Call')
+        : (isVideo ? 'Video Call' : 'Audio Call');
+    final IconData icon = isMissed
+        ? (isVideo ? Icons.videocam_off_outlined : Icons.phone_missed)
+        : (isVideo ? Icons.videocam_outlined : Icons.phone_outlined);
+    final String dur = durationSeconds > 0 ? ' • ${_formatCallDuration(durationSeconds)}' : '';
+
+    return Align(
+      alignment: isSentByMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isMissed ? Colors.red.shade50 : const Color(0xFFFCE4EC),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isMissed ? Colors.red.shade200 : const Color(0xFFFFCDD2),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: color, size: 18),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$label$dur',
+                  style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
+                ),
+                Text(
+                  DateFormat('hh:mm a').format(timestamp),
+                  style: const TextStyle(fontSize: 10, color: kMuted),
+                ),
+              ],
             ),
           ],
         ),
@@ -1800,6 +2061,11 @@ class _ChatWindowState extends State<ChatWindow> {
                   focusNode: _messageFocusNode,
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => _sendMessage(),
+                  onChanged: (text) {
+                    if (chatProvider.id != null) {
+                      _updateAdminTypingStatus(text, chatProvider.id.toString());
+                    }
+                  },
                   decoration: InputDecoration(
                     hintText: _selectedLanguage == 'ne-NP'
                         ? "सन्देश टाइप गर्नुहोस्"
@@ -1898,6 +2164,7 @@ class _ChatWindowState extends State<ChatWindow> {
         'timestamp': FieldValue.serverTimestamp(),
         'type': 'image',
         'imageUrl': imageUrl,
+        'seen': false,
       });
 
       setState(() {
@@ -1924,6 +2191,9 @@ class _ChatWindowState extends State<ChatWindow> {
     _textBeforeVoice = '';
     FocusScope.of(context).requestFocus(_messageFocusNode);
 
+    // Clear typing indicator immediately on send.
+    _clearAdminTypingStatus();
+
     try {
       await _firestore.collection('adminchat').add({
         'message': messageText,
@@ -1933,6 +2203,7 @@ class _ChatWindowState extends State<ChatWindow> {
         'receiverid': chatProvider.id.toString(),
         'timestamp': FieldValue.serverTimestamp(),
         'type': 'text',
+        'seen': false,
       });
 
       await NotificationService.sendChatNotification(
@@ -2080,6 +2351,9 @@ class _ChatWindowState extends State<ChatWindow> {
   @override
   void dispose() {
     _removeCallOverlay();
+    _typingTimer?.cancel();
+    _typingSubscription?.cancel();
+    _clearAdminTypingStatus();
     _scrollController.dispose();
     _messageFocusNode.dispose();
     _messageController.dispose();

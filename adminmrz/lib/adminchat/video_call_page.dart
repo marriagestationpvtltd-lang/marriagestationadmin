@@ -20,6 +20,9 @@ class VideoCallScreen extends StatefulWidget {
   final VoidCallback? onMinimize;
   /// Called when the call ends.  When provided Navigator.pop is skipped.
   final VoidCallback? onEnd;
+  /// Called when the call ends with (callType, status, durationSeconds).
+  /// callType is always 'video'. status is 'answered' or 'missed'.
+  final void Function(String callType, String status, int durationSeconds)? onCallEnded;
 
   const VideoCallScreen({
     super.key,
@@ -30,6 +33,7 @@ class VideoCallScreen extends StatefulWidget {
     this.isOutgoingCall = true,
     this.onMinimize,
     this.onEnd,
+    this.onCallEnded,
   });
 
   @override
@@ -262,6 +266,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         duration: _duration.inSeconds,
       );
     }
+
+    // Fire call-ended callback so the chat can save history.
+    final String callStatus = _callActive ? 'answered' : 'missed';
+    widget.onCallEnded?.call('video', callStatus, _duration.inSeconds);
 
     if (_joined) {
       await _engine.leaveChannel();
