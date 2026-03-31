@@ -180,75 +180,136 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  // ─── Page Header ────────────────────────────────────────────────────────────
+  // ─── Page Header (merges bulk-action bar when items are selected) ────────────
 
-  Widget _buildPageHeader(UserProvider provider) {
-    return Container(
+  static const Duration _selectionTransitionDuration = Duration(milliseconds: 200);
+
+  Widget _buildPageHeader(BuildContext context, UserProvider provider) {
+    final hasSelection = provider.selectedCount > 0;
+
+    return AnimatedContainer(
+      duration: _selectionTransitionDuration,
       decoration: const BoxDecoration(gradient: AppTheme.primaryGradient),
       padding: const EdgeInsets.fromLTRB(20, 14, 14, 14),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: hasSelection
+          ? Row(
               children: [
-                const Text(
-                  'Manage Members',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.3,
+                // ── selected count badge ──────────────────────────────────────
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: AppTheme.radiusSm,
+                  ),
+                  child: Text(
+                    '${provider.selectedCount} selected',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: AppTheme.radiusSm,
-                      ),
-                      child: Text(
-                        '${provider.totalCount} total',
-                        style: const TextStyle(
+                const SizedBox(width: 10),
+                // ── Suspend button ────────────────────────────────────────────
+                Expanded(
+                  child: _bulkActionButton(
+                    label: 'Suspend',
+                    icon: Icons.pause_circle_rounded,
+                    onTap: () => provider.suspendSelectedUsers(context),
+                    color: Colors.white.withOpacity(0.2),
+                    textColor: Colors.white,
+                    borderColor: Colors.white.withOpacity(0.35),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // ── Delete button ─────────────────────────────────────────────
+                Expanded(
+                  child: _bulkActionButton(
+                    label: 'Delete',
+                    icon: Icons.delete_rounded,
+                    onTap: () => provider.deleteSelectedUsers(context),
+                    color: AppTheme.errorLight,
+                    textColor: AppTheme.error,
+                    borderColor: AppTheme.error.withOpacity(0.2),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                // ── Clear selection ───────────────────────────────────────────
+                IconButton(
+                  onPressed: provider.clearSelection,
+                  icon: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+                  constraints: const BoxConstraints(),
+                  padding: const EdgeInsets.all(4),
+                  tooltip: 'Clear selection',
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                // ── title + meta ──────────────────────────────────────────────
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Manage Members',
+                        style: TextStyle(
                           color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Marriage Station',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
-                        fontSize: 12,
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: AppTheme.radiusSm,
+                            ),
+                            child: Text(
+                              '${provider.totalCount} total',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Marriage Station',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // ── Refresh button ────────────────────────────────────────────
+                Tooltip(
+                  message: 'Refresh',
+                  child: Material(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: AppTheme.radiusMd,
+                    child: InkWell(
+                      onTap: () => provider.fetchUsers(forceRefresh: true),
+                      borderRadius: AppTheme.radiusMd,
+                      child: const Padding(
+                        padding: EdgeInsets.all(10),
+                        child: Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
-          ),
-          Tooltip(
-            message: 'Refresh',
-            child: Material(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: AppTheme.radiusMd,
-              child: InkWell(
-                onTap: () => provider.fetchUsers(forceRefresh: true),
-                borderRadius: AppTheme.radiusMd,
-                child: const Padding(
-                  padding: EdgeInsets.all(10),
-                  child: Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -1106,70 +1167,7 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  // ─── Bulk Action Bar ─────────────────────────────────────────────────────────
-
-  Widget _buildBulkActionBar(BuildContext context, UserProvider provider) {
-    if (provider.selectedCount == 0) return const SizedBox.shrink();
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        gradient: AppTheme.primaryGradient,
-        borderRadius: AppTheme.radiusLg,
-        boxShadow: AppTheme.primaryShadow,
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: AppTheme.radiusSm,
-            ),
-            child: Text(
-              '${provider.selectedCount} selected',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _bulkActionButton(
-              label: 'Suspend',
-              icon: Icons.pause_circle_rounded,
-              onTap: () => provider.suspendSelectedUsers(context),
-              color: Colors.white.withOpacity(0.2),
-              textColor: Colors.white,
-              borderColor: Colors.white.withOpacity(0.35),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _bulkActionButton(
-              label: 'Delete',
-              icon: Icons.delete_rounded,
-              onTap: () => provider.deleteSelectedUsers(context),
-              color: AppTheme.errorLight,
-              textColor: AppTheme.error,
-              borderColor: AppTheme.error.withOpacity(0.2),
-            ),
-          ),
-          const SizedBox(width: 6),
-          IconButton(
-            onPressed: provider.clearSelection,
-            icon: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
-            constraints: const BoxConstraints(),
-            padding: const EdgeInsets.all(4),
-            tooltip: 'Clear selection',
-          ),
-        ],
-      ),
-    );
-  }
+  // _buildBulkActionBar removed — functionality merged into _buildPageHeader.
 
   Widget _bulkActionButton({
     required String label,
@@ -1352,7 +1350,7 @@ class _UsersPageState extends State<UsersPage> {
     return Column(
       children: [
         // ── Fixed: Page Header ─────────────────────────────────────────────────
-        _buildPageHeader(provider),
+        _buildPageHeader(context, provider),
 
         // ── Fixed: Search + Filter + Bulk Actions toolbar ─────────────────────
         Container(
@@ -1371,7 +1369,6 @@ class _UsersPageState extends State<UsersPage> {
             children: [
               _buildSearchBar(provider),
               _buildFilterPanel(provider),
-              _buildBulkActionBar(context, provider),
             ],
           ),
         ),
