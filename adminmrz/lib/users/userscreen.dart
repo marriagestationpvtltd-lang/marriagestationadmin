@@ -228,6 +228,7 @@ class _UsersPageState extends State<UsersPage> {
     final bool isEmailVerified = user.emailVerified == 1;
     final bool isPhoneVerified = user.phoneVerified == 1;
     final Color genderAccentColor = isFemale ? const Color(0xFFE91E8C) : const Color(0xFF1976D2);
+    final String? profileImageUrl = _normaliseImageUrl(user.profilePicture);
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
@@ -297,9 +298,9 @@ class _UsersPageState extends State<UsersPage> {
                             ),
                           ),
                           child: ClipOval(
-                            child: user.hasProfilePicture
+                            child: profileImageUrl != null
                                 ? Image.network(
-                                    _normaliseImageUrl(user.profilePicture)!,
+                                    profileImageUrl,
                                     fit: BoxFit.cover,
                                     errorBuilder: (_, __, ___) =>
                                         _avatarIcon(isFemale),
