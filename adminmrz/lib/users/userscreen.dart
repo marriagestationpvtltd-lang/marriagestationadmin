@@ -180,75 +180,136 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  // ─── Page Header ────────────────────────────────────────────────────────────
+  // ─── Page Header (merges bulk-action bar when items are selected) ────────────
 
-  Widget _buildPageHeader(UserProvider provider) {
-    return Container(
+  static const Duration _selectionTransitionDuration = Duration(milliseconds: 200);
+
+  Widget _buildPageHeader(BuildContext context, UserProvider provider) {
+    final hasSelection = provider.selectedCount > 0;
+
+    return AnimatedContainer(
+      duration: _selectionTransitionDuration,
       decoration: const BoxDecoration(gradient: AppTheme.primaryGradient),
       padding: const EdgeInsets.fromLTRB(20, 14, 14, 14),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: hasSelection
+          ? Row(
               children: [
-                const Text(
-                  'Manage Members',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -0.3,
+                // ── selected count badge ──────────────────────────────────────
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: AppTheme.radiusSm,
+                  ),
+                  child: Text(
+                    '${provider.selectedCount} selected',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.2),
-                        borderRadius: AppTheme.radiusSm,
-                      ),
-                      child: Text(
-                        '${provider.totalCount} total',
-                        style: const TextStyle(
+                const SizedBox(width: 10),
+                // ── Suspend button ────────────────────────────────────────────
+                Expanded(
+                  child: _bulkActionButton(
+                    label: 'Suspend',
+                    icon: Icons.pause_circle_rounded,
+                    onTap: () => provider.suspendSelectedUsers(context),
+                    color: Colors.white.withOpacity(0.2),
+                    textColor: Colors.white,
+                    borderColor: Colors.white.withOpacity(0.35),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // ── Delete button ─────────────────────────────────────────────
+                Expanded(
+                  child: _bulkActionButton(
+                    label: 'Delete',
+                    icon: Icons.delete_rounded,
+                    onTap: () => provider.deleteSelectedUsers(context),
+                    color: AppTheme.errorLight,
+                    textColor: AppTheme.error,
+                    borderColor: AppTheme.error.withOpacity(0.2),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                // ── Clear selection ───────────────────────────────────────────
+                IconButton(
+                  onPressed: provider.clearSelection,
+                  icon: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+                  constraints: const BoxConstraints(),
+                  padding: const EdgeInsets.all(4),
+                  tooltip: 'Clear selection',
+                ),
+              ],
+            )
+          : Row(
+              children: [
+                // ── title + meta ──────────────────────────────────────────────
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Manage Members',
+                        style: TextStyle(
                           color: Colors.white,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.3,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      'Marriage Station',
-                      style: TextStyle(
-                        color: Colors.white.withOpacity(0.7),
-                        fontSize: 12,
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.2),
+                              borderRadius: AppTheme.radiusSm,
+                            ),
+                            child: Text(
+                              '${provider.totalCount} total',
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Marriage Station',
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.7),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // ── Refresh button ────────────────────────────────────────────
+                Tooltip(
+                  message: 'Refresh',
+                  child: Material(
+                    color: Colors.white.withOpacity(0.15),
+                    borderRadius: AppTheme.radiusMd,
+                    child: InkWell(
+                      onTap: () => provider.fetchUsers(forceRefresh: true),
+                      borderRadius: AppTheme.radiusMd,
+                      child: const Padding(
+                        padding: EdgeInsets.all(10),
+                        child: Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ],
             ),
-          ),
-          Tooltip(
-            message: 'Refresh',
-            child: Material(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: AppTheme.radiusMd,
-              child: InkWell(
-                onTap: () => provider.fetchUsers(forceRefresh: true),
-                borderRadius: AppTheme.radiusMd,
-                child: const Padding(
-                  padding: EdgeInsets.all(10),
-                  child: Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 
@@ -261,12 +322,12 @@ class _UsersPageState extends State<UsersPage> {
     final verifiedCount = provider.allUsers.where((u) => u.isVerified == 1).length;
 
     final stats = [
-      _StatItem('Total', provider.totalCount, Icons.people_alt_rounded, AppTheme.primaryGradient),
-      _StatItem('Verified', verifiedCount, Icons.verified_rounded, AppTheme.greenGradient),
-      _StatItem('Pending', statusStats['pending'] ?? 0, Icons.pending_rounded, AppTheme.blueGradient),
-      _StatItem('Approved', statusStats['approved'] ?? 0, Icons.check_circle_rounded, const LinearGradient(colors: [Color(0xFF43A047), Color(0xFF2E7D32)], begin: Alignment.topLeft, end: Alignment.bottomRight)),
-      _StatItem('Paid', typeStats['paid'] ?? 0, Icons.workspace_premium_rounded, AppTheme.goldGradient),
-      _StatItem('Online', onlineCount, Icons.circle, AppTheme.purpleGradient),
+      _StatItem('Total', provider.totalCount, Icons.people_alt_rounded, AppTheme.primaryGradient, 'all'),
+      _StatItem('Verified', verifiedCount, Icons.verified_rounded, AppTheme.greenGradient, 'verified'),
+      _StatItem('Pending', statusStats['pending'] ?? 0, Icons.pending_rounded, AppTheme.blueGradient, 'pending'),
+      _StatItem('Approved', statusStats['approved'] ?? 0, Icons.check_circle_rounded, const LinearGradient(colors: [Color(0xFF43A047), Color(0xFF2E7D32)], begin: Alignment.topLeft, end: Alignment.bottomRight), 'approved'),
+      _StatItem('Paid', typeStats['paid'] ?? 0, Icons.workspace_premium_rounded, AppTheme.goldGradient, 'paid'),
+      _StatItem('Online', onlineCount, Icons.circle, AppTheme.purpleGradient, 'online'),
     ];
 
     return Padding(
@@ -287,7 +348,7 @@ class _UsersPageState extends State<UsersPage> {
                       .map((s) => Expanded(
                             child: Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 4),
-                              child: _buildStatCard(s),
+                              child: _buildStatCard(s, provider),
                             ),
                           ))
                       .toList(),
@@ -300,58 +361,88 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  Widget _buildStatCard(_StatItem item) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-      decoration: BoxDecoration(
-        gradient: item.gradient,
+  Widget _buildStatCard(_StatItem item, UserProvider provider) {
+    final isActive = provider.statFilter == item.filterKey;
+    const double _activeIconOpacity = 0.35;
+    const double _inactiveIconOpacity = 0.20;
+
+    return Material(
+      color: Colors.transparent,
+      borderRadius: AppTheme.radiusMd,
+      child: InkWell(
+        onTap: () => provider.setStatFilter(item.filterKey),
         borderRadius: AppTheme.radiusMd,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.10),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: BoxDecoration(
+            gradient: item.gradient,
+            borderRadius: AppTheme.radiusMd,
+            border: isActive
+                ? Border.all(color: Colors.white, width: 2.5)
+                : Border.all(color: Colors.transparent, width: 2.5),
+            boxShadow: isActive
+                ? [
+                    BoxShadow(
+                      color: Colors.white.withOpacity(0.45),
+                      blurRadius: 10,
+                      spreadRadius: 1,
+                      offset: const Offset(0, 0),
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.15),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ]
+                : [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.10),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(item.icon, size: 14, color: Colors.white),
-          ),
-          const SizedBox(width: 7),
-          Flexible(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  item.count.toString(),
-                  style: const TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: Colors.white,
-                    height: 1.1,
-                  ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(isActive ? _activeIconOpacity : _inactiveIconOpacity),
+                  borderRadius: BorderRadius.circular(8),
                 ),
-                Text(
-                  item.label,
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: Colors.white.withOpacity(0.85),
-                    fontWeight: FontWeight.w500,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+                child: Icon(item.icon, size: 14, color: Colors.white),
+              ),
+              const SizedBox(width: 7),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      item.count.toString(),
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        color: Colors.white,
+                        height: 1.1,
+                      ),
+                    ),
+                    Text(
+                      item.label,
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.white.withOpacity(0.85),
+                        fontWeight: FontWeight.w500,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -1106,70 +1197,7 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  // ─── Bulk Action Bar ─────────────────────────────────────────────────────────
-
-  Widget _buildBulkActionBar(BuildContext context, UserProvider provider) {
-    if (provider.selectedCount == 0) return const SizedBox.shrink();
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        gradient: AppTheme.primaryGradient,
-        borderRadius: AppTheme.radiusLg,
-        boxShadow: AppTheme.primaryShadow,
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: AppTheme.radiusSm,
-            ),
-            child: Text(
-              '${provider.selectedCount} selected',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w700,
-                fontSize: 12,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _bulkActionButton(
-              label: 'Suspend',
-              icon: Icons.pause_circle_rounded,
-              onTap: () => provider.suspendSelectedUsers(context),
-              color: Colors.white.withOpacity(0.2),
-              textColor: Colors.white,
-              borderColor: Colors.white.withOpacity(0.35),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: _bulkActionButton(
-              label: 'Delete',
-              icon: Icons.delete_rounded,
-              onTap: () => provider.deleteSelectedUsers(context),
-              color: AppTheme.errorLight,
-              textColor: AppTheme.error,
-              borderColor: AppTheme.error.withOpacity(0.2),
-            ),
-          ),
-          const SizedBox(width: 6),
-          IconButton(
-            onPressed: provider.clearSelection,
-            icon: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
-            constraints: const BoxConstraints(),
-            padding: const EdgeInsets.all(4),
-            tooltip: 'Clear selection',
-          ),
-        ],
-      ),
-    );
-  }
+  // _buildBulkActionBar removed — functionality merged into _buildPageHeader.
 
   Widget _bulkActionButton({
     required String label,
@@ -1352,7 +1380,7 @@ class _UsersPageState extends State<UsersPage> {
     return Column(
       children: [
         // ── Fixed: Page Header ─────────────────────────────────────────────────
-        _buildPageHeader(provider),
+        _buildPageHeader(context, provider),
 
         // ── Fixed: Search + Filter + Bulk Actions toolbar ─────────────────────
         Container(
@@ -1371,7 +1399,6 @@ class _UsersPageState extends State<UsersPage> {
             children: [
               _buildSearchBar(provider),
               _buildFilterPanel(provider),
-              _buildBulkActionBar(context, provider),
             ],
           ),
         ),
@@ -1469,6 +1496,7 @@ class _StatItem {
   final int count;
   final IconData icon;
   final Gradient gradient;
+  final String filterKey;
 
-  const _StatItem(this.label, this.count, this.icon, this.gradient);
+  const _StatItem(this.label, this.count, this.icon, this.gradient, this.filterKey);
 }
