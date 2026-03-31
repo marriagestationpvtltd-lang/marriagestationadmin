@@ -6,6 +6,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'chatprovider.dart';
 import 'chatscreen.dart';
@@ -63,6 +64,18 @@ class _ChatSidebarState extends State<ChatSidebar> {
     _searchDebounce?.cancel();
     _onlineStatusTimer?.cancel();
     super.dispose();
+  }
+
+  static const _kLastChatUserKey = 'last_selected_chat_user_id';
+
+  Future<void> _saveLastSelectedUserId(String userId) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_kLastChatUserKey, userId);
+  }
+
+  Future<String?> _loadLastSelectedUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_kLastChatUserKey);
   }
 
   Future<void> fetchUsers({bool reset = false}) async {
@@ -126,15 +139,24 @@ class _ChatSidebarState extends State<ChatSidebar> {
         _page++;
 
         if (reset) {
+          // Try to restore the last selected user from persistent storage.
+          final savedId = await _loadLastSelectedUserId();
           final chatProvider =
               Provider.of<ChatProvider>(context, listen: false);
-          if (chatProvider.id != null && _users.isNotEmpty) {
-            _selectedChat = _users.firstWhere(
-              (user) => user['id'] == chatProvider.id.toString(),
-              orElse: () => _users[0],
-            );
-          } else if (_users.isNotEmpty) {
-            _selectedChat = _users[0];
+
+          if (_users.isNotEmpty) {
+            // Priority: saved prefs ID > chatProvider.id already set > first user
+            final targetId = savedId ?? chatProvider.id?.toString();
+            if (targetId != null) {
+              _selectedChat = _users.firstWhere(
+                (user) => user['id']?.toString() == targetId,
+                orElse: () => _users[0],
+              );
+            } else {
+              _selectedChat = _users[0];
+            }
+            // Sync ChatProvider so the ChatWindow shows the selected user immediately.
+            _updateSelectedChat();
           }
           listenToConversationChanges();
         }
@@ -693,6 +715,8 @@ class _ChatSidebarState extends State<ChatSidebar> {
                                 _selectedChat = user;
                                 _updateSelectedChat();
                               });
+                              // Persist the selected user so the chat reopens to the same conversation.
+                              _saveLastSelectedUserId(user["id"].toString());
                               // Fetch matched profiles for the newly selected user
                               final newId =
                                   int.tryParse(user["id"].toString()) ?? 0;
