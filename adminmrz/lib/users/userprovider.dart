@@ -105,6 +105,22 @@ class UserProvider with ChangeNotifier {
   }
 
   // Action methods
+  /// Suspend a single user by [userId]. Shows no dialog – caller is responsible
+  /// for prior confirmation.
+  Future<bool> suspendUser(int userId) async {
+    try {
+      final success = await _userService.suspendUsers([userId]);
+      if (success) {
+        _lastFetchTime = null; // Invalidate cache
+      }
+      return success;
+    } catch (e) {
+      _error = e.toString();
+      notifyListeners();
+      return false;
+    }
+  }
+
   Future<void> suspendSelectedUsers(BuildContext context) async {
     if (_selectedUserIds.isEmpty) return;
 

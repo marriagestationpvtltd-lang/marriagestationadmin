@@ -170,7 +170,14 @@ class _UsersPageState extends State<UsersPage> {
     );
     if (confirmed != true || !mounted) return;
 
-    context.read<UserProvider>().suspendSelectedUsers(context);
+    final success = await context.read<UserProvider>().suspendUser(user.id);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(success ? '${user.fullName} has been blocked' : 'Failed to block member. Please try again.'),
+        backgroundColor: success ? AppTheme.error : Colors.red,
+      ),
+    );
   }
 
   // ─── Page Header ────────────────────────────────────────────────────────────
