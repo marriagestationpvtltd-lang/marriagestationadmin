@@ -15,6 +15,11 @@ class VideoCallScreen extends StatefulWidget {
   final String otherUserId;
   final String otherUserName;
   final bool isOutgoingCall;
+  /// Called when the user taps the minimize button.  When provided the screen
+  /// is assumed to be hosted in an overlay and will NOT call Navigator.pop.
+  final VoidCallback? onMinimize;
+  /// Called when the call ends.  When provided Navigator.pop is skipped.
+  final VoidCallback? onEnd;
 
   const VideoCallScreen({
     super.key,
@@ -23,6 +28,8 @@ class VideoCallScreen extends StatefulWidget {
     required this.otherUserId,
     required this.otherUserName,
     this.isOutgoingCall = true,
+    this.onMinimize,
+    this.onEnd,
   });
 
   @override
@@ -265,7 +272,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   }
 
   void _exit() {
-    if (mounted) Navigator.pop(context);
+    if (widget.onEnd != null) {
+      widget.onEnd!();
+    } else if (mounted) {
+      Navigator.pop(context);
+    }
   }
 
   // Control methods
@@ -397,6 +408,13 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
+          // Minimize button – only shown when hosted in an overlay
+          if (widget.onMinimize != null)
+            IconButton(
+              icon: const Icon(Icons.picture_in_picture_alt, color: Colors.white, size: 36),
+              tooltip: 'Minimize call',
+              onPressed: widget.onMinimize,
+            ),
           IconButton(
             icon: Icon(
               _micMuted ? Icons.mic_off : Icons.mic,

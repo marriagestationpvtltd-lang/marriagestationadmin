@@ -12,6 +12,8 @@ class CallScreen extends StatefulWidget {
   final String otherUserId;
   final String otherUserName;
   final bool isOutgoingCall;
+  final VoidCallback? onMinimize;
+  final VoidCallback? onEnd;
 
   const CallScreen({
     super.key,
@@ -20,6 +22,8 @@ class CallScreen extends StatefulWidget {
     required this.otherUserId,
     required this.otherUserName,
     this.isOutgoingCall = true,
+    this.onMinimize,
+    this.onEnd,
   });
 
   @override
@@ -232,7 +236,11 @@ class _CallScreenState extends State<CallScreen> {
   }
 
   void _exit() {
-    if (mounted) Navigator.pop(context);
+    if (widget.onEnd != null) {
+      widget.onEnd!();
+    } else if (mounted) {
+      Navigator.pop(context);
+    }
   }
 
   // ================= UI =================
@@ -267,6 +275,15 @@ class _CallScreenState extends State<CallScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                if (widget.onMinimize != null) ...[
+                  IconButton(
+                    icon: const Icon(Icons.picture_in_picture_alt,
+                        color: Colors.white, size: 36),
+                    tooltip: 'Minimize call',
+                    onPressed: widget.onMinimize,
+                  ),
+                  const SizedBox(width: 24),
+                ],
                 IconButton(
                   icon: const Icon(Icons.call_end,
                       color: Colors.red, size: 56),
