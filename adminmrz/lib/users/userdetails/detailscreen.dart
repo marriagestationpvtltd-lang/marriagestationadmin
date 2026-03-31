@@ -688,10 +688,10 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
         color: AppTheme.borderLight,
       );
 
-  List<Widget> _rows(List<MapEntry<Widget, bool>> entries) {
+  List<Widget> _rows(List<Widget> entries) {
     final widgets = <Widget>[];
     for (var i = 0; i < entries.length; i++) {
-      widgets.add(entries[i].key);
+      widgets.add(entries[i]);
       if (i < entries.length - 1) widgets.add(_buildDivider());
     }
     return widgets;
@@ -705,15 +705,15 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
       icon: Icons.person_outline,
       accentColor: AppTheme.primary,
       rows: _rows([
-        MapEntry(_buildInfoRow('Height', personal.heightName, icon: Icons.height), true),
-        MapEntry(_buildInfoRow('Religion', personal.religionName, icon: Icons.flag_outlined), true),
-        MapEntry(_buildInfoRow('Blood Group', personal.bloodGroup, icon: Icons.water_drop_outlined), true),
-        MapEntry(_buildInfoRow('Community', personal.communityName, icon: Icons.people_outline), true),
-        MapEntry(_buildInfoRow('Mother Tongue', personal.motherTongue, icon: Icons.language), true),
-        MapEntry(_buildInfoRow('Sub Community', personal.subCommunityName, icon: Icons.group_outlined), true),
-        MapEntry(_buildInfoRow('Manglik', personal.manglik, icon: Icons.star_outline), true),
-        MapEntry(_buildInfoRow('Birth City', personal.birthcity, icon: Icons.place_outlined), true),
-        MapEntry(_buildInfoRow('Disability', personal.disability, icon: Icons.accessible_outlined), true),
+        _buildInfoRow('Height', personal.heightName, icon: Icons.height),
+        _buildInfoRow('Religion', personal.religionName, icon: Icons.flag_outlined),
+        _buildInfoRow('Blood Group', personal.bloodGroup, icon: Icons.water_drop_outlined),
+        _buildInfoRow('Community', personal.communityName, icon: Icons.people_outline),
+        _buildInfoRow('Mother Tongue', personal.motherTongue, icon: Icons.language),
+        _buildInfoRow('Sub Community', personal.subCommunityName, icon: Icons.group_outlined),
+        _buildInfoRow('Manglik', personal.manglik, icon: Icons.star_outline),
+        _buildInfoRow('Birth City', personal.birthcity, icon: Icons.place_outlined),
+        _buildInfoRow('Disability', personal.disability, icon: Icons.accessible_outlined),
       ]),
     );
   }
@@ -724,14 +724,14 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
       icon: Icons.school_outlined,
       accentColor: AppTheme.info,
       rows: _rows([
-        MapEntry(_buildInfoRow('Education Type', personal.educationType, icon: Icons.school_outlined, highlight: true), true),
-        MapEntry(_buildInfoRow('Degree', personal.degree, icon: Icons.workspace_premium_outlined), true),
-        MapEntry(_buildInfoRow('Faculty', personal.faculty, icon: Icons.menu_book_outlined), true),
-        MapEntry(_buildInfoRow('Medium', personal.educationMedium, icon: Icons.language), true),
-        MapEntry(_buildInfoRow('Occupation', personal.occupationType, icon: Icons.work_outline, highlight: true), true),
-        MapEntry(_buildInfoRow('Company', personal.companyName, icon: Icons.business_outlined), true),
-        MapEntry(_buildInfoRow('Designation', personal.designation, icon: Icons.badge_outlined), true),
-        MapEntry(_buildInfoRow('Annual Income', personal.annualIncome, icon: Icons.currency_rupee), true),
+        _buildInfoRow('Education Type', personal.educationType, icon: Icons.school_outlined, highlight: true),
+        _buildInfoRow('Degree', personal.degree, icon: Icons.workspace_premium_outlined),
+        _buildInfoRow('Faculty', personal.faculty, icon: Icons.menu_book_outlined),
+        _buildInfoRow('Medium', personal.educationMedium, icon: Icons.language),
+        _buildInfoRow('Occupation', personal.occupationType, icon: Icons.work_outline, highlight: true),
+        _buildInfoRow('Company', personal.companyName, icon: Icons.business_outlined),
+        _buildInfoRow('Designation', personal.designation, icon: Icons.badge_outlined),
+        _buildInfoRow('Annual Income', personal.annualIncome, icon: Icons.currency_rupee),
       ]),
     );
   }
@@ -742,16 +742,16 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
       icon: Icons.family_restroom,
       accentColor: const Color(0xFF7C3AED),
       rows: _rows([
-        MapEntry(_buildInfoRow('Family Type', family.familyType, icon: Icons.home_outlined), true),
-        MapEntry(_buildInfoRow('Family Background', family.familyBackground, icon: Icons.history_edu_outlined), true),
-        MapEntry(_buildInfoRow('Family Origin', family.familyOrigin, icon: Icons.public_outlined), true),
-        MapEntry(_buildInfoRow('Father Status', family.fatherStatus, icon: Icons.person_outline), true),
-        MapEntry(_buildInfoRow('Father Name', family.fatherName, icon: Icons.person_pin_outlined), true),
-        MapEntry(_buildInfoRow('Father Education', family.fatherEducation, icon: Icons.school_outlined), true),
-        MapEntry(_buildInfoRow('Father Occupation', family.fatherOccupation, icon: Icons.work_outline), true),
-        MapEntry(_buildInfoRow('Mother Status', family.motherStatus, icon: Icons.person_outline), true),
-        MapEntry(_buildInfoRow('Mother Education', family.motherEducation, icon: Icons.school_outlined), true),
-        MapEntry(_buildInfoRow('Mother Occupation', family.motherOccupation, icon: Icons.work_outline), true),
+        _buildInfoRow('Family Type', family.familyType, icon: Icons.home_outlined),
+        _buildInfoRow('Family Background', family.familyBackground, icon: Icons.history_edu_outlined),
+        _buildInfoRow('Family Origin', family.familyOrigin, icon: Icons.public_outlined),
+        _buildInfoRow('Father Status', family.fatherStatus, icon: Icons.person_outline),
+        _buildInfoRow('Father Name', family.fatherName, icon: Icons.person_pin_outlined),
+        _buildInfoRow('Father Education', family.fatherEducation, icon: Icons.school_outlined),
+        _buildInfoRow('Father Occupation', family.fatherOccupation, icon: Icons.work_outline),
+        _buildInfoRow('Mother Status', family.motherStatus, icon: Icons.person_outline),
+        _buildInfoRow('Mother Education', family.motherEducation, icon: Icons.school_outlined),
+        _buildInfoRow('Mother Occupation', family.motherOccupation, icon: Icons.work_outline),
       ]),
     );
   }
@@ -762,11 +762,11 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
       icon: Icons.emoji_food_beverage_outlined,
       accentColor: AppTheme.accentDark,
       rows: _rows([
-        MapEntry(_buildInfoRow('Diet', lifestyle.diet, icon: Icons.restaurant_outlined, highlight: true), true),
-        MapEntry(_buildInfoRow('Smoking', lifestyle.smoke, icon: Icons.smoking_rooms_outlined), true),
-        MapEntry(_buildInfoRow('Smoke Type', lifestyle.smokeType, icon: Icons.smoke_free_outlined), true),
-        MapEntry(_buildInfoRow('Drinking', lifestyle.drinks, icon: Icons.local_drink_outlined), true),
-        MapEntry(_buildInfoRow('Drink Type', lifestyle.drinkType, icon: Icons.wine_bar_outlined), true),
+        _buildInfoRow('Diet', lifestyle.diet, icon: Icons.restaurant_outlined, highlight: true),
+        _buildInfoRow('Smoking', lifestyle.smoke, icon: Icons.smoking_rooms_outlined),
+        _buildInfoRow('Smoke Type', lifestyle.smokeType, icon: Icons.smoke_free_outlined),
+        _buildInfoRow('Drinking', lifestyle.drinks, icon: Icons.local_drink_outlined),
+        _buildInfoRow('Drink Type', lifestyle.drinkType, icon: Icons.wine_bar_outlined),
       ]),
     );
   }
@@ -780,15 +780,15 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
           icon: Icons.favorite_outline,
           accentColor: AppTheme.primary,
           rows: _rows([
-            MapEntry(_buildInfoRow('Age Range', partner.ageRange, icon: Icons.calendar_today_outlined), true),
-            MapEntry(_buildInfoRow('Marital Status', partner.maritalStatus, icon: Icons.favorite_border), true),
-            MapEntry(_buildInfoRow('Religion', partner.religion, icon: Icons.flag_outlined), true),
-            MapEntry(_buildInfoRow('Caste', partner.caste, icon: Icons.people_outline), true),
-            MapEntry(_buildInfoRow('Mother Tongue', partner.motherTongue, icon: Icons.language), true),
-            MapEntry(_buildInfoRow('Manglik', partner.manglik, icon: Icons.star_outline), true),
-            MapEntry(_buildInfoRow('Country', partner.country, icon: Icons.public_outlined), true),
-            MapEntry(_buildInfoRow('State', partner.state, icon: Icons.map_outlined), true),
-            MapEntry(_buildInfoRow('City', partner.city, icon: Icons.location_city_outlined), true),
+            _buildInfoRow('Age Range', partner.ageRange, icon: Icons.calendar_today_outlined),
+            _buildInfoRow('Marital Status', partner.maritalStatus, icon: Icons.favorite_border),
+            _buildInfoRow('Religion', partner.religion, icon: Icons.flag_outlined),
+            _buildInfoRow('Caste', partner.caste, icon: Icons.people_outline),
+            _buildInfoRow('Mother Tongue', partner.motherTongue, icon: Icons.language),
+            _buildInfoRow('Manglik', partner.manglik, icon: Icons.star_outline),
+            _buildInfoRow('Country', partner.country, icon: Icons.public_outlined),
+            _buildInfoRow('State', partner.state, icon: Icons.map_outlined),
+            _buildInfoRow('City', partner.city, icon: Icons.location_city_outlined),
           ]),
         ),
         // Lifestyle & Education Preferences
@@ -798,15 +798,15 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
           accentColor: AppTheme.accentDark,
           margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
           rows: _rows([
-            MapEntry(_buildInfoRow('Qualification', partner.qualification, icon: Icons.school_outlined), true),
-            MapEntry(_buildInfoRow('Profession', partner.profession, icon: Icons.work_outline), true),
-            MapEntry(_buildInfoRow('Annual Income', partner.annualIncome, icon: Icons.currency_rupee), true),
-            MapEntry(_buildInfoRow('Diet', partner.diet, icon: Icons.restaurant_outlined), true),
-            MapEntry(_buildInfoRow('Complexion', partner.complexion, icon: Icons.palette_outlined), true),
-            MapEntry(_buildInfoRow('Body Type', partner.bodyType, icon: Icons.accessibility_outlined), true),
-            MapEntry(_buildInfoRow('Smoke Accept', partner.smokeAccept, icon: Icons.smoking_rooms_outlined), true),
-            MapEntry(_buildInfoRow('Drink Accept', partner.drinkAccept, icon: Icons.local_bar_outlined), true),
-            MapEntry(_buildInfoRow('Disability Accept', partner.disabilityAccept, icon: Icons.accessible_outlined), true),
+            _buildInfoRow('Qualification', partner.qualification, icon: Icons.school_outlined),
+            _buildInfoRow('Profession', partner.profession, icon: Icons.work_outline),
+            _buildInfoRow('Annual Income', partner.annualIncome, icon: Icons.currency_rupee),
+            _buildInfoRow('Diet', partner.diet, icon: Icons.restaurant_outlined),
+            _buildInfoRow('Complexion', partner.complexion, icon: Icons.palette_outlined),
+            _buildInfoRow('Body Type', partner.bodyType, icon: Icons.accessibility_outlined),
+            _buildInfoRow('Smoke Accept', partner.smokeAccept, icon: Icons.smoking_rooms_outlined),
+            _buildInfoRow('Drink Accept', partner.drinkAccept, icon: Icons.local_bar_outlined),
+            _buildInfoRow('Disability Accept', partner.disabilityAccept, icon: Icons.accessible_outlined),
           ]),
         ),
         // Other Expectations
