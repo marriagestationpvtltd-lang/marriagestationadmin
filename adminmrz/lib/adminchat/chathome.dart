@@ -44,13 +44,14 @@ class _ChatWindowState extends State<ChatWindow> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   bool _isListening = false;
+  bool _userStoppedListening = false;
   bool _isSearching = false;
   bool _isSendingImage = false;
   bool _showMatchInfo = false;
   File? _selectedImage;
   Uint8List? _selectedImageBytes;
   List<QueryDocumentSnapshot> _filteredMessages = [];
-  html.SpeechRecognition? _webSpeechRecognition;
+  js.JsObject? _webSpeechRecognition;
   FlutterSoundRecorder _recorder = FlutterSoundRecorder();
   final ScrollController _scrollController = ScrollController();
   QuerySnapshot? _lastSnapshot;
@@ -112,82 +113,116 @@ class _ChatWindowState extends State<ChatWindow> {
   }
 
   void _initializeWebSpeech() {
-    if (js.context.hasProperty('webkitSpeechRecognition')) {
-      _webSpeechRecognition = html.SpeechRecognition();
-      _webSpeechRecognition!.continuous = true;
-      _webSpeechRecognition!.interimResults = true;
-      _webSpeechRecognition!.lang = _selectedLanguage;
+    // Prefer the unprefixed SpeechRecognition (Firefox/Edge) with a fallback to
+    // the webkit-prefixed version used by Chrome.
+    final dynamic speechClass = js.context.hasProperty('SpeechRecognition')
+        ? js.context['SpeechRecognition']
+        : js.context.hasProperty('webkitSpeechRecognition')
+            ? js.context['webkitSpeechRecognition']
+            : null;
 
-      _webSpeechRecognition!.onResult.listen((event) {
-        if (event.results != null) {
-          String interimTranscript = '';
-          String finalTranscript = '';
+    if (speechClass == null) return;
 
-          final results = js.JsObject.fromBrowserObject(event.results!);
-          final length = results['length'] as int;
-          for (int i = 0; i < length; i++) {
-            final result = results.callMethod('item', [i]) as js.JsObject;
-            final transcript = result.callMethod('item', [0])['transcript'] as String;
-            final isFinal = result['isFinal'] as bool;
-            if (isFinal) {
-              finalTranscript += transcript;
-            } else {
-              interimTranscript += transcript;
-            }
-          }
+    _webSpeechRecognition = js.JsObject(speechClass as js.JsFunction);
+    _webSpeechRecognition!['continuous'] = true;
+    _webSpeechRecognition!['interimResults'] = true;
+    _webSpeechRecognition!['lang'] = _selectedLanguage;
 
-          // Accumulate final transcripts into the base text
-          if (finalTranscript.isNotEmpty) {
-            _textBeforeVoice = _textBeforeVoice + finalTranscript;
-          }
+    _webSpeechRecognition!['onresult'] = js.allowInterop((dynamic event) {
+      final eventObj = js.JsObject.fromBrowserObject(event);
+      final results = eventObj['results'];
+      if (results == null) return;
 
-          final displayText = interimTranscript.isNotEmpty
-              ? _textBeforeVoice + interimTranscript
-              : _textBeforeVoice;
+      final resultList = js.JsObject.fromBrowserObject(results);
+      // Use safe num→int cast; JS numbers come through as num, not int.
+      final int length = (resultList['length'] as num).toInt();
+      // Only process new results starting at resultIndex to avoid double-counting
+      // previous finals every time onresult fires.
+      final int resultIndex = (eventObj['resultIndex'] as num).toInt();
 
-          setState(() {
-            _messageController.text = displayText;
-            _messageController.selection = TextSelection.fromPosition(
-              TextPosition(offset: displayText.length),
-            );
-          });
+      String interimTranscript = '';
+      String finalTranscript = '';
+
+      for (int i = resultIndex; i < length; i++) {
+        final result = js.JsObject.fromBrowserObject(
+            resultList.callMethod('item', [i]));
+        final transcript =
+            js.JsObject.fromBrowserObject(result.callMethod('item', [0]))['transcript'] as String;
+        // Use == true instead of `as bool` — JS booleans may not cast to Dart bool directly.
+        final isFinal = result['isFinal'] == true;
+        if (isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interimTranscript += transcript;
         }
-      });
+      }
 
-      _webSpeechRecognition!.onEnd.listen((event) {
-        setState(() => _isListening = false);
-      });
+      if (finalTranscript.isNotEmpty) {
+        _textBeforeVoice = _textBeforeVoice + finalTranscript;
+      }
 
-      _webSpeechRecognition!.onError.listen((event) {
-        // Reset the text field to what it was before voice input started,
-        // so no partial/stale transcription remains in the field.
-        final resetText = _textBeforeVoice.trimRight();
-        setState(() {
-          _isListening = false;
-          _messageController.text = resetText;
-          _messageController.selection = TextSelection.fromPosition(
-            TextPosition(offset: resetText.length),
-          );
-        });
-        String errorMsg;
-        switch (event.error) {
-          case 'not-allowed':
-          case 'service-not-allowed':
-            errorMsg = 'Microphone access denied. Please allow microphone permission in your browser settings.';
-            break;
-          case 'no-speech':
-            errorMsg = 'No speech detected. Please try again.';
-            break;
-          case 'aborted':
-            return; // user-initiated stop, no message needed
-          default:
-            errorMsg = 'Speech error: ${event.error}';
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(errorMsg)),
+      final displayText = interimTranscript.isNotEmpty
+          ? _textBeforeVoice + interimTranscript
+          : _textBeforeVoice;
+
+      setState(() {
+        _messageController.text = displayText;
+        _messageController.selection = TextSelection.fromPosition(
+          TextPosition(offset: displayText.length),
         );
       });
-    }
+    });
+
+    _webSpeechRecognition!['onend'] = js.allowInterop((dynamic _) {
+      // With continuous=true the browser may still fire onend after silence.
+      // Restart automatically unless the user explicitly stopped listening.
+      if (!_userStoppedListening && _isListening && mounted) {
+        try {
+          _webSpeechRecognition!.callMethod('start');
+        } catch (e) {
+          setState(() => _isListening = false);
+        }
+      } else {
+        if (mounted) setState(() => _isListening = false);
+      }
+    });
+
+    _webSpeechRecognition!['onerror'] = js.allowInterop((dynamic event) {
+      final error =
+          js.JsObject.fromBrowserObject(event)['error'] as String? ?? '';
+      if (error == 'aborted') return; // user-initiated stop, onend handles state
+
+      // Prevent auto-restart only for unrecoverable errors (permission denied).
+      if (error == 'not-allowed' || error == 'service-not-allowed') {
+        _userStoppedListening = true;
+      }
+
+      final resetText = _textBeforeVoice.trimRight();
+      setState(() {
+        _isListening = false;
+        _messageController.text = resetText;
+        _messageController.selection = TextSelection.fromPosition(
+          TextPosition(offset: resetText.length),
+        );
+      });
+
+      String errorMsg;
+      switch (error) {
+        case 'not-allowed':
+        case 'service-not-allowed':
+          errorMsg =
+              'Microphone access denied. Please allow microphone permission in your browser settings.';
+          break;
+        case 'no-speech':
+          errorMsg = 'No speech detected. Please try again.';
+          break;
+        default:
+          errorMsg = 'Speech error: $error';
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(errorMsg)),
+      );
+    });
   }
 
   Future<void> _initializeRecorder() async {
@@ -199,23 +234,21 @@ class _ChatWindowState extends State<ChatWindow> {
 
   void _startListening() {
     if (_webSpeechRecognition != null && !_isListening) {
-      // Save current text as base so transcript is appended, not replaced.
-      // Do NOT call getUserMedia() here — the Web Speech API handles its own
-      // microphone permission internally. Calling getUserMedia first creates a
-      // double permission prompt which causes browsers to report "access denied".
       _textBeforeVoice = _messageController.text;
       if (_textBeforeVoice.isNotEmpty && !_textBeforeVoice.endsWith(' ')) {
         _textBeforeVoice += ' ';
       }
-      _webSpeechRecognition!.lang = _selectedLanguage;
-      _webSpeechRecognition!.start();
+      _webSpeechRecognition!['lang'] = _selectedLanguage;
+      _userStoppedListening = false;
+      _webSpeechRecognition!.callMethod('start');
       setState(() => _isListening = true);
     }
   }
 
   void _stopListening() {
     if (_isListening && _webSpeechRecognition != null) {
-      _webSpeechRecognition!.stop();
+      _userStoppedListening = true;
+      _webSpeechRecognition!.callMethod('stop');
       setState(() => _isListening = false);
     }
   }
@@ -1251,7 +1284,7 @@ class _ChatWindowState extends State<ChatWindow> {
                     setState(() {
                       _selectedLanguage = _selectedLanguage == 'en-US' ? 'ne-NP' : 'en-US';
                       if (_webSpeechRecognition != null) {
-                        _webSpeechRecognition!.lang = _selectedLanguage;
+                        _webSpeechRecognition!['lang'] = _selectedLanguage;
                       }
                     });
                   },
