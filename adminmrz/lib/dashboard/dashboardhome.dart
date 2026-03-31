@@ -1,5 +1,3 @@
-import 'dart:async';
-import 'package:adminmrz/core/app_constants.dart';
 import 'package:adminmrz/theme/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -18,46 +16,34 @@ class _DashboardHomeState extends State<DashboardHome> {
   DashboardData? _dashboardData;
   bool _isLoading = true;
   String _error = '';
+  bool _apiWarning = false;
   final DashboardService _dashboardService = DashboardService();
   final DateFormat _dateFormat = DateFormat('EEEE, MMM d, yyyy');
-  Timer? _refreshTimer;
-  DateTime? _lastFetchTime;
-
-  bool get _isCacheValid =>
-      _lastFetchTime != null &&
-      DateTime.now().difference(_lastFetchTime!) < AppConstants.liveCacheDuration;
 
   @override
   void initState() {
     super.initState();
     _fetchDashboardData();
-    _refreshTimer = Timer.periodic(AppConstants.autoRefreshInterval, (_) {
-      if (mounted) _fetchDashboardData(forceRefresh: true);
-    });
-  }
-
-  @override
-  void dispose() {
-    _refreshTimer?.cancel();
-    super.dispose();
   }
 
   Future<void> _fetchDashboardData({bool forceRefresh = false}) async {
-    if (!forceRefresh && _isCacheValid && _dashboardData != null) return;
+    // Skip if data is already loaded and a force refresh was not requested.
+    // Data stays cached until the user taps the Refresh button.
+    if (!forceRefresh && _dashboardData != null) return;
     setState(() {
       _isLoading = true;
       _error = '';
+      _apiWarning = false;
     });
     try {
       final response = await _dashboardService.getDashboardData();
-      if (response.success) {
-        setState(() {
-          _dashboardData = response.dashboard;
-          _lastFetchTime = DateTime.now();
-        });
-      } else {
-        setState(() => _error = 'Failed to load dashboard data');
-      }
+      // Always display whatever data came back in a successful HTTP response.
+      // If the API marked success=false, show a soft warning so admins are aware
+      // the data may be incomplete, but do not hide it entirely.
+      setState(() {
+        _dashboardData = response.dashboard;
+        _apiWarning = !response.success;
+      });
     } catch (e) {
       setState(() => _error = 'Error: ${e.toString()}');
     } finally {
@@ -246,7 +232,7 @@ class _DashboardHomeState extends State<DashboardHome> {
         users.total.toString(),
         Icons.people_alt_outlined,
         AppTheme.primaryGradient,
-        'All registered',
+        'Today: ${users.todayRegistered}  |  This month: ${users.thisMonthRegistered}',
       ),
       (
         'Active Members',
@@ -267,7 +253,7 @@ class _DashboardHomeState extends State<DashboardHome> {
         users.verified.toString(),
         Icons.verified_outlined,
         AppTheme.purpleGradient,
-        'ID verified',
+        'Unverified: ${users.unverified}',
       ),
     ];
 
@@ -322,7 +308,7 @@ class _DashboardHomeState extends State<DashboardHome> {
         payments.totalSold.toString(),
         Icons.shopping_bag_outlined,
         AppTheme.goldGradient,
-        'Packages sold',
+        'Active: ${payments.activePackages}  |  Expired: ${payments.expiredPackages}',
       ),
     ];
 
@@ -927,6 +913,34 @@ class _DashboardHomeState extends State<DashboardHome> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── API Warning Banner ──────────────────────────────────────────
+          if (_apiWarning) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.amber.shade50,
+                borderRadius: AppTheme.radiusSm,
+                border: Border.all(color: Colors.amber.shade300),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Colors.amber.shade700, size: 18),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Dashboard data loaded with warnings. Some values may be incomplete.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.amber.shade800,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+          ],
+
           // ── Welcome Banner ──────────────────────────────────────────────
           Container(
             padding: const EdgeInsets.all(24),
