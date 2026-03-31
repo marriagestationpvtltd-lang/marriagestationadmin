@@ -55,46 +55,57 @@ class MatchedProfileProvider with ChangeNotifier {
   List<String> get profilePictures =>
       _matchedProfiles.map((profile) => profile.profilePicture).toList();
 
-  // Fetch first page (resets list)
+  // Fetch ALL pages so the displayed list count always matches the total count
   Future<void> fetchMatchedProfiles(int userId) async {
     _currentUserId = userId;
     _currentPage = 1;
     _hasMore = false;
     _isloading = true;
+    _matchedProfiles = [];
     notifyListeners();
 
     try {
-      final response = await http.post(
-        Uri.parse('https://digitallami.com/match_admin.php'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'user_id': userId,
-          'page': 1,
-          'per_page': _perPage,
-        }),
-      );
+      // Fetch pages sequentially until all profiles are loaded
+      while (true) {
+        final response = await http.post(
+          Uri.parse('https://digitallami.com/match_admin.php'),
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode({
+            'user_id': userId,
+            'page': _currentPage,
+            'per_page': _perPage,
+          }),
+        );
 
-      if (response.statusCode == 200) {
+        if (response.statusCode != 200) {
+          throw Exception('Failed to load matched profiles: ${response.statusCode}');
+        }
+
         final data = json.decode(response.body);
         final list = data['data'] as List? ?? [];
+        final pageProfiles = list.map((p) => MatchedProfile.fromJson(p)).toList();
 
-        _matchedProfiles = list.map((p) => MatchedProfile.fromJson(p)).toList();
+        _matchedProfiles.addAll(pageProfiles);
+
         _totalCount = data['total'] is int
             ? data['total'] as int
             : int.tryParse(data['total']?.toString() ?? '') ?? _matchedProfiles.length;
-        _hasMore = _matchedProfiles.length >= _perPage &&
-            _matchedProfiles.length < _totalCount;
 
-        if (_matchedProfiles.isNotEmpty) {
-          _name = _matchedProfiles.first.firstName;
-          _memberid = _matchedProfiles.first.memberid;
-        } else {
-          _name = '';
-          _memberid = '';
-          _hasMore = false;
+        // Stop if this page had fewer items than per_page (last page) or all loaded
+        if (pageProfiles.length < _perPage || _matchedProfiles.length >= _totalCount) {
+          break;
         }
+        _currentPage++;
+      }
+
+      _hasMore = false;
+
+      if (_matchedProfiles.isNotEmpty) {
+        _name = _matchedProfiles.first.firstName;
+        _memberid = _matchedProfiles.first.memberid;
       } else {
-        throw Exception('Failed to load matched profiles: ${response.statusCode}');
+        _name = '';
+        _memberid = '';
       }
     } catch (e) {
       debugPrint('Error fetching matched profiles: $e');
@@ -104,52 +115,8 @@ class MatchedProfileProvider with ChangeNotifier {
     }
   }
 
-  // Fetch next page (appends to list)
-  Future<void> fetchMoreProfiles() async {
-    if (_isLoadingMore || !_hasMore || _currentUserId == null) {
-      debugPrint('fetchMoreProfiles skipped: '
-          'isLoadingMore=$_isLoadingMore hasMore=$_hasMore userId=$_currentUserId');
-      return;
-    }
-    _isLoadingMore = true;
-    notifyListeners();
-
-    try {
-      final nextPage = _currentPage + 1;
-      final response = await http.post(
-        Uri.parse('https://digitallami.com/match_admin.php'),
-        headers: {'Content-Type': 'application/json'},
-        body: json.encode({
-          'user_id': _currentUserId,
-          'page': nextPage,
-          'per_page': _perPage,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final list = data['data'] as List? ?? [];
-        final newProfiles = list.map((p) => MatchedProfile.fromJson(p)).toList();
-
-        if (newProfiles.isNotEmpty) {
-          _matchedProfiles.addAll(newProfiles);
-          _currentPage = nextPage;
-          _totalCount = data['total'] is int
-              ? data['total'] as int
-              : int.tryParse(data['total']?.toString() ?? '') ?? _matchedProfiles.length;
-          _hasMore = newProfiles.length >= _perPage &&
-              _matchedProfiles.length < _totalCount;
-        } else {
-          _hasMore = false;
-        }
-      }
-    } catch (e) {
-      debugPrint('Error fetching more profiles: $e');
-    } finally {
-      _isLoadingMore = false;
-      notifyListeners();
-    }
-  }
+  // No-op: all profiles are loaded upfront by fetchMatchedProfiles
+  Future<void> fetchMoreProfiles() async {}
 
   // Helper methods
   String getProfilePicture(int index) {
