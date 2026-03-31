@@ -28,9 +28,9 @@ import 'package:firebase_storage/firebase_storage.dart';
 class ChatWindow extends StatefulWidget {
   final String name;
   final bool isOnline;
-  var receiverIdd;
+  final dynamic receiverIdd;
 
-  ChatWindow({required this.name, required this.isOnline, required this.receiverIdd});
+  const ChatWindow({super.key, required this.name, required this.isOnline, required this.receiverIdd});
 
   @override
   State<ChatWindow> createState() => _ChatWindowState();
@@ -57,6 +57,10 @@ class _ChatWindowState extends State<ChatWindow> {
   QuerySnapshot? _lastSnapshot;
   String? _lastUploadedImageUrl;
 
+  // Cached streams – recreated only when the selected receiver changes.
+  int? _cachedReceiverId;
+  Stream<QuerySnapshot>? _messagesStream;
+
   // Voice typing state
   String _selectedLanguage = 'en-US'; // 'en-US' or 'ne-NP'
   String _textBeforeVoice = ''; // text already in field before listening started
@@ -66,20 +70,18 @@ class _ChatWindowState extends State<ChatWindow> {
   bool _isLoadingMatchDetails = false;
   List<Map<String, dynamic>> _mutualMatches = [];
 
+  // Active call overlay
+  OverlayEntry? _callOverlayEntry;
+
   @override
   void initState() {
     super.initState();
     _initializeWebSpeech();
     _initializeRecorder();
-    _printFirebaseConfig();
     _fetchMatchDetails();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FocusScope.of(context).requestFocus(_messageFocusNode);
     });
-  }
-
-  void _printFirebaseConfig() {
-    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
   }
 
   Future<void> _fetchMatchDetails() async {
@@ -296,6 +298,157 @@ class _ChatWindowState extends State<ChatWindow> {
     }
   }
 
+  // ── CALL OVERLAY HELPERS ─────────────────────────────────────────────────
+
+  /// Remove the active call overlay and clean up.
+  void _removeCallOverlay() {
+    _callOverlayEntry?.remove();
+    _callOverlayEntry = null;
+  }
+
+  /// Launch a call (video or audio) in a floating overlay so the admin can
+  /// minimize it and continue browsing other conversations without ending it.
+  void _launchCall(ChatProvider chatProvider, {required bool isVideo}) {
+    if (_callOverlayEntry != null) return; // call already active
+
+    final userId = chatProvider.id.toString();
+    final userName = chatProvider.namee.toString();
+    final isMinimizedNotifier = ValueNotifier<bool>(false);
+
+    _callOverlayEntry = OverlayEntry(
+      builder: (ctx) => ValueListenableBuilder<bool>(
+        valueListenable: isMinimizedNotifier,
+        builder: (_, isMin, __) {
+          final callWidget = isVideo
+              ? VideoCallScreen(
+                  currentUserId: '1',
+                  currentUserName: 'Admin',
+                  otherUserId: userId,
+                  otherUserName: userName,
+                  onMinimize: () => isMinimizedNotifier.value = true,
+                  onEnd: _removeCallOverlay,
+                )
+              : CallScreen(
+                  currentUserId: '1',
+                  currentUserName: 'Admin',
+                  otherUserId: userId,
+                  otherUserName: userName,
+                  onMinimize: () => isMinimizedNotifier.value = true,
+                  onEnd: _removeCallOverlay,
+                );
+
+          return Stack(
+            children: [
+              // Full-screen call – kept alive via Offstage while minimized
+              Offstage(offstage: isMin, child: callWidget),
+              // Floating mini-bar shown when minimized
+              if (isMin)
+                _buildMiniCallBar(
+                  userName: userName,
+                  isVideo: isVideo,
+                  onMaximize: () => isMinimizedNotifier.value = false,
+                  onEnd: _removeCallOverlay,
+                ),
+            ],
+          );
+        },
+      ),
+    );
+    Overlay.of(context).insert(_callOverlayEntry!);
+  }
+
+  void _launchVideoCall(ChatProvider chatProvider) =>
+      _launchCall(chatProvider, isVideo: true);
+
+  void _launchAudioCall(ChatProvider chatProvider) =>
+      _launchCall(chatProvider, isVideo: false);
+
+  /// A compact floating bar shown at the bottom-right when the call is
+  /// minimized.  The admin can tap it to expand back or end the call.
+  Widget _buildMiniCallBar({
+    required String userName,
+    required bool isVideo,
+    required VoidCallback onMaximize,
+    required VoidCallback onEnd,
+  }) {
+    return Positioned(
+      bottom: 24,
+      right: 24,
+      child: Material(
+        color: Colors.transparent,
+        child: GestureDetector(
+          onTap: onMaximize,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: const Color(0xFF1E293B),
+              borderRadius: BorderRadius.circular(40),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.35),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  margin: const EdgeInsets.only(right: 8),
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF22C55E),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                Icon(
+                  isVideo ? Icons.videocam : Icons.call,
+                  color: Colors.white,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  userName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                GestureDetector(
+                  onTap: onEnd,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.call_end, color: Colors.white, size: 14),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                GestureDetector(
+                  onTap: onMaximize,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(Icons.open_in_full, color: Colors.white, size: 14),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   // ── ICON BUTTON HELPER ────────────────────────────────────────────
   Widget _iconBtn({
     required IconData icon,
@@ -334,6 +487,24 @@ class _ChatWindowState extends State<ChatWindow> {
     const kOnline = Color(0xFF22C55E);
 
     final chatProvider = Provider.of<ChatProvider>(context);
+
+    // Rebuild the Firestore stream only when the selected user changes so that
+    // StreamBuilder keeps its existing subscription and never flashes a loading
+    // spinner while switching conversations.
+    if (chatProvider.id != _cachedReceiverId) {
+      _cachedReceiverId = chatProvider.id;
+      _lastSnapshot = null; // clear stale messages from the previous user
+      _messagesStream = chatProvider.id == null
+          ? null
+          : _firestore
+              .collection('adminchat')
+              .where('senderid', whereIn: [senderId.toString(), chatProvider.id.toString()])
+              .where('receiverid', whereIn: [senderId.toString(), chatProvider.id.toString()])
+              .orderBy('timestamp', descending: true)
+              .snapshots();
+      // Re-fetch match details for the newly selected user
+      if (chatProvider.id != null) Future.microtask(_fetchMatchDetails);
+    }
 
     return Scaffold(
       backgroundColor: const Color(0xFFF0F2F5),
@@ -462,37 +633,13 @@ class _ChatWindowState extends State<ChatWindow> {
               _iconBtn(
                 icon: Icons.video_call_outlined,
                 iconColor: kPrimary,
-                onTap: () async {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => VideoCallScreen(
-                        currentUserId: '1',
-                        currentUserName: 'Admin',
-                        otherUserId: chatProvider.id.toString(),
-                        otherUserName: chatProvider.namee.toString(),
-                      ),
-                    ),
-                  );
-                },
+                onTap: () => _launchVideoCall(chatProvider),
               ),
               const SizedBox(width: 6),
               _iconBtn(
                 icon: Icons.call_outlined,
                 iconColor: const Color(0xFF334155),
-                onTap: () async {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => CallScreen(
-                        currentUserId: '1',
-                        currentUserName: 'Admin',
-                        otherUserId: chatProvider.id.toString(),
-                        otherUserName: chatProvider.namee.toString(),
-                      ),
-                    ),
-                  );
-                },
+                onTap: () => _launchAudioCall(chatProvider),
               ),
               const SizedBox(width: 6),
               _iconBtn(
@@ -554,12 +701,7 @@ class _ChatWindowState extends State<ChatWindow> {
 
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
-              stream: _firestore
-                  .collection('adminchat')
-                  .where('senderid', whereIn: [senderId.toString(), chatProvider.id.toString()])
-                  .where('receiverid', whereIn: [senderId.toString(), chatProvider.id.toString()])
-                  .orderBy('timestamp', descending: true)
-                  .snapshots(),
+              stream: _messagesStream,
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
                   return Center(
@@ -1608,6 +1750,7 @@ class _ChatWindowState extends State<ChatWindow> {
 
   @override
   void dispose() {
+    _removeCallOverlay();
     _scrollController.dispose();
     _messageFocusNode.dispose();
     _messageController.dispose();
