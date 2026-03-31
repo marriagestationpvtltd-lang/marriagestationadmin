@@ -36,6 +36,11 @@ class User {
   int isDelete;
   String? createdDate;
   int? roleId;
+  String usertype;
+  int isOnline;
+  String? profilePicture;
+  String? lastLogin;
+  String privacy;
 
   User({
     required this.id,
@@ -51,6 +56,11 @@ class User {
     required this.isDelete,
     this.createdDate,
     this.roleId,
+    this.usertype = 'free',
+    this.isOnline = 0,
+    this.profilePicture,
+    this.lastLogin,
+    this.privacy = 'public',
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -68,6 +78,11 @@ class User {
       isDelete: json['isDelete'] is int ? json['isDelete'] : int.tryParse(json['isDelete']?.toString() ?? '') ?? 0,
       createdDate: json['createdDate']?.toString(),
       roleId: json['roleId'] is int ? json['roleId'] : int.tryParse(json['roleId']?.toString() ?? ''),
+      usertype: json['usertype']?.toString() ?? json['userType']?.toString() ?? 'free',
+      isOnline: json['isOnline'] is int ? json['isOnline'] : int.tryParse(json['isOnline']?.toString() ?? '') ?? 0,
+      profilePicture: json['profilePicture']?.toString() ?? json['profile_picture']?.toString(),
+      lastLogin: json['lastLogin']?.toString() ?? json['last_login']?.toString(),
+      privacy: json['privacy']?.toString() ?? 'public',
     );
   }
 
@@ -78,9 +93,18 @@ class User {
     return parts.join(' ');
   }
 
-  bool get hasProfilePicture => false;
+  bool get hasProfilePicture => profilePicture != null && profilePicture!.isNotEmpty;
 
   bool get isPending => isVerified == null;
+
+  /// Lowercase status key used for filtering ('pending', 'approved', 'rejected', 'not_uploaded').
+  String get status {
+    if (isActive == 0) return 'rejected';
+    if (isVerified == null) return 'pending';
+    if (isVerified == 0) return 'rejected';
+    if (isVerified == 1) return 'approved';
+    return 'not_uploaded';
+  }
 
   String get formattedStatus {
     if (isActive == 0) return 'INACTIVE';

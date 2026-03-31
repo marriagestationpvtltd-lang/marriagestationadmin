@@ -28,15 +28,19 @@ class Package {
   final String? baseAmount;
   final dynamic facility;
   final dynamic duration;
+  final String description;
+  final String price;
 
   Package({
     required this.id,
     required this.name,
-    required this.isActive,
+    this.isActive = 1,
     this.createdDate,
     this.baseAmount,
     this.facility,
     this.duration,
+    this.description = '',
+    this.price = '',
   });
 
   factory Package.fromJson(Map<String, dynamic> json) {
@@ -48,6 +52,8 @@ class Package {
       baseAmount: json['baseAmount']?.toString(),
       facility: json['facility'],
       duration: json['duration'],
+      description: json['description']?.toString() ?? '',
+      price: json['price']?.toString() ?? json['baseAmount']?.toString() ?? '',
     );
   }
 
@@ -56,6 +62,8 @@ class Package {
       'id': id,
       'name': name,
       'isActive': isActive,
+      'description': description,
+      if (price.isNotEmpty) 'price': price,
       if (baseAmount != null) 'baseAmount': baseAmount,
       if (facility != null) 'facility': facility,
       if (duration != null) 'duration': duration,
@@ -65,18 +73,31 @@ class Package {
   Map<String, dynamic> toCreateJson() {
     return {
       'name': name,
+      'description': description,
+      if (price.isNotEmpty) 'price': price,
       if (baseAmount != null) 'baseAmount': baseAmount,
       if (facility != null) 'facility': facility,
       if (duration != null) 'duration': duration,
     };
   }
 
+  /// Numeric price parsed from [price] or [baseAmount].
   double get numericPrice {
+    final raw = price.isNotEmpty ? price : (baseAmount ?? '');
     try {
-      return double.parse(baseAmount?.replaceAll('Rs ', '').replaceAll(',', '').trim() ?? '0');
+      return double.parse(raw.replaceAll('Rs ', '').replaceAll(',', '').trim());
     } catch (e) {
       return 0.0;
     }
+  }
+
+  static final _durationRegExp = RegExp(r'(\d+)');
+
+  /// Duration in months parsed from the [duration] string (e.g. '3 Month' → 3).
+  int get durationInMonths {
+    if (duration == null) return 0;
+    final match = _durationRegExp.firstMatch(duration.toString());
+    return match != null ? int.tryParse(match.group(1) ?? '') ?? 0 : 0;
   }
 }
 
