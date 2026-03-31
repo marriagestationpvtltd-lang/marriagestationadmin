@@ -14,6 +14,9 @@ class CallScreen extends StatefulWidget {
   final bool isOutgoingCall;
   final VoidCallback? onMinimize;
   final VoidCallback? onEnd;
+  /// Called when the call ends with (callType, status, durationSeconds).
+  /// callType is always 'audio'. status is 'answered' or 'missed'.
+  final void Function(String callType, String status, int durationSeconds)? onCallEnded;
 
   const CallScreen({
     super.key,
@@ -24,6 +27,7 @@ class CallScreen extends StatefulWidget {
     this.isOutgoingCall = true,
     this.onMinimize,
     this.onEnd,
+    this.onCallEnded,
   });
 
   @override
@@ -202,7 +206,6 @@ class _CallScreenState extends State<CallScreen> {
     if (_ending) return;
     _ending = true;
 
-
     try {
       _callTimer?.cancel();
       _timeoutTimer?.cancel();
@@ -218,8 +221,11 @@ class _CallScreenState extends State<CallScreen> {
     } catch (e) {
     }
 
-    if (!mounted) return;
+    // Fire call-ended callback so the chat can save history.
+    final String callStatus = _callActive ? 'answered' : 'missed';
+    widget.onCallEnded?.call('audio', callStatus, _duration.inSeconds);
 
+    if (!mounted) return;
 
     // ✅ MAIN FIX (root navigator + microtask)
     Future.microtask(() {
