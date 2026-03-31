@@ -67,9 +67,9 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
       setState(() => _searchQuery = _searchController.text.toLowerCase());
     });
     _scrollController.addListener(_onScroll);
-    // Poll online status for matched profiles every 30 seconds
+    // Poll online status for matched profiles every 10 seconds
     _onlineStatusTimer = Timer.periodic(
-      const Duration(seconds: 30),
+      const Duration(seconds: 10),
       (_) {
         if (!mounted || !_matchesLoaded) return;
         Provider.of<MatchedProfileProvider>(context, listen: false)
