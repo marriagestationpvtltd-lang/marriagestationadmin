@@ -50,9 +50,9 @@ class _ChatSidebarState extends State<ChatSidebar> {
     super.initState();
     _scrollController.addListener(_onScroll);
     fetchUsers(reset: true);
-    // Poll online status every 30 seconds so the list updates live
+    // Poll online status every 10 seconds so the list updates live
     _onlineStatusTimer = Timer.periodic(
-      const Duration(seconds: 30),
+      const Duration(seconds: 10),
       (_) => _refreshOnlineStatus(),
     );
   }
@@ -211,6 +211,8 @@ class _ChatSidebarState extends State<ChatSidebar> {
         };
 
         bool changed = false;
+        bool selectedChatStatusChanged = false;
+        final String? selectedId = _selectedChat?['id']?.toString();
         for (int i = 0; i < _users.length; i++) {
           final userId = _users[i]['id']?.toString();
           if (userId == null) continue;
@@ -224,11 +226,20 @@ class _ChatSidebarState extends State<ChatSidebar> {
               'last_seen_text': fresh['last_seen_text'],
             };
             changed = true;
+            // If this user is the currently selected chat, update the reference
+            if (userId == selectedId) {
+              _selectedChat = _users[i];
+              selectedChatStatusChanged = true;
+            }
           }
         }
 
         if (changed && mounted) {
           _applyFilters();
+          // Sync ChatProvider so the chat header reflects the updated online status
+          if (selectedChatStatusChanged) {
+            _updateSelectedChat();
+          }
         }
       }
     } catch (e) {
