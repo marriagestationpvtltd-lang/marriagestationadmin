@@ -36,7 +36,7 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final url = Uri.parse('${AppConstants.apiBaseUrl}/admin/users/login');
+      final url = Uri.parse('${AppConstants.apiBaseUrl}/login.php');
       final response = await http.post(
         url,
         headers: {
@@ -48,25 +48,25 @@ class AuthProvider with ChangeNotifier {
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
-        if (responseData['status'] == 200) {
-          final recordList = responseData['recordList'] as List;
-          if (recordList.isNotEmpty) {
-            _token = recordList[0]['token']?.toString();
-            _adminData = Map<String, dynamic>.from(recordList[0]);
 
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setString('token', _token!);
-            await prefs.setString('adminData', json.encode(_adminData));
+        if (responseData['success'] == true) {
+          final data = responseData['data'] as Map<String, dynamic>;
+          _token = data['token']?.toString();
+          _adminData = data['admin'] as Map<String, dynamic>?;
 
-            _isLoading = false;
-            notifyListeners();
-            return true;
-          }
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString('token', _token!);
+          await prefs.setString('adminData', json.encode(_adminData));
+
+          _isLoading = false;
+          notifyListeners();
+          return true;
+        } else {
+          _error = responseData['message']?.toString() ?? 'Login failed';
+          _isLoading = false;
+          notifyListeners();
+          return false;
         }
-        _error = responseData['message']?.toString() ?? 'Login failed';
-        _isLoading = false;
-        notifyListeners();
-        return false;
       } else {
         _error = 'Server error: ${response.statusCode}';
         _isLoading = false;

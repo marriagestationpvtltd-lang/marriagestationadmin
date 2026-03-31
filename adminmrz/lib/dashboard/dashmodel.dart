@@ -5,13 +5,12 @@ class DashboardResponse {
   DashboardResponse({required this.success, required this.data});
 
   factory DashboardResponse.fromJson(Map<String, dynamic> json) {
-    final status = json['status'];
-    final success = status == 200 || status?.toString() == '200';
-    final recordList = json['recordList'] as List? ?? [];
-    final record = recordList.isNotEmpty ? recordList[0] as Map<String, dynamic> : <String, dynamic>{};
+    final success = json['success'] == true;
+    // api9 returns: { success, dashboard: { users: {...}, payments: {...} } }
+    final dashboard = json['dashboard'] as Map<String, dynamic>? ?? {};
     return DashboardResponse(
       success: success,
-      data: DashboardData.fromJson(record),
+      data: DashboardData.fromJson(dashboard),
     );
   }
 }
@@ -32,12 +31,13 @@ class DashboardData {
   });
 
   factory DashboardData.fromJson(Map<String, dynamic> json) {
+    final users = json['users'] as Map<String, dynamic>? ?? {};
     return DashboardData(
-      todayRegistration: _parseInt(json['todayRegistration']),
-      monthlyRegistration: _parseInt(json['monthlyRegistration']),
+      todayRegistration: _parseInt(users['todayRegistered']),
+      monthlyRegistration: _parseInt(users['thisMonthRegistered']),
       todayProposal: _parseInt(json['todayProposal']),
       monthlyProposal: _parseInt(json['monthlyProposal']),
-      recentUsers: ((json['recentUserResult'] ?? []) as List)
+      recentUsers: ((users['recentUsers'] ?? json['recentUserResult'] ?? []) as List)
           .map((u) => RecentUser.fromJson(u as Map<String, dynamic>))
           .toList(),
     );

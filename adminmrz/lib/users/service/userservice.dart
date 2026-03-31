@@ -12,22 +12,23 @@ class UserService {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
     return {
-      'Content-Type': 'application/json',
       'Accept': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
     };
   }
 
+  Future<Map<String, String>> _jsonAuthHeaders() async {
+    return {
+      ...await _authHeaders(),
+      'Content-Type': 'application/json',
+    };
+  }
+
   Future<UserListResponse> getUsers({int startIndex = 0, int fetchRecord = 50, String searchString = ''}) async {
     final response = await http
-        .post(
-          Uri.parse('$baseUrl/admin/appUsers/getAppUsers'),
+        .get(
+          Uri.parse('$baseUrl/get_users.php'),
           headers: await _authHeaders(),
-          body: json.encode({
-            'startIndex': startIndex,
-            'fetchRecord': fetchRecord,
-            'searchString': searchString,
-          }),
         )
         .timeout(AppConstants.requestTimeout);
 
@@ -40,18 +41,18 @@ class UserService {
   }
 
   Future<bool> suspendUsers(List<int> userIds) async {
-    final headers = await _authHeaders();
+    final headers = await _jsonAuthHeaders();
     final results = await Future.wait(userIds.map((userId) async {
       final response = await http
           .post(
-            Uri.parse('$baseUrl/admin/users/activeInactiveUsers'),
+            Uri.parse('$baseUrl/update_user_status.php'),
             headers: headers,
-            body: json.encode({'id': userId}),
+            body: json.encode({'id': userId, 'action': 'suspend'}),
           )
           .timeout(AppConstants.requestTimeout);
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return data['status'] == 200;
+        return data['success'] == true;
       }
       return false;
     }));
@@ -59,18 +60,18 @@ class UserService {
   }
 
   Future<bool> deleteUsers(List<int> userIds) async {
-    final headers = await _authHeaders();
+    final headers = await _jsonAuthHeaders();
     final results = await Future.wait(userIds.map((userId) async {
       final response = await http
           .post(
-            Uri.parse('$baseUrl/admin/users/deleteUser'),
+            Uri.parse('$baseUrl/delete_user.php'),
             headers: headers,
             body: json.encode({'id': userId}),
           )
           .timeout(AppConstants.requestTimeout);
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        return data['status'] == 200;
+        return data['success'] == true;
       }
       return false;
     }));

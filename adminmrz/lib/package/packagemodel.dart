@@ -10,12 +10,13 @@ class PackageListResponse {
   });
 
   factory PackageListResponse.fromJson(Map<String, dynamic> json) {
-    final status = json['status'];
-    final success = status == 200 || status?.toString() == '200';
+    // api9 returns: { success, count, data: [...] }
+    final success = json['success'] == true;
+    final count = json['count'] is int ? json['count'] : int.tryParse(json['count']?.toString() ?? '') ?? 0;
     return PackageListResponse(
       success: success,
-      totalRecords: json['totalRecords'] is int ? json['totalRecords'] : int.tryParse(json['totalRecords']?.toString() ?? '') ?? 0,
-      data: List<Package>.from((json['recordList'] ?? []).map((x) => Package.fromJson(x))),
+      totalRecords: count,
+      data: List<Package>.from((json['data'] ?? []).map((x) => Package.fromJson(x))),
     );
   }
 }
@@ -113,14 +114,14 @@ class CreatePackageResponse {
   });
 
   factory CreatePackageResponse.fromJson(Map<String, dynamic> json) {
-    final status = json['status'];
+    // api9 returns: { success, message, data: { id: ... } }
     return CreatePackageResponse(
-      success: status == 200 || status?.toString() == '200',
+      success: json['success'] == true,
       message: json['message']?.toString() ?? '',
-      packageId: json['recordList'] is List && (json['recordList'] as List).isNotEmpty
-          ? (json['recordList'][0]['id'] is int
-              ? json['recordList'][0]['id'] as int
-              : int.tryParse(json['recordList'][0]['id']?.toString() ?? '') ?? 0)
+      packageId: json['data'] is Map
+          ? (json['data']['id'] is int
+              ? json['data']['id'] as int
+              : int.tryParse(json['data']['id']?.toString() ?? '') ?? 0)
           : 0,
     );
   }

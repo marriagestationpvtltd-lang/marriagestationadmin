@@ -41,9 +41,15 @@ class DocumentsProvider with ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString('token');
     return {
-      'Content-Type': 'application/json',
       'Accept': 'application/json',
       if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  Future<Map<String, String>> _jsonAuthHeaders() async {
+    return {
+      ...await _authHeaders(),
+      'Content-Type': 'application/json',
     };
   }
 
@@ -55,39 +61,16 @@ class DocumentsProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final url = Uri.parse('${AppConstants.apiBaseUrl}/admin/appUsers/getAppUsers');
+      final url = Uri.parse('${AppConstants.apiBaseUrl}/get_documents.php');
       final response = await http
-          .post(
-            url,
-            headers: await _authHeaders(),
-            body: json.encode({'startIndex': 0, 'fetchRecord': 100, 'searchString': ''}),
-          )
+          .get(url, headers: await _authHeaders())
           .timeout(AppConstants.requestTimeout);
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
-        final status = responseData['status'];
-        if (status == 200 || status?.toString() == '200') {
-          final List<dynamic> data = responseData['recordList'] ?? [];
-          _documents = data
-              .map((u) => Document(
-                    userId: u['id'] is int ? u['id'] : int.tryParse(u['id']?.toString() ?? '') ?? 0,
-                    email: u['email']?.toString() ?? '',
-                    firstName: u['firstName']?.toString() ?? '',
-                    lastName: u['lastName']?.toString() ?? '',
-                    gender: u['gender']?.toString() ?? '',
-                    status: u['isVerified'] == 1
-                        ? 'approved'
-                        : u['isVerified'] == null
-                            ? 'pending'
-                            : 'rejected',
-                    isVerified: u['isVerified'] is int ? u['isVerified'] : 0,
-                    documentId: u['id'] is int ? u['id'] : int.tryParse(u['id']?.toString() ?? '') ?? 0,
-                    documentType: 'Identity',
-                    documentIdNumber: u['contactNo']?.toString() ?? '',
-                    photo: null,
-                  ))
-              .toList();
+        if (responseData['success'] == true) {
+          final List<dynamic> data = responseData['data'] ?? [];
+          _documents = data.map((doc) => Document.fromJson(doc)).toList();
           _lastFetchTime = DateTime.now();
           _isLoading = false;
           notifyListeners();
@@ -121,21 +104,27 @@ class DocumentsProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final url = Uri.parse('${AppConstants.apiBaseUrl}/admin/appUsers/approveDocument');
-      final bool isVerified = action == 'approve';
+      final url = Uri.parse('${AppConstants.apiBaseUrl}/update_document_status.php');
+
+      final Map<String, dynamic> body = {
+        'user_id': userId,
+        'action': action,
+      };
+      if (action == 'reject' && rejectReason != null) {
+        body['reject_reason'] = rejectReason;
+      }
 
       final response = await http
           .post(
             url,
-            headers: await _authHeaders(),
-            body: json.encode({'id': userId, 'isVerified': isVerified}),
+            headers: await _jsonAuthHeaders(),
+            body: json.encode(body),
           )
           .timeout(AppConstants.requestTimeout);
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
-        final status = responseData['status'];
-        if (status == 200 || status?.toString() == '200') {
+        if (responseData['success'] == true) {
           final index = _documents.indexWhere((doc) => doc.userId == userId);
           if (index != -1) {
             final updatedDoc = Document(
