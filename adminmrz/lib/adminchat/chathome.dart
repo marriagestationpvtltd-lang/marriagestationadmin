@@ -44,6 +44,7 @@ class _ChatWindowState extends State<ChatWindow> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseStorage _storage = FirebaseStorage.instance;
   bool _isListening = false;
+  bool _userStoppedListening = false;
   bool _isSearching = false;
   bool _isSendingImage = false;
   bool _showMatchInfo = false;
@@ -112,8 +113,8 @@ class _ChatWindowState extends State<ChatWindow> {
   }
 
   void _initializeWebSpeech() {
-    // Use the webkit-prefixed constructor directly so Chrome recognizes the API.
-    // Falling back to the unprefixed constructor for browsers that support it.
+    // Prefer the unprefixed SpeechRecognition (Firefox/Edge) with a fallback to
+    // the webkit-prefixed version used by Chrome.
     final dynamic speechClass = js.context.hasProperty('SpeechRecognition')
         ? js.context['SpeechRecognition']
         : js.context.hasProperty('webkitSpeechRecognition')
@@ -128,21 +129,27 @@ class _ChatWindowState extends State<ChatWindow> {
     _webSpeechRecognition!['lang'] = _selectedLanguage;
 
     _webSpeechRecognition!['onresult'] = js.allowInterop((dynamic event) {
-      final results = js.JsObject.fromBrowserObject(event)['results'];
+      final eventObj = js.JsObject.fromBrowserObject(event);
+      final results = eventObj['results'];
       if (results == null) return;
 
       final resultList = js.JsObject.fromBrowserObject(results);
-      final int length = resultList['length'] as int;
+      // Use safe num→int cast; JS numbers come through as num, not int.
+      final int length = (resultList['length'] as num).toInt();
+      // Only process new results starting at resultIndex to avoid double-counting
+      // previous finals every time onresult fires.
+      final int resultIndex = (eventObj['resultIndex'] as num).toInt();
 
       String interimTranscript = '';
       String finalTranscript = '';
 
-      for (int i = 0; i < length; i++) {
+      for (int i = resultIndex; i < length; i++) {
         final result = js.JsObject.fromBrowserObject(
             resultList.callMethod('item', [i]));
         final transcript =
             js.JsObject.fromBrowserObject(result.callMethod('item', [0]))['transcript'] as String;
-        final isFinal = result['isFinal'] as bool;
+        // Use == true instead of `as bool` — JS booleans may not cast to Dart bool directly.
+        final isFinal = result['isFinal'] == true;
         if (isFinal) {
           finalTranscript += transcript;
         } else {
@@ -167,13 +174,28 @@ class _ChatWindowState extends State<ChatWindow> {
     });
 
     _webSpeechRecognition!['onend'] = js.allowInterop((dynamic _) {
-      setState(() => _isListening = false);
+      // With continuous=true the browser may still fire onend after silence.
+      // Restart automatically unless the user explicitly stopped listening.
+      if (!_userStoppedListening && _isListening && mounted) {
+        try {
+          _webSpeechRecognition!.callMethod('start');
+        } catch (e) {
+          setState(() => _isListening = false);
+        }
+      } else {
+        if (mounted) setState(() => _isListening = false);
+      }
     });
 
     _webSpeechRecognition!['onerror'] = js.allowInterop((dynamic event) {
       final error =
           js.JsObject.fromBrowserObject(event)['error'] as String? ?? '';
-      if (error == 'aborted') return; // user-initiated stop
+      if (error == 'aborted') return; // user-initiated stop, onend handles state
+
+      // Prevent auto-restart only for unrecoverable errors (permission denied).
+      if (error == 'not-allowed' || error == 'service-not-allowed') {
+        _userStoppedListening = true;
+      }
 
       final resetText = _textBeforeVoice.trimRight();
       setState(() {
@@ -217,6 +239,7 @@ class _ChatWindowState extends State<ChatWindow> {
         _textBeforeVoice += ' ';
       }
       _webSpeechRecognition!['lang'] = _selectedLanguage;
+      _userStoppedListening = false;
       _webSpeechRecognition!.callMethod('start');
       setState(() => _isListening = true);
     }
@@ -224,6 +247,7 @@ class _ChatWindowState extends State<ChatWindow> {
 
   void _stopListening() {
     if (_isListening && _webSpeechRecognition != null) {
+      _userStoppedListening = true;
       _webSpeechRecognition!.callMethod('stop');
       setState(() => _isListening = false);
     }
