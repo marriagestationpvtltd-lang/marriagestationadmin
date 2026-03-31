@@ -10,7 +10,6 @@ import 'package:http/http.dart' as http;
 import 'chatprovider.dart';
 import 'chatscreen.dart';
 import 'constant.dart';
-import 'loading.dart';
 
 class ChatSidebar extends StatefulWidget {
   @override
@@ -494,16 +493,13 @@ class _ChatSidebarState extends State<ChatSidebar> {
                           setState(() {
                             _selectedChat = user;
                             _updateSelectedChat();
-
-                            Future.microtask(() =>
-                                Provider.of<MatchedProfileProvider>(context, listen: false)
-                                    .fetchMatchedProfiles(chatProvider.id!));
                           });
-
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(builder: (context) => Loading()),
-                          );
+                          // Fetch matched profiles for the newly selected user
+                          final newId = int.tryParse(user["id"].toString()) ?? 0;
+                          if (newId > 0) {
+                            Provider.of<MatchedProfileProvider>(context, listen: false)
+                                .fetchMatchedProfiles(newId);
+                          }
                         },
                       );
                     },
