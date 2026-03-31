@@ -136,7 +136,7 @@ class AppTheme {
         ),
         scaffoldBackgroundColor: scaffoldBg,
         fontFamily: 'Inter',
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           elevation: 0,
           color: cardBg,
           shape: RoundedRectangleBorder(borderRadius: radiusMd),
