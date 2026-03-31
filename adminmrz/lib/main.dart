@@ -9,6 +9,7 @@ import 'adminchat/services/callmanager.dart';
 import 'auth/dashboard.dart';
 import 'auth/login.dart';
 import 'auth/service.dart';
+import 'core/theme_provider.dart';
 import 'document/docprovider/docservice.dart';
 import 'firebase_options.dart';
 import 'package/packageProvider.dart';
@@ -42,6 +43,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (context) => AuthProvider()),
         ChangeNotifierProvider(create: (context) => DocumentsProvider()),
         ChangeNotifierProvider(create: (context) => UserProvider()),
@@ -51,25 +53,52 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (context) => MatchedProfileProvider()),
         ChangeNotifierProvider(create: (_) => CallManager()),
       ],
-      child: MaterialApp(
-        title: 'Admin Panel',
-        theme: ThemeData(
-          primarySwatch: Colors.blue,
-          scaffoldBackgroundColor: const Color(0xFFf8f9fa),
-          appBarTheme: const AppBarTheme(
-            backgroundColor: Colors.white,
-            foregroundColor: Colors.black,
-            elevation: 0,
-            centerTitle: true,
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) => MaterialApp(
+          title: 'Admin Panel',
+          themeMode: themeProvider.themeMode,
+          theme: ThemeData(
+            brightness: Brightness.light,
+            primarySwatch: Colors.blue,
+            scaffoldBackgroundColor: const Color(0xFFF1F5F9),
+            colorScheme: const ColorScheme.light(
+              primary: Color(0xFF6366F1),
+              surface: Colors.white,
+              onSurface: Color(0xFF334155),
+              outlineVariant: Color(0xFFE2E8F0),
+            ),
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
+              elevation: 0,
+              centerTitle: true,
+            ),
           ),
-        ),
-        debugShowCheckedModeBanner: false,
-        home: Consumer<AuthProvider>(
-          builder: (context, authProvider, _) {
-            return authProvider.isAuthenticated
-                ? const DashboardPage()
-                : const LoginPage();
-          },
+          darkTheme: ThemeData(
+            brightness: Brightness.dark,
+            primarySwatch: Colors.blue,
+            scaffoldBackgroundColor: const Color(0xFF0D1117),
+            colorScheme: const ColorScheme.dark(
+              primary: Color(0xFF6366F1),
+              surface: Color(0xFF1E293B),
+              onSurface: Color(0xFFCBD5E1),
+              outlineVariant: Color(0xFF334155),
+            ),
+            appBarTheme: const AppBarTheme(
+              backgroundColor: Color(0xFF1E293B),
+              foregroundColor: Color(0xFFCBD5E1),
+              elevation: 0,
+              centerTitle: true,
+            ),
+          ),
+          debugShowCheckedModeBanner: false,
+          home: Consumer<AuthProvider>(
+            builder: (context, authProvider, _) {
+              return authProvider.isAuthenticated
+                  ? const DashboardPage()
+                  : const LoginPage();
+            },
+          ),
         ),
       ),
     );

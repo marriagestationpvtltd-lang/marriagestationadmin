@@ -1,4 +1,5 @@
 import 'package:adminmrz/auth/service.dart';
+import 'package:adminmrz/core/theme_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -378,7 +379,7 @@ class _DashboardPageState extends State<DashboardPage> {
           child: isChatPage
               ? _pages[_selectedIndex]
               : Container(
-                  color: _kContentBg,
+                  color: Theme.of(context).scaffoldBackgroundColor,
                   padding: const EdgeInsets.all(24),
                   child: _pages[_selectedIndex],
                 ),
@@ -389,44 +390,72 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Widget _buildTopBar() {
     final title = _navItems[_selectedIndex].label;
+    final cs = Theme.of(context).colorScheme;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final topBarBg = cs.surface;
+    final topBarBorder = cs.outlineVariant;
+    final iconBg = isDark ? const Color(0xFF263248) : const Color(0xFFF8FAFC);
+    final mutedColor = cs.onSurface.withOpacity(0.45);
+
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: const BoxDecoration(
-        color: _kTopBarBg,
-        border: Border(bottom: BorderSide(color: _kTopBarBorder)),
+      decoration: BoxDecoration(
+        color: topBarBg,
+        border: Border(bottom: BorderSide(color: topBarBorder)),
       ),
       child: Row(
         children: [
           // Breadcrumb
-          const Icon(Icons.home_outlined, size: 14, color: _kTextSecondary),
+          Icon(Icons.home_outlined, size: 14, color: mutedColor),
           const SizedBox(width: 6),
-          const Text('/', style: TextStyle(fontSize: 12, color: _kTextSecondary)),
+          Text('/', style: TextStyle(fontSize: 12, color: mutedColor)),
           const SizedBox(width: 6),
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: Color(0xFF334155),
+              color: cs.onSurface,
             ),
           ),
           const Spacer(),
+          // Dark / Light mode toggle
+          Container(
+            width: 36,
+            height: 36,
+            margin: const EdgeInsets.only(right: 8),
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: topBarBorder),
+            ),
+            child: IconButton(
+              onPressed: () => context.read<ThemeProvider>().toggleTheme(),
+              icon: Icon(
+                isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+                size: 18,
+                color: mutedColor,
+              ),
+              padding: EdgeInsets.zero,
+              tooltip: isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+            ),
+          ),
           // Notification bell
           Container(
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: iconBg,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: _kTopBarBorder),
+              border: Border.all(color: topBarBorder),
             ),
             child: IconButton(
               onPressed: () {},
-              icon: const Icon(
+              icon: Icon(
                 Icons.notifications_outlined,
                 size: 18,
-                color: _kTextMuted,
+                color: mutedColor,
               ),
               padding: EdgeInsets.zero,
               tooltip: 'Notifications',
