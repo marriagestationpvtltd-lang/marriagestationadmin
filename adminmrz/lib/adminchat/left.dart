@@ -233,106 +233,174 @@ class _ChatSidebarState extends State<ChatSidebar> {
 
   @override
   Widget build(BuildContext context) {
+    const kPrimary = Color(0xFFD81B60);
+    const kPrimaryLight = Color(0xFFFCE4EC);
+    const kText = Color(0xFF1E293B);
+    const kMuted = Color(0xFF64748B);
+    const kBorder = Color(0xFFE2E8F0);
+
     final chatProvider = Provider.of<ChatProvider>(context);
 
     return Container(
       width: 280,
-      color: Colors.grey[200],
+      color: Colors.white,
       child: Column(
         children: [
-          // 🔍 SEARCH
-          Padding(
-            padding: const EdgeInsets.all(10.0),
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: "Search...",
-                prefixIcon: Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                  icon: Icon(Icons.clear, size: 18),
-                  onPressed: () {
-                    setState(() {
-                      _searchQuery = "";
-                      _applyFilters();
-                    });
-                  },
-                )
-                    : null,
-                border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: BorderSide.none),
-                filled: true,
-                fillColor: Colors.white,
-              ),
-              onChanged: (value) {
-                _searchQuery = value;
-                _applyFilters();
-              },
+          // ── HEADER ──────────────────────────────────────────────────
+          Container(
+            height: 56,
+            color: Colors.white,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                const Text(
+                  'Conversations',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: kText,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: kPrimaryLight,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${_filteredUsers.length}',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: kPrimary,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
 
-          // 🎛️ FILTER OPTIONS
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          // ── SEARCH BAR ──────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: SizedBox(
+              height: 40,
+              child: TextField(
+                decoration: InputDecoration(
+                  hintText: "Search conversations...",
+                  hintStyle: const TextStyle(fontSize: 12, color: kMuted),
+                  prefixIcon: const Icon(Icons.search, size: 18, color: kMuted),
+                  suffixIcon: _searchQuery.isNotEmpty
+                      ? IconButton(
+                          icon: const Icon(Icons.clear, size: 16, color: kMuted),
+                          onPressed: () {
+                            setState(() {
+                              _searchQuery = "";
+                              _applyFilters();
+                            });
+                          },
+                        )
+                      : null,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: const BorderSide(color: kBorder, width: 1),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: const BorderSide(color: kBorder, width: 1),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: const BorderSide(color: kPrimary, width: 1),
+                  ),
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFC),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                  isDense: true,
+                ),
+                onChanged: (value) {
+                  _searchQuery = value;
+                  _applyFilters();
+                },
+              ),
+            ),
+          ),
+
+          // ── FILTER CHIPS ────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
             child: Column(
               children: [
-                // Filter chips row
                 SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Row(
                     children: [
                       FilterChip(
-                        label: Text('Paid Members'),
+                        label: const Text('Paid', style: TextStyle(fontSize: 10)),
                         selected: _showOnlyPaid,
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                        labelPadding: const EdgeInsets.symmetric(horizontal: 2),
                         onSelected: (bool selected) {
                           setState(() {
                             _showOnlyPaid = selected;
                             _applyFilters();
                           });
                         },
-                        selectedColor: Colors.blue,
-                        checkmarkColor: Colors.white,
+                        selectedColor: kPrimaryLight,
+                        checkmarkColor: kPrimary,
+                        side: const BorderSide(color: kBorder),
                       ),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       FilterChip(
-                        label: Text('Online Only'),
+                        label: const Text('Online', style: TextStyle(fontSize: 10)),
                         selected: _showOnlyOnline,
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                        labelPadding: const EdgeInsets.symmetric(horizontal: 2),
                         onSelected: (bool selected) {
                           setState(() {
                             _showOnlyOnline = selected;
                             _applyFilters();
                           });
                         },
-                        selectedColor: Colors.green,
-                        checkmarkColor: Colors.white,
+                        selectedColor: kPrimaryLight,
+                        checkmarkColor: kPrimary,
+                        side: const BorderSide(color: kBorder),
                       ),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 6),
                       FilterChip(
-                        label: Text('Has Matches'),
+                        label: const Text('Matches', style: TextStyle(fontSize: 10)),
                         selected: _showWithMatches,
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                        labelPadding: const EdgeInsets.symmetric(horizontal: 2),
                         onSelected: (bool selected) {
                           setState(() {
                             _showWithMatches = selected;
                             _applyFilters();
                           });
                         },
-                        selectedColor: Colors.red,
-                        checkmarkColor: Colors.white,
+                        selectedColor: kPrimaryLight,
+                        checkmarkColor: kPrimary,
+                        side: const BorderSide(color: kBorder),
                       ),
-                      SizedBox(width: 8),
-                      // Sort dropdown
+                      const SizedBox(width: 6),
                       Container(
-                        padding: EdgeInsets.symmetric(horizontal: 8),
+                        height: 28,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: const Color(0xFFF8FAFC),
                           borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.grey.shade300),
+                          border: Border.all(color: kBorder),
                         ),
                         child: DropdownButton<String>(
                           value: _sortBy,
-                          underline: SizedBox(),
-                          icon: Icon(Icons.sort, size: 18),
-                          items: [
+                          underline: const SizedBox(),
+                          icon: const Icon(Icons.sort, size: 14, color: kMuted),
+                          style: const TextStyle(fontSize: 10, color: kText),
+                          items: const [
                             DropdownMenuItem(value: 'recent', child: Text('Recent')),
                             DropdownMenuItem(value: 'name', child: Text('Name')),
                             DropdownMenuItem(value: 'matches', child: Text('Matches')),
@@ -352,243 +420,203 @@ class _ChatSidebarState extends State<ChatSidebar> {
                   ),
                 ),
 
-                // Reset filters button
                 if (_showOnlyPaid || _showOnlyOnline || _showWithMatches || _searchQuery.isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 5),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.end,
-                      children: [
-                        TextButton.icon(
-                          onPressed: _resetFilters,
-                          icon: Icon(Icons.clear_all, size: 16),
-                          label: Text('Clear Filters'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: Colors.red,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                        ),
-                      ],
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: _resetFilters,
+                      icon: const Icon(Icons.clear_all, size: 14),
+                      label: const Text('Clear', style: TextStyle(fontSize: 11)),
+                      style: TextButton.styleFrom(
+                        foregroundColor: kPrimary,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        minimumSize: Size.zero,
+                      ),
                     ),
                   ),
               ],
             ),
           ),
 
-          // Count indicator
+          // ── COUNT ROW ───────────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            child: Row(
-              children: [
-                Text(
-                  '${_filteredUsers.length} users',
-                  style: TextStyle(fontSize: 12, color: Colors.grey[600]),
-                ),
-                if (_showOnlyPaid)
-                  Container(
-                    margin: EdgeInsets.only(left: 5),
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.shade100,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text('Paid', style: TextStyle(fontSize: 10)),
-                  ),
-                if (_showOnlyOnline)
-                  Container(
-                    margin: EdgeInsets.only(left: 5),
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.green.shade100,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text('Online', style: TextStyle(fontSize: 10)),
-                  ),
-                if (_showWithMatches)
-                  Container(
-                    margin: EdgeInsets.only(left: 5),
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: Colors.red.shade100,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text('Matches', style: TextStyle(fontSize: 10)),
-                  ),
-              ],
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '${_filteredUsers.length} users',
+                style: const TextStyle(fontSize: 11, color: kMuted),
+              ),
             ),
           ),
 
-          Divider(height: 1),
+          Container(height: 1, color: kBorder),
 
-          // 📋 LIST
+          // ── LIST ────────────────────────────────────────────────────
           Expanded(
             child: _filteredUsers.isEmpty
                 ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.person_off, size: 48, color: Colors.grey),
-                  SizedBox(height: 10),
-                  Text(
-                    'No users found',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                  if (_showOnlyPaid || _showOnlyOnline || _showWithMatches || _searchQuery.isNotEmpty)
-                    TextButton(
-                      onPressed: _resetFilters,
-                      child: Text('Clear filters'),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.person_off, size: 40, color: Colors.grey[300]),
+                        const SizedBox(height: 10),
+                        const Text(
+                          'No users found',
+                          style: TextStyle(color: kMuted, fontSize: 13),
+                        ),
+                        if (_showOnlyPaid || _showOnlyOnline || _showWithMatches || _searchQuery.isNotEmpty)
+                          TextButton(
+                            onPressed: _resetFilters,
+                            style: TextButton.styleFrom(foregroundColor: kPrimary),
+                            child: const Text('Clear filters', style: TextStyle(fontSize: 12)),
+                          ),
+                      ],
                     ),
-                ],
-              ),
-            )
+                  )
                 : ListView.builder(
-              itemCount: _filteredUsers.length,
-              itemBuilder: (context, index) {
-                var user = _filteredUsers[index];
-                bool isSelected = _selectedChat == user;
+                    itemCount: _filteredUsers.length,
+                    itemBuilder: (context, index) {
+                      var user = _filteredUsers[index];
+                      bool isSelected = _selectedChat == user;
 
-                return _buildUserRow(
-                  user["name"] ?? "",
-                  conversationMap[user["id"].toString()]?['lastMessage'] ?? user["chat_message"] ?? "",
-                  int.tryParse(user["matches"].toString()) ?? 0,
-                  user["last_seen_text"] ?? "",
-                  user["is_paid"] ?? false,
-                  user["is_online"] ?? false,
-                  user["profile_picture"] ?? "",
-                  isSelected,
-                      () {
-                    setState(() {
-                      _selectedChat = user;
-                      _updateSelectedChat();
+                      return _buildUserRow(
+                        user["name"] ?? "",
+                        conversationMap[user["id"].toString()]?['lastMessage'] ?? user["chat_message"] ?? "",
+                        int.tryParse(user["matches"].toString()) ?? 0,
+                        user["last_seen_text"] ?? "",
+                        user["is_paid"] ?? false,
+                        user["is_online"] ?? false,
+                        user["profile_picture"] ?? "",
+                        isSelected,
+                        () {
+                          setState(() {
+                            _selectedChat = user;
+                            _updateSelectedChat();
 
-                      Future.microtask(() =>
-                          Provider.of<MatchedProfileProvider>(context,
-                              listen: false)
-                              .fetchMatchedProfiles(chatProvider.id!));
-                    });
+                            Future.microtask(() =>
+                                Provider.of<MatchedProfileProvider>(context, listen: false)
+                                    .fetchMatchedProfiles(chatProvider.id!));
+                          });
 
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => Loading(),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(builder: (context) => Loading()),
+                          );
+                        },
+                      );
+                    },
+                  ),
           ),
         ],
       ),
     );
   }
 
-  // 🔥 USER ROW UI
+  // ── USER ROW ────────────────────────────────────────────────────────
   Widget _buildUserRow(
-      String name,
-      String chatMessage,
-      int matches,
-      String lastSeen,
-      bool isPaid,
-      bool isOnline,
-      String profileImage,
-      bool isSelected,
-      VoidCallback onTap,
-      ) {
+    String name,
+    String chatMessage,
+    int matches,
+    String lastSeen,
+    bool isPaid,
+    bool isOnline,
+    String profileImage,
+    bool isSelected,
+    VoidCallback onTap,
+  ) {
+    const kPrimary = Color(0xFFD81B60);
+    const kPrimaryLight = Color(0xFFFCE4EC);
+    const kText = Color(0xFF1E293B);
+    const kMuted = Color(0xFF64748B);
+    const kOnline = Color(0xFF22C55E);
+
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        color: isSelected ? Colors.blue[100] : Colors.transparent,
-        padding: EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFFFFF1F5) : Colors.white,
+          border: isSelected
+              ? const Border(left: BorderSide(color: kPrimary, width: 3))
+              : null,
+        ),
+        padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
         child: Row(
           children: [
             Stack(
               children: [
-                // 🖼️ PROFILE IMAGE
                 CircleAvatar(
-                  radius: 22,
-                  backgroundColor: Colors.grey[300],
+                  radius: 20,
+                  backgroundColor: const Color(0xFFF1F5F9),
                   backgroundImage: profileImage.isNotEmpty
                       ? NetworkImage(profileImage)
                       : null,
                   child: profileImage.isEmpty
-                      ? Icon(Icons.person, color: Colors.grey)
+                      ? Icon(Icons.person, color: Colors.grey[400], size: 20)
                       : null,
                 ),
-
-                // 🟢 ONLINE DOT
                 Positioned(
                   right: 0,
                   bottom: 0,
                   child: Container(
-                    width: 12,
-                    height: 12,
+                    width: 10,
+                    height: 10,
                     decoration: BoxDecoration(
-                      color: isOnline ? Colors.green : Colors.grey,
+                      color: isOnline ? kOnline : const Color(0xFFCBD5E1),
                       shape: BoxShape.circle,
                       border: Border.all(color: Colors.white, width: 2),
                     ),
                   ),
                 ),
-
-                // 💰 PAID BADGE
                 if (isPaid)
                   Positioned(
                     left: 0,
                     top: 0,
                     child: Container(
-                      width: 16,
-                      height: 16,
+                      width: 14,
+                      height: 14,
                       decoration: BoxDecoration(
                         color: Colors.amber,
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 2),
+                        border: Border.all(color: Colors.white, width: 1.5),
                       ),
-                      child: Icon(
-                        Icons.star,
-                        size: 10,
-                        color: Colors.white,
-                      ),
+                      child: const Icon(Icons.star, size: 8, color: Colors.white),
                     ),
                   ),
               ],
             ),
 
-            SizedBox(width: 10),
+            const SizedBox(width: 10),
 
-            // 📄 TEXT
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          name,
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 14,
-                            color: isPaid ? Colors.amber[800] : null,
-                          ),
-                        ),
-                      ),
-                    ],
+                  Text(
+                    name,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      fontSize: 13,
+                      color: isPaid ? kPrimary : kText,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  SizedBox(height: 2),
+                  const SizedBox(height: 2),
                   Text(
                     isOnline ? "Online" : lastSeen,
-                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: isOnline ? kOnline : kMuted,
+                    ),
                   ),
                   if (chatMessage.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 2),
-                      child: Text(
-                        chatMessage,
-                        style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                    Text(
+                      chatMessage,
+                      style: const TextStyle(fontSize: 11, color: kMuted),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                 ],
               ),
@@ -596,21 +624,24 @@ class _ChatSidebarState extends State<ChatSidebar> {
 
             if (matches > 0)
               Container(
-                padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.red[50],
+                  color: kPrimaryLight,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.favorite, color: Colors.red, size: 12),
-                    SizedBox(width: 2),
-                    Text("$matches",
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.red,
-                        )),
+                    const Icon(Icons.favorite, color: kPrimary, size: 10),
+                    const SizedBox(width: 2),
+                    Text(
+                      '$matches',
+                      style: const TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: kPrimary,
+                      ),
+                    ),
                   ],
                 ),
               ),

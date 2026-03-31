@@ -125,6 +125,13 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
 
   @override
   Widget build(BuildContext context) {
+    const kPrimary = Color(0xFFD81B60);
+    const kPrimaryLight = Color(0xFFFCE4EC);
+    const kText = Color(0xFF1E293B);
+    const kMuted = Color(0xFF64748B);
+    const kBorder = Color(0xFFE2E8F0);
+    const kOnline = Color(0xFF22C55E);
+
     final matchedProfilesProvider = Provider.of<MatchedProfileProvider>(context);
     final chatProvider = Provider.of<ChatProvider>(context);
 
@@ -138,10 +145,10 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
 
     return Container(
       width: 280,
-      color: Colors.grey[200],
+      color: Colors.white,
       child: Column(
         children: [
-          // 🔘 Matched Profile & All Profiles Tabs
+          // ── TABS ──────────────────────────────────────────────────────
           Row(
             children: [
               _tabButton("Matched ${filteredIndices.length}", 0),
@@ -149,122 +156,125 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
             ],
           ),
 
-          // 🔍 Search Bar
+          // ── SEARCH BAR ──────────────────────────────────────────────
           Padding(
-            padding: const EdgeInsets.all(10.0),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: "Search by name, occupation...",
-                prefixIcon: Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20),
-                  borderSide: BorderSide.none,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: SizedBox(
+              height: 38,
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: "Search by name, occupation...",
+                  hintStyle: const TextStyle(fontSize: 12, color: kMuted),
+                  prefixIcon: const Icon(Icons.search, size: 18, color: kMuted),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: const BorderSide(color: kBorder, width: 1),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: const BorderSide(color: kBorder, width: 1),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(20),
+                    borderSide: const BorderSide(color: kPrimary, width: 1),
+                  ),
+                  filled: true,
+                  fillColor: const Color(0xFFF8FAFC),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                  isDense: true,
                 ),
-                filled: true,
-                fillColor: Colors.white,
               ),
             ),
           ),
 
-          // 📂 Filters Toggle Button
-          ListTile(
-            leading: Icon(Icons.filter_list),
-            title: Text("Filters"),
-            trailing: Icon(_showFilters ? Icons.expand_less : Icons.expand_more),
-            onTap: () {
-              setState(() {
-                _showFilters = !_showFilters;
-              });
-            },
+          // ── FILTERS TOGGLE ──────────────────────────────────────────
+          InkWell(
+            onTap: () => setState(() => _showFilters = !_showFilters),
+            child: Container(
+              height: 40,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  const Icon(Icons.tune, size: 16, color: kMuted),
+                  const SizedBox(width: 8),
+                  const Text("Filters", style: TextStyle(fontSize: 12, color: kMuted)),
+                  const Spacer(),
+                  Icon(
+                    _showFilters ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                    size: 18,
+                    color: kMuted,
+                  ),
+                ],
+              ),
+            ),
           ),
 
-          // 📌 Collapsible Filters
+          // ── COLLAPSIBLE FILTERS ─────────────────────────────────────
           if (_showFilters)
             Container(
-              padding: EdgeInsets.all(10),
-              color: Colors.white,
+              padding: const EdgeInsets.all(12),
+              color: const Color(0xFFF8FAFC),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text("Member Status", style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text("Member Status", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kMuted)),
+                  const SizedBox(height: 4),
                   DropdownButton<String>(
                     value: _memberStatus,
                     isExpanded: true,
+                    style: const TextStyle(fontSize: 12, color: kText),
                     items: ["All Members", "Paid Members", "Unpaid Members"]
                         .map((status) => DropdownMenuItem(value: status, child: Text(status)))
                         .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _memberStatus = value!;
-                      });
-                    },
+                    onChanged: (value) => setState(() => _memberStatus = value!),
                   ),
-                  SizedBox(height: 10),
-                  Text("Online Status", style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  const Text("Online Status", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kMuted)),
+                  const SizedBox(height: 4),
                   DropdownButton<String>(
                     value: _onlineStatus,
                     isExpanded: true,
+                    style: const TextStyle(fontSize: 12, color: kText),
                     items: ["All Profiles", "Online Members", "Offline Members"]
                         .map((status) => DropdownMenuItem(value: status, child: Text(status)))
                         .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _onlineStatus = value!;
-                      });
-                    },
+                    onChanged: (value) => setState(() => _onlineStatus = value!),
                   ),
-                  SizedBox(height: 10),
-                  Text("Sort By", style: TextStyle(fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 8),
+                  const Text("Sort By", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kMuted)),
+                  const SizedBox(height: 4),
                   DropdownButton<String>(
                     value: _sortBy,
                     isExpanded: true,
+                    style: const TextStyle(fontSize: 12, color: kText),
                     items: ["Match %", "Name", "Age", "Recently Active", "Recently Shared"]
                         .map((sort) => DropdownMenuItem(value: sort, child: Text(sort)))
                         .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        _sortBy = value!;
-                      });
-                    },
+                    onChanged: (value) => setState(() => _sortBy = value!),
                   ),
-                  SizedBox(height: 10),
-                  // Active filters summary
                   if (_memberStatus != "All Members" || _onlineStatus != "All Profiles")
-                    Container(
-                      padding: EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.blue.shade50,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.info, size: 16, color: Colors.blue),
-                          SizedBox(width: 4),
-                          Expanded(
-                            child: Text(
-                              '${filteredIndices.length} profiles match your filters',
-                              style: TextStyle(fontSize: 12),
-                            ),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _memberStatus = "All Members";
-                                _onlineStatus = "All Profiles";
-                                _sortBy = "Match %";
-                              });
-                            },
-                            child: Text('Clear', style: TextStyle(fontSize: 10)),
-                          ),
-                        ],
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () => setState(() {
+                          _memberStatus = "All Members";
+                          _onlineStatus = "All Profiles";
+                          _sortBy = "Match %";
+                        }),
+                        style: TextButton.styleFrom(
+                          foregroundColor: kPrimary,
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          minimumSize: Size.zero,
+                        ),
+                        child: const Text('Clear filters', style: TextStyle(fontSize: 11)),
                       ),
                     ),
                 ],
               ),
             ),
 
-          // 📊 Shared Profiles Counter for current user
+          // ── SHARED STATS ─────────────────────────────────────────────
           StreamBuilder<QuerySnapshot>(
             stream: _firestore
                 .collection('profile_shares')
@@ -276,12 +286,12 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
               int uniqueProfiles = _sharedProfileIds.length;
 
               return Container(
-                padding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.blue.shade200),
+                  color: const Color(0xFFF0FDF4),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFBBF7D0)),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -290,18 +300,14 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
                       icon: Icons.share,
                       value: sharedCount.toString(),
                       label: 'Total Shares',
-                      color: Colors.blue,
+                      color: const Color(0xFF16A34A),
                     ),
-                    Container(
-                      width: 1,
-                      height: 30,
-                      color: Colors.blue.shade200,
-                    ),
+                    Container(width: 1, height: 28, color: const Color(0xFFBBF7D0)),
                     _buildStatItem(
                       icon: Icons.people,
                       value: uniqueProfiles.toString(),
                       label: 'Unique Profiles',
-                      color: Colors.green,
+                      color: const Color(0xFF0284C7),
                     ),
                   ],
                 ),
@@ -309,7 +315,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
             },
           ),
 
-          // 🔄 Recently Shared Profiles Horizontal List for current user
+          // ── RECENTLY SHARED ───────────────────────────────────────────
           StreamBuilder<QuerySnapshot>(
             stream: _firestore
                 .collection('profile_shares')
@@ -319,31 +325,26 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
                 .limit(5)
                 .snapshots(),
             builder: (context, snapshot) {
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                return SizedBox.shrink();
-              }
+              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) return const SizedBox.shrink();
 
               return Container(
                 height: 60,
-                margin: EdgeInsets.symmetric(vertical: 4),
+                margin: const EdgeInsets.symmetric(vertical: 4),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 10),
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Text(
                         'Recently Shared with ${chatProvider.namee ?? "User"}',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.grey[700],
-                        ),
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kMuted),
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Expanded(
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
                         itemCount: snapshot.data!.docs.length,
                         itemBuilder: (context, index) {
                           var share = snapshot.data!.docs[index].data() as Map<String, dynamic>;
@@ -351,58 +352,35 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
                           int shareCount = _sharedProfilesData[profileId]?['share_count'] ?? 1;
 
                           return Container(
-                            margin: EdgeInsets.symmetric(horizontal: 4),
-                            padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            margin: const EdgeInsets.only(right: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(
-                              color: Colors.blue.shade50,
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.blue.shade200),
+                              color: const Color(0xFFF0FDF4),
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: const Color(0xFFBBF7D0)),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.share, size: 12, color: Colors.blue),
-                                SizedBox(width: 4),
+                                const Icon(Icons.share, size: 10, color: Color(0xFF16A34A)),
+                                const SizedBox(width: 4),
                                 Text(
                                   share['profile_name'] ?? 'Profile',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w500,
-                                  ),
+                                  style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500),
                                 ),
                                 if (shareCount > 1)
                                   Container(
-                                    margin: EdgeInsets.only(left: 4),
-                                    padding: EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                    margin: const EdgeInsets.only(left: 4),
+                                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                                     decoration: BoxDecoration(
                                       color: Colors.orange,
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     child: Text(
                                       '$shareCount',
-                                      style: TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 7,
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                                      style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.w700),
                                     ),
                                   ),
-                                SizedBox(width: 4),
-                                Container(
-                                  padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green,
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Text(
-                                    'Shared',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 7,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                ),
                               ],
                             ),
                           );
@@ -415,12 +393,14 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
             },
           ),
 
-          // 📜 Profile List
+          Container(height: 1, color: kBorder),
+
+          // ── PROFILE LIST ─────────────────────────────────────────────
           Expanded(
             child: Consumer<MatchedProfileProvider>(
               builder: (context, provider, child) {
                 if (provider.isloading) {
-                  return Center(child: CircularProgressIndicator());
+                  return const Center(child: CircularProgressIndicator(color: kPrimary));
                 }
 
                 List<int> filteredIndices = _filterProfiles(provider);
@@ -431,23 +411,19 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(Icons.person_off, size: 48, color: Colors.grey),
-                        SizedBox(height: 10),
-                        Text(
-                          'No profiles found',
-                          style: TextStyle(color: Colors.grey),
-                        ),
+                        Icon(Icons.person_off, size: 40, color: Colors.grey[300]),
+                        const SizedBox(height: 10),
+                        const Text('No profiles found', style: TextStyle(color: kMuted, fontSize: 13)),
                         if (_memberStatus != "All Members" || _onlineStatus != "All Profiles" || _searchQuery.isNotEmpty)
                           TextButton(
-                            onPressed: () {
-                              setState(() {
-                                _memberStatus = "All Members";
-                                _onlineStatus = "All Profiles";
-                                _sortBy = "Match %";
-                                _searchController.clear();
-                              });
-                            },
-                            child: Text('Clear filters'),
+                            style: TextButton.styleFrom(foregroundColor: kPrimary),
+                            onPressed: () => setState(() {
+                              _memberStatus = "All Members";
+                              _onlineStatus = "All Profiles";
+                              _sortBy = "Match %";
+                              _searchController.clear();
+                            }),
+                            child: const Text('Clear filters', style: TextStyle(fontSize: 12)),
                           ),
                       ],
                     ),
@@ -456,6 +432,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
 
                 return ListView.builder(
                   itemCount: filteredIndices.length,
+                  padding: const EdgeInsets.only(bottom: 8),
                   itemBuilder: (context, index) {
                     final profileIndex = filteredIndices[index];
                     bool isPaid = provider.isPaidList[profileIndex];
@@ -469,254 +446,256 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
                         ? provider.profilePictures[profileIndex]
                         : null;
 
-                    return Card(
-                      margin: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      elevation: isShared ? 2 : 1,
-                      child: Container(
-                        decoration: isShared ? BoxDecoration(
-                          border: Border(
-                            left: BorderSide(color: Colors.green, width: 3),
+                    return Container(
+                      margin: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border(
+                          left: BorderSide(
+                            color: isShared ? const Color(0xFF22C55E) : Colors.transparent,
+                            width: 3,
                           ),
-                        ) : null,
-                        child: ListTile(
-                          contentPadding: EdgeInsets.all(8),
-                          leading: Stack(
-                            children: [
-                              CircleAvatar(
-                                radius: 28,
-                                backgroundColor: Colors.grey[300],
-                                backgroundImage: profilePicture != null && profilePicture.isNotEmpty
-                                    ? NetworkImage(profilePicture)
-                                    : null,
-                                child: profilePicture == null || profilePicture.isEmpty
-                                    ? Icon(Icons.person, size: 30, color: Colors.grey[700])
-                                    : null,
-                              ),
-                              // Online/Offline indicator
-                              Positioned(
-                                bottom: 0,
-                                right: 0,
-                                child: Container(
-                                  width: 14,
-                                  height: 14,
-                                  decoration: BoxDecoration(
-                                    color: isOnline ? Colors.green : Colors.grey,
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: Colors.white, width: 2),
-                                  ),
+                          right: BorderSide(color: kBorder),
+                          top: BorderSide(color: kBorder),
+                          bottom: BorderSide(color: kBorder),
+                        ),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(10),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            // ── AVATAR ──
+                            Stack(
+                              children: [
+                                CircleAvatar(
+                                  radius: 24,
+                                  backgroundColor: const Color(0xFFF1F5F9),
+                                  backgroundImage: profilePicture != null && profilePicture.isNotEmpty
+                                      ? NetworkImage(profilePicture)
+                                      : null,
+                                  child: profilePicture == null || profilePicture.isEmpty
+                                      ? Icon(Icons.person, size: 24, color: Colors.grey[400])
+                                      : null,
                                 ),
-                              ),
-                              // Paid member badge
-                              if (isPaid)
                                 Positioned(
-                                  top: 0,
-                                  left: 0,
+                                  bottom: 0,
+                                  right: 0,
                                   child: Container(
-                                    width: 20,
-                                    height: 20,
+                                    width: 12,
+                                    height: 12,
                                     decoration: BoxDecoration(
-                                      color: Colors.amber,
+                                      color: isOnline ? kOnline : const Color(0xFFCBD5E1),
                                       shape: BoxShape.circle,
                                       border: Border.all(color: Colors.white, width: 2),
                                     ),
-                                    child: Icon(
-                                      Icons.star,
-                                      size: 12,
-                                      color: Colors.white,
-                                    ),
                                   ),
                                 ),
-                            ],
-                          ),
-                          title: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      "${provider.firstNames[profileIndex]} ${provider.lastNames[profileIndex]}",
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                        color: isPaid ? Colors.amber[800] : null,
+                                if (isPaid)
+                                  Positioned(
+                                    top: 0,
+                                    left: 0,
+                                    child: Container(
+                                      width: 16,
+                                      height: 16,
+                                      decoration: BoxDecoration(
+                                        color: Colors.amber,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(color: Colors.white, width: 1.5),
                                       ),
-                                      overflow: TextOverflow.ellipsis,
+                                      child: const Icon(Icons.star, size: 9, color: Colors.white),
                                     ),
                                   ),
-                                  Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: isPaid ? Colors.pink : Colors.blue,
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Text(
-                                      isPaid ? "Paid" : "Free",
-                                      style: TextStyle(color: Colors.white, fontSize: 10),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              // Shared badge with count and time
-                              if (isShared)
-                                Padding(
-                                  padding: const EdgeInsets.only(top: 2),
-                                  child: Row(
+                              ],
+                            ),
+                            const SizedBox(width: 10),
+
+                            // ── CONTENT ──
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
                                     children: [
+                                      Expanded(
+                                        child: Text(
+                                          "${provider.firstNames[profileIndex]} ${provider.lastNames[profileIndex]}",
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 13,
+                                            color: isPaid ? kPrimary : kText,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
                                       Container(
-                                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                                         decoration: BoxDecoration(
-                                          color: Colors.green.shade50,
-                                          borderRadius: BorderRadius.circular(10),
-                                          border: Border.all(color: Colors.green.shade200),
+                                          color: isPaid ? kPrimaryLight : const Color(0xFFEFF6FF),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          isPaid ? "Paid" : "Free",
+                                          style: TextStyle(
+                                            color: isPaid ? kPrimary : const Color(0xFF2563EB),
+                                            fontSize: 9,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (isShared) ...[
+                                    const SizedBox(height: 2),
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                          decoration: BoxDecoration(
+                                            color: const Color(0xFFF0FDF4),
+                                            borderRadius: BorderRadius.circular(8),
+                                            border: Border.all(color: const Color(0xFFBBF7D0)),
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              const Icon(Icons.check_circle, color: Color(0xFF22C55E), size: 9),
+                                              const SizedBox(width: 2),
+                                              Text(
+                                                'Shared${shareCount > 1 ? ' ×$shareCount' : ''}',
+                                                style: const TextStyle(
+                                                  color: Color(0xFF16A34A),
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w600,
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        if (lastShareTime != null) ...[
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            _getTimeAgo(lastShareTime),
+                                            style: const TextStyle(fontSize: 9, color: kMuted),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ],
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.work_outline, size: 11, color: kMuted),
+                                      const SizedBox(width: 3),
+                                      Expanded(
+                                        child: Text(
+                                          provider.occupation[profileIndex],
+                                          style: const TextStyle(fontSize: 11, color: kMuted),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.cake_outlined, size: 11, color: kMuted),
+                                      const SizedBox(width: 2),
+                                      Text('${provider.age[profileIndex]}y', style: const TextStyle(fontSize: 11, color: kMuted)),
+                                      const SizedBox(width: 8),
+                                      const Icon(Icons.wc, size: 11, color: kMuted),
+                                      const SizedBox(width: 2),
+                                      Text(provider.gender[profileIndex], style: const TextStyle(fontSize: 11, color: kMuted)),
+                                    ],
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    children: [
+                                      const Icon(Icons.badge_outlined, size: 11, color: kMuted),
+                                      const SizedBox(width: 2),
+                                      Expanded(
+                                        child: Text(
+                                          "ID: ${provider.memberiddd[profileIndex]}",
+                                          style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w500, color: kMuted),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: kPrimaryLight,
+                                          borderRadius: BorderRadius.circular(8),
                                         ),
                                         child: Row(
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
-                                            Icon(Icons.check_circle, color: Colors.green, size: 10),
-                                            SizedBox(width: 2),
+                                            const Icon(Icons.favorite, color: kPrimary, size: 10),
+                                            const SizedBox(width: 2),
                                             Text(
-                                              'Shared ${shareCount > 1 ? '$shareCount times' : ''}',
-                                              style: TextStyle(
-                                                color: Colors.green.shade700,
-                                                fontSize: 8,
-                                                fontWeight: FontWeight.bold,
+                                              "${provider.matchingPercentages[profileIndex]}%",
+                                              style: const TextStyle(
+                                                color: kPrimary,
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w700,
                                               ),
                                             ),
                                           ],
                                         ),
                                       ),
-                                      if (lastShareTime != null)
-                                        Padding(
-                                          padding: const EdgeInsets.only(left: 4),
-                                          child: Text(
-                                            _getTimeAgo(lastShareTime),
-                                            style: TextStyle(
-                                              fontSize: 8,
-                                              color: Colors.grey[500],
-                                            ),
-                                          ),
-                                        ),
                                     ],
                                   ),
-                                ),
-                            ],
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(Icons.work, size: 12, color: Colors.grey),
-                                  SizedBox(width: 2),
-                                  Expanded(
-                                    child: Text(
-                                      provider.occupation[profileIndex],
-                                      style: TextStyle(color: Colors.grey[600], fontSize: 11),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Row(
-                                children: [
-                                  Icon(Icons.cake, size: 12, color: Colors.grey),
-                                  SizedBox(width: 2),
-                                  Text(
-                                    'Age: ${provider.age[profileIndex]}',
-                                    style: TextStyle(fontSize: 11),
-                                  ),
-                                  SizedBox(width: 8),
-                                  Icon(Icons.wc, size: 12, color: Colors.grey),
-                                  SizedBox(width: 2),
-                                  Text(
-                                    provider.gender[profileIndex],
-                                    style: TextStyle(fontSize: 11),
-                                  ),
-                                ],
-                              ),
-                              Row(
-                                children: [
-                                  Icon(Icons.badge, size: 12, color: Colors.grey),
-                                  SizedBox(width: 2),
-                                  Expanded(
-                                    child: Text(
-                                      "ID: ${provider.memberiddd[profileIndex]}",
-                                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold),
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  Spacer(),
-                                  Container(
-                                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Colors.red.shade50,
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(Icons.favorite, color: Colors.red, size: 12),
-                                        SizedBox(width: 2),
-                                        Text(
-                                          "${provider.matchingPercentages[profileIndex]}%",
-                                          style: TextStyle(
-                                            color: Colors.red,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.bold,
-                                          ),
+                                  const SizedBox(height: 4),
+                                  Row(
+                                    mainAxisAlignment: MainAxisAlignment.end,
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.favorite_border, color: kPrimary, size: 16),
+                                        onPressed: () {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('Liked ${provider.firstNames[profileIndex]}'),
+                                              duration: const Duration(seconds: 1),
+                                            ),
+                                          );
+                                        },
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                      ),
+                                      const SizedBox(width: 4),
+                                      IconButton(
+                                        icon: Icon(
+                                          Icons.share,
+                                          color: isShared ? const Color(0xFF22C55E) : const Color(0xFF2563EB),
+                                          size: 16,
                                         ),
-                                      ],
-                                    ),
+                                        onPressed: isShared
+                                            ? null
+                                            : () {
+                                                _sendMessage(
+                                                  provider.lastNames[profileIndex],
+                                                  provider.matchingPercentages[profileIndex].toString(),
+                                                  provider.memberiddd[profileIndex].toString(),
+                                                  provider.gender[profileIndex],
+                                                  provider.occupation[profileIndex],
+                                                  provider.education[profileIndex],
+                                                  provider.marit[profileIndex],
+                                                  provider.age[profileIndex].toString(),
+                                                  provider.ids[profileIndex],
+                                                  provider.firstNames[profileIndex],
+                                                  provider.lastNames[profileIndex],
+                                                  profilePicture,
+                                                ).then((_) => _loadSharedProfilesForUser());
+                                              },
+                                        padding: EdgeInsets.zero,
+                                        constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
-                              SizedBox(height: 4),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  IconButton(
-                                    icon: Icon(Icons.favorite_border, color: Colors.red, size: 18),
-                                    onPressed: () {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('Liked ${provider.firstNames[profileIndex]}'),
-                                          duration: Duration(seconds: 1),
-                                        ),
-                                      );
-                                    },
-                                    padding: EdgeInsets.zero,
-                                    constraints: BoxConstraints(),
-                                  ),
-                                  SizedBox(width: 8),
-                                  IconButton(
-                                    icon: Icon(Icons.share, color: Colors.blue, size: 18),
-                                    onPressed: isShared ? null : () {
-                                      _sendMessage(
-                                        provider.lastNames[profileIndex],
-                                        provider.matchingPercentages[profileIndex].toString(),
-                                        provider.memberiddd[profileIndex].toString(),
-                                        provider.gender[profileIndex],
-                                        provider.occupation[profileIndex],
-                                        provider.education[profileIndex],
-                                        provider.marit[profileIndex],
-                                        provider.age[profileIndex].toString(),
-                                        provider.ids[profileIndex],
-                                        provider.firstNames[profileIndex],
-                                        provider.lastNames[profileIndex],
-                                        profilePicture,
-                                      ).then((_) {
-                                        // Reload shared profiles after sharing
-                                        _loadSharedProfilesForUser();
-                                      });
-                                    },
-                                    padding: EdgeInsets.zero,
-                                    constraints: BoxConstraints(),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     );
@@ -961,17 +940,21 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
   }
 
   Widget _tabButton(String title, int index) {
+    const kPrimary = Color(0xFFD81B60);
+    const kMuted = Color(0xFF64748B);
+    final isSelected = widget.selectedTab == index;
+
     return Expanded(
       child: GestureDetector(
         onTap: () => widget.onTabChange(index),
         child: Container(
-          padding: EdgeInsets.all(12),
+          height: 44,
           decoration: BoxDecoration(
-            color: widget.selectedTab == index ? Colors.pink : Colors.white,
+            color: Colors.white,
             border: Border(
               bottom: BorderSide(
-                color: widget.selectedTab == index ? Colors.pink : Colors.grey.shade300,
-                width: 2,
+                color: isSelected ? kPrimary : const Color(0xFFE2E8F0),
+                width: isSelected ? 2 : 1,
               ),
             ),
           ),
@@ -979,9 +962,9 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
           child: Text(
             title,
             style: TextStyle(
-              color: widget.selectedTab == index ? Colors.white : Colors.black,
-              fontWeight: FontWeight.bold,
-              fontSize: 13,
+              color: isSelected ? kPrimary : kMuted,
+              fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              fontSize: 12,
             ),
           ),
         ),

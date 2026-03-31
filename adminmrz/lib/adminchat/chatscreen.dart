@@ -37,12 +37,14 @@ class _ChatScreenState extends State<ChatScreen> {
     final chatProvider = Provider.of<ChatProvider>(context);
 
     return Scaffold(
+      backgroundColor: const Color(0xFFF0F2F5),
       body: Row(
         children: [
           ChatSidebar(), // Left Sidebar
-          // Text(users),
+          Container(width: 1, color: const Color(0xFFE2E8F0)),
           Expanded(
               child: ChatWindow(name: 'select user to chat', isOnline: true, receiverIdd: 903,)), // Center Chat Window
+          Container(width: 1, color: const Color(0xFFE2E8F0)),
           ProfileSidebar(
             selectedTab: selectedTab,
             onTabChange: (index) {
