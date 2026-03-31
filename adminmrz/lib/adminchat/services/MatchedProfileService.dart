@@ -172,6 +172,52 @@ class MatchedProfileProvider with ChangeNotifier {
     return '${_matchedProfiles[index].firstName} ${_matchedProfiles[index].lastName}';
   }
 
+  // Lightweight refresh: re-fetch current profiles and update only isOnline field
+  Future<void> refreshOnlineStatuses() async {
+    if (_currentUserId == null || _matchedProfiles.isEmpty) return;
+
+    try {
+      final response = await http.post(
+        Uri.parse('https://digitallami.com/match_admin.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'user_id': _currentUserId,
+          'page': 1,
+          'per_page': _matchedProfiles.length.clamp(_perPage, 100),
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final list = data['data'] as List? ?? [];
+
+        // Build a lookup map: id -> isOnline
+        final Map<int, bool> onlineMap = {
+          for (var item in list)
+            (item['id'] ?? 0) as int: (item['is_online'] ?? false) as bool,
+        };
+
+        // Update only isOnline without disturbing order or other fields
+        bool changed = false;
+        final updated = _matchedProfiles.map((profile) {
+          final newStatus = onlineMap[profile.id];
+          if (newStatus != null && newStatus != profile.isOnline) {
+            changed = true;
+            return profile.copyWith(isOnline: newStatus);
+          }
+          return profile;
+        }).toList();
+
+        if (changed) {
+          _matchedProfiles = updated;
+          notifyListeners();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error refreshing online statuses: $e');
+    }
+  }
+
   void clearData() {
     _matchedProfiles.clear();
     _name = '';

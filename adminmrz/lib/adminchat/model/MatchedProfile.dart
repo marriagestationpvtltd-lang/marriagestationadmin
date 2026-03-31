@@ -31,6 +31,25 @@ class MatchedProfile {
     required this.profilePicture, // Add this
   });
 
+  MatchedProfile copyWith({bool? isOnline}) {
+    return MatchedProfile(
+      id: id,
+      firstName: firstName,
+      lastName: lastName,
+      memberid: memberid,
+      matchingPercentage: matchingPercentage,
+      isPaid: isPaid,
+      isOnline: isOnline ?? this.isOnline,
+      occupation: occupation,
+      education: education,
+      country: country,
+      marit: marit,
+      gender: gender,
+      age: age,
+      profilePicture: profilePicture,
+    );
+  }
+
   factory MatchedProfile.fromJson(Map<String, dynamic> json) {
     return MatchedProfile(
       id: json['id'] ?? 0,

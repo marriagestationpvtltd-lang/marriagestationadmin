@@ -42,12 +42,18 @@ class _ChatSidebarState extends State<ChatSidebar> {
   bool _isInitialLoading = true;
   final ScrollController _scrollController = ScrollController();
   Timer? _searchDebounce;
+  Timer? _onlineStatusTimer;
 
   @override
   void initState() {
     super.initState();
     _scrollController.addListener(_onScroll);
     fetchUsers(reset: true);
+    // Poll online status every 30 seconds so the list updates live
+    _onlineStatusTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) => _refreshOnlineStatus(),
+    );
   }
 
   @override
@@ -55,6 +61,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
     _conversationSub?.cancel();
     _scrollController.dispose();
     _searchDebounce?.cancel();
+    _onlineStatusTimer?.cancel();
     super.dispose();
   }
 
@@ -153,6 +160,57 @@ class _ChatSidebarState extends State<ChatSidebar> {
         !_isLoadingMore &&
         _hasMore) {
       fetchUsers();
+    }
+  }
+
+  // Lightweight poll: fetch a large page and update only is_online / last_seen_text
+  Future<void> _refreshOnlineStatus() async {
+    if (_users.isEmpty || !mounted) return;
+    try {
+      final uri = Uri.parse('https://digitallami.com/get.php').replace(
+        queryParameters: {
+          'page': '1',
+          'limit': _users.length.toString(),
+        },
+      );
+      final response = await http.get(uri);
+      if (response.statusCode == 200) {
+        final jsonResponse = jsonDecode(response.body);
+        final List<dynamic> freshList =
+            (jsonResponse["data"] as List?) ?? [];
+
+        // Build lookup: id -> {is_online, last_seen_text}
+        final Map<String, Map<String, dynamic>> freshMap = {
+          for (var u in freshList)
+            u['id'].toString(): {
+              'is_online': u['is_online'] ?? false,
+              'last_seen_text': u['last_seen_text']?.toString() ?? '',
+            },
+        };
+
+        bool changed = false;
+        for (int i = 0; i < _users.length; i++) {
+          final userId = _users[i]['id']?.toString();
+          if (userId == null) continue;
+          final fresh = freshMap[userId];
+          if (fresh == null) continue;
+          if (_users[i]['is_online'] != fresh['is_online'] ||
+              _users[i]['last_seen_text'] != fresh['last_seen_text']) {
+            _users[i] = {
+              ..._users[i] as Map<String, dynamic>,
+              'is_online': fresh['is_online'],
+              'last_seen_text': fresh['last_seen_text'],
+            };
+            changed = true;
+          }
+        }
+
+        if (changed && mounted) {
+          _applyFilters();
+        }
+      }
+    } catch (e) {
+      debugPrint('Error refreshing online status: $e');
     }
   }
 
