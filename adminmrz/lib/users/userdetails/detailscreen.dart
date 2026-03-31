@@ -373,12 +373,12 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
                       runSpacing: 4,
                       children: [
                         if (p.age != null)
-                          _metaChip(Icons.cake, '\${p.age} yrs', Colors.blue.shade700),
+                          _metaChip(Icons.cake, '${p.age} yrs', Colors.blue.shade700),
                         _metaChip(Icons.location_on, p.city, Colors.blue.shade700),
                         if (p.country != 'Not available')
                           _metaChip(Icons.public, p.country, Colors.teal.shade700),
                         _metaChip(Icons.favorite, p.maritalStatusName, Colors.pink.shade600),
-                        _metaChip(Icons.badge, 'ID: \${p.memberId}', Colors.grey.shade600),
+                        _metaChip(Icons.badge, 'ID: ${p.memberId}', Colors.grey.shade600),
                       ],
                     ),
                     const SizedBox(height: 12),
