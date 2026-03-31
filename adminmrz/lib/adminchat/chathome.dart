@@ -65,6 +65,13 @@ class _ChatWindowState extends State<ChatWindow> {
   String _selectedLanguage = 'en-US'; // 'en-US' or 'ne-NP'
   String _textBeforeVoice = ''; // text already in field before listening started
 
+  // Pagination
+  static const int _pageSize = 20;
+  int _currentLimit = 20;
+  bool _isLoadingMore = false;
+  bool _hasMoreMessages = true;
+  int? _prevUserId;
+
   // Match-related data
   Map<String, dynamic>? _matchDetails;
   bool _isLoadingMatchDetails = false;
@@ -79,6 +86,7 @@ class _ChatWindowState extends State<ChatWindow> {
     _initializeWebSpeech();
     _initializeRecorder();
     _fetchMatchDetails();
+    _scrollController.addListener(_onScrollForPagination);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FocusScope.of(context).requestFocus(_messageFocusNode);
     });
@@ -748,6 +756,13 @@ class _ChatWindowState extends State<ChatWindow> {
 
                 if (snapshot.hasData) {
                   _lastSnapshot = snapshot.data;
+                  // If we received fewer docs than requested, there are no older messages.
+                  final bool noMore = snapshot.data!.docs.length < _currentLimit;
+                  if (noMore != !_hasMoreMessages) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) setState(() => _hasMoreMessages = !noMore);
+                    });
+                  }
                 }
 
                 if (messages.isEmpty) {
@@ -772,13 +787,42 @@ class _ChatWindowState extends State<ChatWindow> {
                 }
 
                 final itemCount = messages.length;
+                // Extra slot at the end of the reversed list (= visual top) for the
+                // load-more indicator.
+                final listItemCount = itemCount + (_hasMoreMessages || _isLoadingMore ? 1 : 0);
 
                 return ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
                   reverse: true,
-                  itemCount: itemCount,
+                  itemCount: listItemCount,
                   itemBuilder: (context, index) {
+                    // The last item in the reversed list is the oldest-message indicator.
+                    if (index == itemCount) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Center(
+                          child: _isLoadingMore
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: kPrimary,
+                                  ),
+                                )
+                              : TextButton.icon(
+                                  onPressed: _loadMoreMessages,
+                                  icon: const Icon(Icons.history, size: 14, color: kPrimary),
+                                  label: const Text(
+                                    'Load older messages',
+                                    style: TextStyle(fontSize: 12, color: kPrimary),
+                                  ),
+                                ),
+                        ),
+                      );
+                    }
+
                     var doc = messages[index];
                     var data = doc.data() as Map<String, dynamic>;
                     bool isSentByMe = data['senderid'] == senderId.toString();
