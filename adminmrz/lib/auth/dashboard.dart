@@ -2,6 +2,7 @@ import 'package:adminmrz/auth/service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../adminchat/chatprovider.dart';
 import '../adminchat/loading.dart';
 import '../dashboard/dashboardhome.dart';
 import '../document/screens/docscreen.dart';
@@ -40,14 +41,30 @@ class _DashboardPageState extends State<DashboardPage> {
   int _selectedIndex = 0;
   bool _isSidebarExpanded = true;
 
-  final List<Widget> _pages = [
-    const DashboardHome(),
-    const UsersPage(),
-    const DocumentsPage(),
-    const PackagesPage(),
-    const PaymentsPage(),
-    Loading(),
-  ];
+  late final List<Widget> _pages;
+
+  @override
+  void initState() {
+    super.initState();
+    _pages = [
+      const DashboardHome(),
+      UsersPage(onOpenChat: _openChatForUser),
+      const DocumentsPage(),
+      const PackagesPage(),
+      const PaymentsPage(),
+      Loading(),
+    ];
+  }
+
+  /// Navigate to the Chat tab and pre-select [userId] so the conversation
+  /// opens immediately — mirroring how the chat sidebar selects a user.
+  void _openChatForUser(int userId) {
+    // Update the ChatProvider to select this user (same as chat sidebar does)
+    final chatProvider = context.read<ChatProvider>();
+    chatProvider.updateidd(userId);
+    // Switch to Chat tab (index 5)
+    setState(() => _selectedIndex = 5);
+  }
 
   static const List<_NavItem> _navItems = [
     _NavItem(icon: Icons.grid_view_rounded,   label: 'Dashboard'),
