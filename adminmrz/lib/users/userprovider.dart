@@ -15,6 +15,7 @@ class UserProvider with ChangeNotifier {
   String _searchQuery = '';
   String _statusFilter = 'all';
   String _userTypeFilter = 'all';
+  String _genderFilter = 'all';
   bool _isSelectAll = false;
 
   // Getters
@@ -27,6 +28,7 @@ class UserProvider with ChangeNotifier {
   String get searchQuery => _searchQuery;
   String get statusFilter => _statusFilter;
   String get userTypeFilter => _userTypeFilter;
+  String get genderFilter => _genderFilter;
   Set<int> get selectedUserIds => _selectedUserIds;
   bool get isSelectAll => _isSelectAll;
   int get selectedCount => _selectedUserIds.length;
@@ -203,6 +205,11 @@ class UserProvider with ChangeNotifier {
     _applyFilters();
   }
 
+  void setGenderFilter(String gender) {
+    _genderFilter = gender;
+    _applyFilters();
+  }
+
   void _applyFilters() {
     List<User> filtered = List<User>.from(_allUsers);
 
@@ -225,6 +232,11 @@ class UserProvider with ChangeNotifier {
       filtered = filtered.where((user) => user.usertype == _userTypeFilter).toList();
     }
 
+    // Apply gender filter
+    if (_genderFilter != 'all') {
+      filtered = filtered.where((user) => user.gender == _genderFilter).toList();
+    }
+
     _filteredUsers = filtered;
     notifyListeners();
   }
@@ -233,6 +245,7 @@ class UserProvider with ChangeNotifier {
     _searchQuery = '';
     _statusFilter = 'all';
     _userTypeFilter = 'all';
+    _genderFilter = 'all';
     _applyFilters();
   }
 
