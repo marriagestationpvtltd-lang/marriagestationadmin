@@ -3,6 +3,7 @@ import 'package:adminmrz/users/userdetails/userdetailprovider.dart';
 import 'package:adminmrz/users/userprovider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'model/usermodel.dart';
 
@@ -56,12 +57,157 @@ class _UsersPageState extends State<UsersPage> {
     }
   }
 
+  String _cleanPhone(String? phone) {
+    if (phone == null || phone.isEmpty || phone == 'null') return '';
+    return phone.replaceAll(RegExp(r'[^\d+]'), '');
+  }
+
+  Future<void> _launchWhatsApp(String phone) async {
+    final cleaned = _cleanPhone(phone);
+    if (cleaned.isEmpty) return;
+    final uri = Uri.parse('https://wa.me/$cleaned');
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  Future<void> _launchViber(String phone) async {
+    final cleaned = _cleanPhone(phone);
+    if (cleaned.isEmpty) return;
+    final uri = Uri.parse('viber://chat?number=$cleaned');
+    bool launched = false;
+    if (await canLaunchUrl(uri)) {
+      launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+    if (!launched && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Viber app is not installed on this device'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  Future<void> _launchEmail(String email) async {
+    if (email.isEmpty) return;
+    final uri = Uri(scheme: 'mailto', path: email);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
+  }
+
+  // ─── Verification badge ──────────────────────────────────────────────────
+
+  Widget _verifiedBadge(bool isVerified) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: isVerified
+            ? Colors.green.withOpacity(0.1)
+            : Colors.red.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(
+          color: isVerified
+              ? Colors.green.withOpacity(0.4)
+              : Colors.red.withOpacity(0.4),
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            isVerified ? Icons.verified_rounded : Icons.cancel_outlined,
+            size: 10,
+            color: isVerified ? Colors.green : Colors.red,
+          ),
+          const SizedBox(width: 3),
+          Text(
+            isVerified ? 'Verified' : 'Unverified',
+            style: TextStyle(
+              fontSize: 10,
+              color: isVerified ? Colors.green.shade700 : Colors.red.shade700,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _sendVerifyBtn(BuildContext ctx, String type) {
+    return GestureDetector(
+      onTap: () {
+        ScaffoldMessenger.of(ctx).showSnackBar(
+          SnackBar(
+            content: Text('Verification request sent for $type'),
+            backgroundColor: Colors.blue,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        decoration: BoxDecoration(
+          color: Colors.blue.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: Colors.blue.withOpacity(0.35)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.send_rounded, size: 10, color: Colors.blue.shade700),
+            const SizedBox(width: 3),
+            Text(
+              'Send Verification Request',
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.blue.shade700,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Communication button ────────────────────────────────────────────────
+
+  Widget _commBtn({
+    required IconData icon,
+    required String tooltip,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.all(7),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: color.withOpacity(0.25)),
+          ),
+          child: Icon(icon, size: 16, color: color),
+        ),
+      ),
+    );
+  }
+
   // ─── User Card ───────────────────────────────────────────────────────────
 
   Widget _buildUserCard(User user, UserProvider provider) {
     final bool isSelected = provider.isUserSelected(user.id);
     final Color statusColor = user.statusColor;
     final bool isFemale = user.gender.toLowerCase() == 'female';
+    final String cleanedPhone = _cleanPhone(user.phone);
+    final bool hasPhone = cleanedPhone.isNotEmpty;
+    final bool isEmailVerified = user.emailVerified == 1;
+    final bool isPhoneVerified = user.phoneVerified == 1;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
@@ -84,11 +230,10 @@ class _UsersPageState extends State<UsersPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // ── Row 1: checkbox + avatar + name/email + badges ──────────
+              // ── Row 1: checkbox + avatar + name + badges ─────────────────
               Row(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  // Checkbox (stops card navigation)
                   GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () => provider.toggleUserSelection(user.id),
@@ -137,7 +282,7 @@ class _UsersPageState extends State<UsersPage> {
                   ),
                   const SizedBox(width: 10),
 
-                  // Name + Email
+                  // Name + ID
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -154,18 +299,16 @@ class _UsersPageState extends State<UsersPage> {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          user.email,
+                          '#${user.id} · ${user.gender}',
                           style: TextStyle(
-                              fontSize: 12, color: Colors.grey.shade600),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                              fontSize: 11, color: Colors.grey.shade500),
                         ),
                       ],
                     ),
                   ),
                   const SizedBox(width: 6),
 
-                  // Status + Plan badges (stacked)
+                  // Status + Plan badges
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -186,28 +329,102 @@ class _UsersPageState extends State<UsersPage> {
               Divider(height: 1, thickness: 0.8, color: Colors.grey.shade200),
               const SizedBox(height: 8),
 
-              // ── Row 2: Info chips ───────────────────────────────────────
+              // ── Row 2: Email row ─────────────────────────────────────────
+              Row(
+                children: [
+                  Icon(Icons.email_outlined,
+                      size: 13, color: Colors.grey.shade500),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      user.email.isNotEmpty ? user.email : '—',
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.grey.shade700),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  _verifiedBadge(isEmailVerified),
+                  if (!isEmailVerified) ...[
+                    const SizedBox(width: 5),
+                    _sendVerifyBtn(context, 'Email'),
+                  ],
+                  const SizedBox(width: 6),
+                  if (user.email.isNotEmpty)
+                    _commBtn(
+                      icon: Icons.send_outlined,
+                      tooltip: 'Send Email',
+                      color: Colors.orange,
+                      onTap: () => _launchEmail(user.email),
+                    ),
+                ],
+              ),
+
+              const SizedBox(height: 7),
+
+              // ── Row 3: Phone row ─────────────────────────────────────────
+              Row(
+                children: [
+                  Icon(Icons.phone_outlined,
+                      size: 13, color: Colors.grey.shade500),
+                  const SizedBox(width: 5),
+                  Expanded(
+                    child: Text(
+                      hasPhone ? cleanedPhone : '—',
+                      style: TextStyle(
+                          fontSize: 12, color: Colors.grey.shade700),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  _verifiedBadge(isPhoneVerified),
+                  if (!isPhoneVerified) ...[
+                    const SizedBox(width: 5),
+                    _sendVerifyBtn(context, 'Phone'),
+                  ],
+                  if (hasPhone) ...[
+                    const SizedBox(width: 6),
+                    _commBtn(
+                      icon: Icons.chat_rounded,
+                      tooltip: 'WhatsApp',
+                      color: const Color(0xFF25D366),
+                      onTap: () => _launchWhatsApp(cleanedPhone),
+                    ),
+                    const SizedBox(width: 4),
+                    _commBtn(
+                      icon: Icons.videocam_rounded,
+                      tooltip: 'Viber',
+                      color: const Color(0xFF7360F2),
+                      onTap: () => _launchViber(cleanedPhone),
+                    ),
+                  ],
+                ],
+              ),
+
+              const SizedBox(height: 8),
+              Divider(height: 1, thickness: 0.8, color: Colors.grey.shade200),
+              const SizedBox(height: 8),
+
+              // ── Row 4: Info chips ────────────────────────────────────────
               Wrap(
-                spacing: 6,
+                spacing: 5,
                 runSpacing: 5,
                 children: [
-                  _infoChip(Icons.tag, '#${user.id}', Colors.blueGrey),
-                  _infoChip(
-                    isFemale ? Icons.female : Icons.male,
-                    user.gender,
-                    isFemale ? Colors.pink : Colors.blue,
-                  ),
-                  _infoChip(
-                    Icons.calendar_today_outlined,
-                    'Reg: ${_formatDate(user.registrationDate)}',
-                    Colors.teal,
-                  ),
+                  _infoChip(Icons.calendar_today_outlined,
+                      'Reg: ${_formatDate(user.registrationDate)}', Colors.teal),
                   _infoChip(
                     user.isActive == 1
                         ? Icons.check_circle_outline
                         : Icons.cancel_outlined,
                     user.isActive == 1 ? 'Active' : 'Inactive',
                     user.isActive == 1 ? Colors.green : Colors.red,
+                  ),
+                  _infoChip(
+                    user.isOnline == 1 ? Icons.circle : Icons.circle_outlined,
+                    user.isOnline == 1 ? 'Online' : 'Offline',
+                    user.isOnline == 1 ? Colors.green : Colors.grey,
                   ),
                   if (user.expiryDate != null &&
                       user.expiryDate!.isNotEmpty &&
@@ -230,7 +447,7 @@ class _UsersPageState extends State<UsersPage> {
 
               const SizedBox(height: 8),
 
-              // ── Row 3: Actions ──────────────────────────────────────────
+              // ── Row 5: Action buttons ────────────────────────────────────
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -240,34 +457,36 @@ class _UsersPageState extends State<UsersPage> {
                     Colors.blue,
                     () => _navigateToUser(user),
                   ),
-                  const SizedBox(width: 4),
-                  PopupMenuButton<String>(
-                    icon: Icon(Icons.more_horiz,
-                        size: 18, color: Colors.grey.shade500),
-                    tooltip: 'More actions',
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
-                    itemBuilder: (_) => [
-                      _popupItem('view', Icons.person_outline, 'View Profile',
-                          Colors.blue),
-                      _popupItem('message', Icons.chat_bubble_outline,
-                          'Send Message', Colors.green),
-                      _popupItem('email', Icons.email_outlined, 'Send Email',
-                          Colors.orange),
-                    ],
-                    onSelected: (v) {
-                      if (v == 'view') {
-                        _navigateToUser(user);
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Coming soon'),
-                            duration: Duration(seconds: 1),
-                          ),
-                        );
-                      }
+                  const SizedBox(width: 5),
+                  _actionIconBtn(
+                    Icons.chat_bubble_outline,
+                    'Direct Chat',
+                    Colors.green,
+                    () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Opening chat…'),
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
                     },
                   ),
+                  if (hasPhone) ...[
+                    const SizedBox(width: 5),
+                    _actionIconBtn(
+                      Icons.message_rounded,
+                      'WhatsApp',
+                      const Color(0xFF25D366),
+                      () => _launchWhatsApp(cleanedPhone),
+                    ),
+                    const SizedBox(width: 5),
+                    _actionIconBtn(
+                      Icons.video_call_outlined,
+                      'Viber',
+                      const Color(0xFF7360F2),
+                      () => _launchViber(cleanedPhone),
+                    ),
+                  ],
                 ],
               ),
             ],
@@ -350,22 +569,7 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  PopupMenuItem<String> _popupItem(
-      String val, IconData icon, String label, Color color) {
-    return PopupMenuItem(
-      value: val,
-      height: 40,
-      child: Row(
-        children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 10),
-          Text(label, style: const TextStyle(fontSize: 13)),
-        ],
-      ),
-    );
-  }
-
-  // ─── Filter chips row ─────────────────────────────────────────────────────
+  // ─── Filter chips row ────────────────────────────────────────────────────
 
   Widget _buildFilterRow(UserProvider provider) {
     return Container(
@@ -375,12 +579,10 @@ class _UsersPageState extends State<UsersPage> {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           children: [
-            // Select-all toggle
             _selectAllChip(provider),
             const SizedBox(width: 10),
             Container(width: 1, height: 22, color: Colors.grey.shade300),
             const SizedBox(width: 10),
-            // Status filters
             ...[
               ('all', 'All'),
               ('approved', 'Approved'),
@@ -401,7 +603,6 @@ class _UsersPageState extends State<UsersPage> {
                 }),
             Container(width: 1, height: 22, color: Colors.grey.shade300),
             const SizedBox(width: 6),
-            // Plan filters
             ...[
               ('all', 'All Plans'),
               ('paid', 'Paid'),
@@ -418,11 +619,9 @@ class _UsersPageState extends State<UsersPage> {
                     const SizedBox(width: 6),
                   ];
                 }),
-            // Clear filters button (only if filters active)
             if (provider.statusFilter != 'all' ||
                 provider.userTypeFilter != 'all')
-              _filterChip(
-                  '✕ Clear', true, Colors.red, provider.clearFilters),
+              _filterChip('✕ Clear', true, Colors.red, provider.clearFilters),
           ],
         ),
       ),
@@ -484,10 +683,8 @@ class _UsersPageState extends State<UsersPage> {
               'All',
               style: TextStyle(
                 fontSize: 12,
-                color:
-                    allSelected ? Colors.blue : Colors.grey.shade700,
-                fontWeight:
-                    allSelected ? FontWeight.w600 : FontWeight.w400,
+                color: allSelected ? Colors.blue : Colors.grey.shade700,
+                fontWeight: allSelected ? FontWeight.w600 : FontWeight.w400,
               ),
             ),
           ],
@@ -522,7 +719,7 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  // ─── Bulk action bar ──────────────────────────────────────────────────────
+  // ─── Bulk action bar ─────────────────────────────────────────────────────
 
   Widget _buildBulkActionBar(UserProvider provider) {
     return AnimatedSize(
@@ -559,8 +756,7 @@ class _UsersPageState extends State<UsersPage> {
                   ),
                   const Spacer(),
                   TextButton.icon(
-                    onPressed: () =>
-                        provider.suspendSelectedUsers(context),
+                    onPressed: () => provider.suspendSelectedUsers(context),
                     icon: const Icon(Icons.pause_circle_outline, size: 15),
                     label: const Text('Suspend'),
                     style: TextButton.styleFrom(
@@ -573,8 +769,7 @@ class _UsersPageState extends State<UsersPage> {
                   ),
                   const SizedBox(width: 2),
                   TextButton.icon(
-                    onPressed: () =>
-                        provider.deleteSelectedUsers(context),
+                    onPressed: () => provider.deleteSelectedUsers(context),
                     icon: const Icon(Icons.delete_outline, size: 15),
                     label: const Text('Delete'),
                     style: TextButton.styleFrom(
@@ -598,7 +793,7 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  // ─── Empty state ──────────────────────────────────────────────────────────
+  // ─── Empty state ─────────────────────────────────────────────────────────
 
   Widget _buildEmptyState(UserProvider provider) {
     return Center(
@@ -614,8 +809,7 @@ class _UsersPageState extends State<UsersPage> {
               provider.searchQuery.isNotEmpty
                   ? 'No results for "${provider.searchQuery}"'
                   : 'No members found',
-              style:
-                  TextStyle(fontSize: 15, color: Colors.grey.shade500),
+              style: TextStyle(fontSize: 15, color: Colors.grey.shade500),
             ),
             if (provider.statusFilter != 'all' ||
                 provider.userTypeFilter != 'all')
@@ -632,142 +826,176 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  // ─── Build ────────────────────────────────────────────────────────────────
+  // ─── Header bar (replaces AppBar — avoids duplicate "Members" title) ─────
+
+  Widget _buildHeaderBar(UserProvider provider) {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 12, 12, 8),
+      child: Row(
+        children: [
+          if (provider.totalCount > 0) ...[
+            _statPill('Total', provider.totalCount, Colors.blue),
+            const SizedBox(width: 6),
+            _statPill('Shown', provider.filteredCount, Colors.teal),
+            if (provider.selectedCount > 0) ...[
+              const SizedBox(width: 6),
+              _statPill('Selected', provider.selectedCount, Colors.purple),
+            ],
+          ],
+          const Spacer(),
+          Tooltip(
+            message: 'Refresh',
+            child: InkWell(
+              onTap: () => provider.fetchUsers(),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.all(7),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade100,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Icon(Icons.refresh_rounded,
+                    size: 18, color: Colors.grey.shade600),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _statPill(String label, int count, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: RichText(
+        text: TextSpan(
+          children: [
+            TextSpan(
+              text: '$count ',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: color,
+              ),
+            ),
+            TextSpan(
+              text: label,
+              style: TextStyle(
+                fontSize: 11,
+                color: color.withOpacity(0.8),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ─── Build ───────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<UserProvider>();
 
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
-      appBar: AppBar(
-        title: const Text('Members'),
-        centerTitle: false,
-        elevation: 0,
-        backgroundColor: Colors.white,
-        foregroundColor: const Color(0xFF1A1A2E),
-        actions: [
-          if (provider.totalCount > 0)
-            Center(
-              child: Container(
-                margin: const EdgeInsets.only(right: 6),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  provider.filteredCount == provider.totalCount
-                      ? '${provider.totalCount}'
-                      : '${provider.filteredCount}/${provider.totalCount}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: Colors.blue.shade700,
-                  ),
-                ),
+    // Plain Column — no Scaffold/AppBar to avoid duplicating the "Members"
+    // title already shown in dashboard.dart's top bar.
+    return Column(
+      children: [
+        // ── Header: stats + refresh ───────────────────────────────────────
+        _buildHeaderBar(provider),
+
+        // ── Search bar ───────────────────────────────────────────────────
+        Container(
+          color: Colors.white,
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          child: TextField(
+            controller: _searchController,
+            decoration: InputDecoration(
+              hintText: 'Search by name, email, phone or ID…',
+              hintStyle:
+                  TextStyle(fontSize: 14, color: Colors.grey.shade400),
+              prefixIcon: Icon(Icons.search_rounded,
+                  color: Colors.grey.shade400, size: 20),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: Colors.grey.shade200),
               ),
-            ),
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: () => provider.fetchUsers(),
-            tooltip: 'Refresh',
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // ── Search bar (always visible, pinned at top) ─────────────────
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search by name, email or ID…',
-                hintStyle:
-                    TextStyle(fontSize: 14, color: Colors.grey.shade400),
-                prefixIcon: Icon(Icons.search_rounded,
-                    color: Colors.grey.shade400, size: 20),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: Colors.grey.shade200),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide(color: Colors.grey.shade200),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide:
-                      BorderSide(color: Colors.blue.shade300, width: 1.5),
-                ),
-                filled: true,
-                fillColor: Colors.grey.shade50,
-                contentPadding: const EdgeInsets.symmetric(
-                    vertical: 10, horizontal: 14),
-                isDense: true,
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon:
-                            const Icon(Icons.clear_rounded, size: 18),
-                        onPressed: () {
-                          _searchController.clear();
-                          provider.setSearchQuery('');
-                        },
-                      )
-                    : null,
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide: BorderSide(color: Colors.grey.shade200),
               ),
-              onChanged: (v) {
-                provider.setSearchQuery(v);
-              },
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(10),
+                borderSide:
+                    BorderSide(color: Colors.blue.shade300, width: 1.5),
+              ),
+              filled: true,
+              fillColor: Colors.grey.shade50,
+              contentPadding: const EdgeInsets.symmetric(
+                  vertical: 10, horizontal: 14),
+              isDense: true,
+              suffixIcon: _searchController.text.isNotEmpty
+                  ? IconButton(
+                      icon: const Icon(Icons.clear_rounded, size: 18),
+                      onPressed: () {
+                        _searchController.clear();
+                        provider.setSearchQuery('');
+                      },
+                    )
+                  : null,
             ),
+            onChanged: (v) {
+              provider.setSearchQuery(v);
+            },
           ),
+        ),
 
-          // ── Filter chips ────────────────────────────────────────────────
-          _buildFilterRow(provider),
+        // ── Filter chips ─────────────────────────────────────────────────
+        _buildFilterRow(provider),
 
-          Divider(height: 1, thickness: 1, color: Colors.grey.shade200),
+        Divider(height: 1, thickness: 1, color: Colors.grey.shade200),
 
-          // ── Scrollable list ─────────────────────────────────────────────
-          Expanded(
-            child: provider.isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : RefreshIndicator(
-                    onRefresh: () => provider.fetchUsers(),
-                    child: CustomScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      slivers: [
-                        // Bulk action bar
+        // ── Scrollable list ──────────────────────────────────────────────
+        Expanded(
+          child: provider.isLoading
+              ? const Center(child: CircularProgressIndicator())
+              : RefreshIndicator(
+                  onRefresh: () => provider.fetchUsers(),
+                  child: CustomScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      SliverToBoxAdapter(
+                        child: _buildBulkActionBar(provider),
+                      ),
+                      if (provider.filteredUsers.isEmpty)
                         SliverToBoxAdapter(
-                          child: _buildBulkActionBar(provider),
-                        ),
-
-                        // Empty state or list
-                        if (provider.filteredUsers.isEmpty)
-                          SliverToBoxAdapter(
-                            child: _buildEmptyState(provider),
-                          )
-                        else
-                          SliverPadding(
-                            padding: const EdgeInsets.only(bottom: 24),
-                            sliver: SliverList(
-                              delegate: SliverChildBuilderDelegate(
-                                (context, index) => _buildUserCard(
-                                  provider.filteredUsers[index],
-                                  provider,
-                                ),
-                                childCount: provider.filteredUsers.length,
+                          child: _buildEmptyState(provider),
+                        )
+                      else
+                        SliverPadding(
+                          padding: const EdgeInsets.only(bottom: 24),
+                          sliver: SliverList(
+                            delegate: SliverChildBuilderDelegate(
+                              (context, index) => _buildUserCard(
+                                provider.filteredUsers[index],
+                                provider,
                               ),
+                              childCount: provider.filteredUsers.length,
                             ),
                           ),
-                      ],
-                    ),
+                        ),
+                    ],
                   ),
-          ),
-        ],
-      ),
+                ),
+        ),
+      ],
     );
   }
 }

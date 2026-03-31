@@ -38,6 +38,9 @@ class User {
   String? registrationDate;
   String? expiryDate;
   String? paymentStatus;
+  String? phone;
+  int phoneVerified;
+  int emailVerified;
 
   User({
     required this.id,
@@ -57,6 +60,9 @@ class User {
     this.registrationDate,
     this.expiryDate,
     this.paymentStatus,
+    this.phone,
+    required this.phoneVerified,
+    required this.emailVerified,
   });
 
   factory User.fromJson(Map<String, dynamic> json) {
@@ -83,6 +89,17 @@ class User {
           json['expiryDate']?.toString(),
       paymentStatus: json['payment_status']?.toString() ??
           json['paymentStatus']?.toString(),
+      phone: json['phone']?.toString() ??
+          json['mobile']?.toString() ??
+          json['phone_number']?.toString(),
+      phoneVerified: json['phone_verified'] is int
+          ? json['phone_verified']
+          : (json['phoneVerified'] is int ? json['phoneVerified'] : 0),
+      emailVerified: json['email_verified'] is int
+          ? json['email_verified']
+          : (json['emailVerified'] is int
+              ? json['emailVerified']
+              : (json['isVerified'] is int ? json['isVerified'] : 0)),
     );
   }
 

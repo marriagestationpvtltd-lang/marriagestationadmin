@@ -211,7 +211,9 @@ class UserProvider with ChangeNotifier {
       filtered = filtered.where((user) {
         return user.fullName.toLowerCase().contains(_searchQuery) ||
             user.email.toLowerCase().contains(_searchQuery) ||
-            user.id.toString().contains(_searchQuery);
+            user.id.toString().contains(_searchQuery) ||
+            (user.phone != null &&
+                user.phone!.toLowerCase().contains(_searchQuery));
       }).toList();
     }
 
