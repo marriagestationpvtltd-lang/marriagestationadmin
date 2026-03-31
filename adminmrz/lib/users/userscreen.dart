@@ -9,6 +9,16 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'model/usermodel.dart';
 
+// Stat card config (soft colours, no heavy gradients)
+class _StatConfig {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final Color bg;
+  final String key;
+  const _StatConfig(this.label, this.icon, this.color, this.bg, this.key);
+}
+
 class UsersPage extends StatefulWidget {
   const UsersPage({Key? key}) : super(key: key);
 
@@ -16,13 +26,38 @@ class UsersPage extends StatefulWidget {
   State<UsersPage> createState() => _UsersPageState();
 }
 
-class _UsersPageState extends State<UsersPage> {
+class _UsersPageState extends State<UsersPage>
+    with SingleTickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
-  bool _showFilterPanel = false;
+
+  User? _previewUser;
+  late final AnimationController _slideController;
+  late final Animation<Offset> _slideAnimation;
+
+  static const _statCards = [
+    _StatConfig('Total',    Icons.people_alt_rounded,        Color(0xFF7C3AED), Color(0xFFF5F3FF), 'all'),
+    _StatConfig('Verified', Icons.verified_rounded,          Color(0xFF059669), Color(0xFFECFDF5), 'verified'),
+    _StatConfig('Pending',  Icons.pending_actions_rounded,   Color(0xFFD97706), Color(0xFFFFFBEB), 'pending'),
+    _StatConfig('Approved', Icons.check_circle_rounded,      Color(0xFF16A34A), Color(0xFFF0FDF4), 'approved'),
+    _StatConfig('Paid',     Icons.workspace_premium_rounded, Color(0xFF9333EA), Color(0xFFFAF5FF), 'paid'),
+    _StatConfig('Online',   Icons.circle,                    Color(0xFF0EA5E9), Color(0xFFF0F9FF), 'online'),
+  ];
 
   @override
   void initState() {
     super.initState();
+    _slideController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 240),
+    );
+    _slideAnimation = Tween<Offset>(
+      begin: const Offset(1.0, 0.0),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _slideController,
+      curve: Curves.easeOut,
+      reverseCurve: Curves.easeIn,
+    ));
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<UserProvider>().fetchUsers();
     });
@@ -31,7 +66,19 @@ class _UsersPageState extends State<UsersPage> {
   @override
   void dispose() {
     _searchController.dispose();
+    _slideController.dispose();
     super.dispose();
+  }
+
+  void _openPreview(User user) {
+    setState(() => _previewUser = user);
+    _slideController.forward();
+  }
+
+  void _closePreview() {
+    _slideController.reverse().then((_) {
+      if (mounted) setState(() => _previewUser = null);
+    });
   }
 
   void _navigateToUserDetails(User user) {
@@ -39,11 +86,8 @@ class _UsersPageState extends State<UsersPage> {
       context,
       MaterialPageRoute(
         builder: (context) => ChangeNotifierProvider(
-          create: (context) => UserDetailsProvider(),
-          child: UserDetailsScreen(
-            userId: user.id,
-            myId: user.id,
-          ),
+          create: (_) => UserDetailsProvider(),
+          child: UserDetailsScreen(userId: user.id, myId: user.id),
         ),
       ),
     );
@@ -51,9 +95,7 @@ class _UsersPageState extends State<UsersPage> {
 
   Future<void> _sendEmail(String email) async {
     final uri = Uri(scheme: 'mailto', path: email);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    }
+    if (await canLaunchUrl(uri)) await launchUrl(uri);
   }
 
   Future<void> _approveUserDocument(User user) async {
@@ -76,23 +118,14 @@ class _UsersPageState extends State<UsersPage> {
       ),
     );
     if (confirmed != true || !mounted) return;
-
     final docProvider = context.read<DocumentsProvider>();
-    final success = await docProvider.updateDocumentStatus(
-      userId: user.id,
-      action: 'approve',
-    );
+    final success = await docProvider.updateDocumentStatus(userId: user.id, action: 'approve');
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(success ? 'Document approved' : (docProvider.error ?? 'Failed to approve')),
-        backgroundColor: success ? AppTheme.success : Colors.red,
-      ),
-    );
-    if (success) {
-      // Refresh users to reflect updated status
-      context.read<UserProvider>().fetchUsers(forceRefresh: true);
-    }
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(success ? 'Document approved' : (docProvider.error ?? 'Failed to approve')),
+      backgroundColor: success ? AppTheme.success : Colors.red,
+    ));
+    if (success) context.read<UserProvider>().fetchUsers(forceRefresh: true);
   }
 
   Future<void> _rejectUserDocument(User user) async {
@@ -108,19 +141,13 @@ class _UsersPageState extends State<UsersPage> {
             const SizedBox(height: 12),
             TextField(
               controller: reasonController,
-              decoration: const InputDecoration(
-                labelText: 'Reason (optional)',
-                border: OutlineInputBorder(),
-              ),
+              decoration: const InputDecoration(labelText: 'Reason (optional)', border: OutlineInputBorder()),
               maxLines: 2,
             ),
           ],
         ),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
             onPressed: () => Navigator.pop(context, true),
@@ -130,7 +157,6 @@ class _UsersPageState extends State<UsersPage> {
       ),
     );
     if (confirmed != true || !mounted) return;
-
     final docProvider = context.read<DocumentsProvider>();
     final success = await docProvider.updateDocumentStatus(
       userId: user.id,
@@ -138,15 +164,11 @@ class _UsersPageState extends State<UsersPage> {
       rejectReason: reasonController.text.trim().isEmpty ? null : reasonController.text.trim(),
     );
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(success ? 'Document rejected' : (docProvider.error ?? 'Failed to reject')),
-        backgroundColor: success ? AppTheme.error : Colors.red,
-      ),
-    );
-    if (success) {
-      context.read<UserProvider>().fetchUsers(forceRefresh: true);
-    }
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(success ? 'Document rejected' : (docProvider.error ?? 'Failed to reject')),
+      backgroundColor: success ? AppTheme.error : Colors.red,
+    ));
+    if (success) context.read<UserProvider>().fetchUsers(forceRefresh: true);
   }
 
   Future<void> _blockUser(User user) async {
@@ -156,10 +178,7 @@ class _UsersPageState extends State<UsersPage> {
         title: const Text('Block Member'),
         content: Text('Block ${user.fullName}? They will no longer be able to access the platform.'),
         actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.error),
             onPressed: () => Navigator.pop(context, true),
@@ -169,531 +188,61 @@ class _UsersPageState extends State<UsersPage> {
       ),
     );
     if (confirmed != true || !mounted) return;
-
     final success = await context.read<UserProvider>().suspendUser(user.id);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(success ? '${user.fullName} has been blocked' : 'Failed to block member. Please try again.'),
-        backgroundColor: success ? AppTheme.error : Colors.red,
-      ),
-    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(success ? '${user.fullName} has been blocked' : 'Failed to block member. Please try again.'),
+      backgroundColor: success ? AppTheme.error : Colors.red,
+    ));
   }
 
-  // ─── Page Header (merges bulk-action bar when items are selected) ────────────
+  static const Duration _transitionDuration = Duration(milliseconds: 200);
 
-  static const Duration _selectionTransitionDuration = Duration(milliseconds: 200);
-
-  Widget _buildPageHeader(BuildContext context, UserProvider provider) {
+  Widget _buildHeader(UserProvider provider) {
     final hasSelection = provider.selectedCount > 0;
-
     return AnimatedContainer(
-      duration: _selectionTransitionDuration,
-      decoration: const BoxDecoration(gradient: AppTheme.primaryGradient),
-      padding: const EdgeInsets.fromLTRB(20, 14, 14, 14),
-      child: hasSelection
-          ? Row(
-              children: [
-                // ── selected count badge ──────────────────────────────────────
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: AppTheme.radiusSm,
-                  ),
-                  child: Text(
-                    '${provider.selectedCount} selected',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                // ── Suspend button ────────────────────────────────────────────
-                Expanded(
-                  child: _bulkActionButton(
-                    label: 'Suspend',
-                    icon: Icons.pause_circle_rounded,
-                    onTap: () => provider.suspendSelectedUsers(context),
-                    color: Colors.white.withOpacity(0.2),
-                    textColor: Colors.white,
-                    borderColor: Colors.white.withOpacity(0.35),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                // ── Delete button ─────────────────────────────────────────────
-                Expanded(
-                  child: _bulkActionButton(
-                    label: 'Delete',
-                    icon: Icons.delete_rounded,
-                    onTap: () => provider.deleteSelectedUsers(context),
-                    color: AppTheme.errorLight,
-                    textColor: AppTheme.error,
-                    borderColor: AppTheme.error.withOpacity(0.2),
-                  ),
-                ),
-                const SizedBox(width: 6),
-                // ── Clear selection ───────────────────────────────────────────
-                IconButton(
-                  onPressed: provider.clearSelection,
-                  icon: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
-                  constraints: const BoxConstraints(),
-                  padding: const EdgeInsets.all(4),
-                  tooltip: 'Clear selection',
-                ),
-              ],
-            )
-          : Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    // ── title + meta ──────────────────────────────────────────────
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text(
-                            'Manage Members',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: -0.3,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.2),
-                                  borderRadius: AppTheme.radiusSm,
-                                ),
-                                child: Text(
-                                  '${provider.totalCount} total',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                'Marriage Station',
-                                style: TextStyle(
-                                  color: Colors.white.withOpacity(0.7),
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-                    // ── Refresh button ────────────────────────────────────────────
-                    Tooltip(
-                      message: 'Refresh',
-                      child: Material(
-                        color: Colors.white.withOpacity(0.15),
-                        borderRadius: AppTheme.radiusMd,
-                        child: InkWell(
-                          onTap: () => provider.fetchUsers(forceRefresh: true),
-                          borderRadius: AppTheme.radiusMd,
-                          child: const Padding(
-                            padding: EdgeInsets.all(10),
-                            child: Icon(Icons.refresh_rounded, color: Colors.white, size: 20),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                // ── Stats grid inside header ──────────────────────────────────
-                _buildStatsGrid(provider, padding: const EdgeInsets.only(top: 12)),
-              ],
-            ),
+      duration: _transitionDuration,
+      color: hasSelection ? AppTheme.primary : Colors.white,
+      padding: const EdgeInsets.fromLTRB(16, 10, 10, 10),
+      child: hasSelection ? _buildBulkActionRow(provider) : _buildTitleRow(provider),
     );
   }
 
-  // ─── Stats Grid ─────────────────────────────────────────────────────────────
-
-  Widget _buildStatsGrid(UserProvider provider, {EdgeInsets padding = const EdgeInsets.fromLTRB(12, 14, 12, 4)}) {
-    final statusStats = provider.getStatusStats();
-    final typeStats = provider.getUserTypeStats();
-    final onlineCount = provider.allUsers.where((u) => u.isOnline == 1).length;
-    final verifiedCount = provider.allUsers.where((u) => u.isVerified == 1).length;
-
-    final stats = [
-      _StatItem('Total', provider.totalCount, Icons.people_alt_rounded, AppTheme.primaryGradient, 'all'),
-      _StatItem('Verified', verifiedCount, Icons.verified_rounded, AppTheme.greenGradient, 'verified'),
-      _StatItem('Pending', statusStats['pending'] ?? 0, Icons.pending_rounded, AppTheme.blueGradient, 'pending'),
-      _StatItem('Approved', statusStats['approved'] ?? 0, Icons.check_circle_rounded, const LinearGradient(colors: [Color(0xFF43A047), Color(0xFF2E7D32)], begin: Alignment.topLeft, end: Alignment.bottomRight), 'approved'),
-      _StatItem('Paid', typeStats['paid'] ?? 0, Icons.workspace_premium_rounded, AppTheme.goldGradient, 'paid'),
-      _StatItem('Online', onlineCount, Icons.circle, AppTheme.purpleGradient, 'online'),
-    ];
-
-    return Padding(
-      padding: padding,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          const cols = 3;
-          const rows = 2;
-          return Column(
-            children: List.generate(rows, (row) {
-              final start = row * cols;
-              final end = (start + cols).clamp(0, stats.length);
-              final rowItems = stats.sublist(start, end);
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: rowItems
-                      .map((s) => Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 4),
-                              child: _buildStatCard(s, provider),
-                            ),
-                          ))
-                      .toList(),
-                ),
-              );
-            }),
-          );
-        },
-      ),
-    );
-  }
-
-  Widget _buildStatCard(_StatItem item, UserProvider provider) {
-    final isActive = provider.statFilter == item.filterKey;
-    const double _activeIconOpacity = 0.35;
-    const double _inactiveIconOpacity = 0.20;
-
-    return Material(
-      color: Colors.transparent,
-      borderRadius: AppTheme.radiusMd,
-      child: InkWell(
-        onTap: () => provider.setStatFilter(item.filterKey),
-        borderRadius: AppTheme.radiusMd,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
-          decoration: BoxDecoration(
-            gradient: item.gradient,
-            borderRadius: AppTheme.radiusMd,
-            border: isActive
-                ? Border.all(color: Colors.white, width: 2.5)
-                : Border.all(color: Colors.transparent, width: 2.5),
-            boxShadow: isActive
-                ? [
-                    BoxShadow(
-                      color: Colors.white.withOpacity(0.45),
-                      blurRadius: 10,
-                      spreadRadius: 1,
-                      offset: const Offset(0, 0),
-                    ),
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.15),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ]
-                : [
-                    BoxShadow(
-                      color: Colors.black.withOpacity(0.10),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-          ),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(isActive ? _activeIconOpacity : _inactiveIconOpacity),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(item.icon, size: 14, color: Colors.white),
-              ),
-              const SizedBox(width: 7),
-              Flexible(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      item.count.toString(),
-                      style: const TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
-                        height: 1.1,
-                      ),
-                    ),
-                    Text(
-                      item.label,
-                      style: TextStyle(
-                        fontSize: 10,
-                        color: Colors.white.withOpacity(0.85),
-                        fontWeight: FontWeight.w500,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ─── Search & Filter ─────────────────────────────────────────────────────────
-
-  Widget _buildSearchBar(UserProvider provider) {
-    final hasActiveFilters = provider.statusFilter != 'all' ||
-        provider.userTypeFilter != 'all' ||
-        provider.genderFilter != 'all';
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _searchController,
-              style: const TextStyle(fontSize: 14, color: AppTheme.textPrimary),
-              decoration: InputDecoration(
-                hintText: 'Search name, email or ID…',
-                hintStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
-                prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.primary, size: 20),
-                filled: true,
-                fillColor: AppTheme.cardBg,
-                contentPadding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                border: OutlineInputBorder(
-                  borderRadius: AppTheme.radiusMd,
-                  borderSide: const BorderSide(color: AppTheme.border),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: AppTheme.radiusMd,
-                  borderSide: const BorderSide(color: AppTheme.border),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: AppTheme.radiusMd,
-                  borderSide: const BorderSide(color: AppTheme.primary, width: 1.5),
-                ),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.close_rounded, size: 16, color: AppTheme.textMuted),
-                        onPressed: () {
-                          _searchController.clear();
-                          provider.setSearchQuery('');
-                          setState(() {});
-                        },
-                      )
-                    : null,
-              ),
-              onChanged: (v) {
-                provider.setSearchQuery(v);
-                setState(() {});
-              },
-            ),
-          ),
-          const SizedBox(width: 8),
-          Tooltip(
-            message: 'Filters',
-            child: Material(
-              color: hasActiveFilters ? AppTheme.primary : AppTheme.cardBg,
-              borderRadius: AppTheme.radiusMd,
-              child: InkWell(
-                onTap: () => setState(() => _showFilterPanel = !_showFilterPanel),
-                borderRadius: AppTheme.radiusMd,
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                      color: hasActiveFilters ? AppTheme.primary : AppTheme.border,
-                    ),
-                    borderRadius: AppTheme.radiusMd,
-                  ),
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Icon(
-                        Icons.tune_rounded,
-                        size: 20,
-                        color: hasActiveFilters ? Colors.white : AppTheme.primary,
-                      ),
-                      if (hasActiveFilters)
-                        Positioned(
-                          right: -4,
-                          top: -4,
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: AppTheme.accent,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterPanel(UserProvider provider) {
-    if (!_showFilterPanel) return const SizedBox.shrink();
-
-    final hasActiveFilters = provider.statusFilter != 'all' ||
-        provider.userTypeFilter != 'all' ||
-        provider.genderFilter != 'all';
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppTheme.cardBg,
-        borderRadius: AppTheme.radiusLg,
-        border: Border.all(color: AppTheme.border),
-        boxShadow: AppTheme.cardShadow,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.tune_rounded, size: 15, color: AppTheme.primary),
-              const SizedBox(width: 6),
-              const Text(
-                'Filter Members',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppTheme.textPrimary,
-                ),
-              ),
-              const Spacer(),
-              if (hasActiveFilters)
-                GestureDetector(
-                  onTap: () {
-                    provider.clearFilters();
-                    _searchController.clear();
-                  },
-                  child: const Text(
-                    'Clear All',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppTheme.error,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 10,
-            children: [
-              _filterDropdown<String>(
-                label: 'Status',
-                value: provider.statusFilter,
-                items: const {
-                  'all': 'All Status',
-                  'approved': 'Approved',
-                  'pending': 'Pending',
-                  'rejected': 'Rejected',
-                  'not_uploaded': 'Not Uploaded',
-                },
-                onChanged: provider.setStatusFilter,
-              ),
-              _filterDropdown<String>(
-                label: 'Membership',
-                value: provider.userTypeFilter,
-                items: const {
-                  'all': 'All Types',
-                  'paid': 'Paid',
-                  'free': 'Free',
-                },
-                onChanged: provider.setUserTypeFilter,
-              ),
-              _filterDropdown<String>(
-                label: 'Gender',
-                value: provider.genderFilter,
-                items: const {
-                  'all': 'All Gender',
-                  'Male': 'Male',
-                  'Female': 'Female',
-                },
-                onChanged: provider.setGenderFilter,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _filterDropdown<T>({
-    required String label,
-    required T value,
-    required Map<T, String> items,
-    required ValueChanged<T> onChanged,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
+  Widget _buildTitleRow(UserProvider provider) {
+    return Row(
       children: [
-        Text(
-          label.toUpperCase(),
-          style: const TextStyle(
-            fontSize: 10,
-            color: AppTheme.textMuted,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.5,
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Manage Members',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppTheme.textPrimary, letterSpacing: -0.3),
+              ),
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 1),
+                    decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.1), borderRadius: AppTheme.radiusSm),
+                    child: Text('${provider.totalCount} total',
+                        style: const TextStyle(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.w600)),
+                  ),
+                  const SizedBox(width: 6),
+                  const Text('Marriage Station', style: TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+                ],
+              ),
+            ],
           ),
         ),
-        const SizedBox(height: 4),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
-          decoration: BoxDecoration(
-            color: AppTheme.scaffoldBg,
+        Tooltip(
+          message: 'Refresh',
+          child: InkWell(
+            onTap: () => provider.fetchUsers(forceRefresh: true),
             borderRadius: AppTheme.radiusSm,
-            border: Border.all(color: AppTheme.border),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<T>(
-              value: value,
-              isDense: true,
-              icon: const Icon(
-                Icons.keyboard_arrow_down_rounded,
-                size: 16,
-                color: AppTheme.primary,
-              ),
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textPrimary,
-              ),
-              onChanged: (v) {
-                if (v != null) onChanged(v);
-              },
-              items: items.entries
-                  .map((e) => DropdownMenuItem<T>(value: e.key, child: Text(e.value)))
-                  .toList(),
+            child: const Padding(
+              padding: EdgeInsets.all(8),
+              child: Icon(Icons.refresh_rounded, color: AppTheme.textSecondary, size: 20),
             ),
           ),
         ),
@@ -701,335 +250,616 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  // ─── User Card ───────────────────────────────────────────────────────────────
-
-  Widget _buildUserCard(User user, UserProvider provider) {
-    final isSelected = provider.isUserSelected(user.id);
-    final isPending = user.isPending;
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      decoration: BoxDecoration(
-        color: AppTheme.cardBg,
-        borderRadius: AppTheme.radiusLg,
-        border: Border.all(
-          color: isSelected ? AppTheme.primary : AppTheme.borderLight,
-          width: isSelected ? 1.5 : 1,
+  Widget _buildBulkActionRow(UserProvider provider) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
+          decoration: BoxDecoration(color: Colors.white.withOpacity(0.2), borderRadius: AppTheme.radiusSm),
+          child: Text('${provider.selectedCount} selected',
+              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12)),
         ),
-        boxShadow: AppTheme.cardShadow,
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: AppTheme.radiusLg,
-        child: InkWell(
-          onTap: () => _navigateToUserDetails(user),
-          borderRadius: AppTheme.radiusLg,
-          splashColor: AppTheme.primary.withOpacity(0.06),
-          highlightColor: AppTheme.primary.withOpacity(0.03),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // ── Header Row ────────────────────────────────────────────
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Checkbox
-                    GestureDetector(
-                      onTap: () => provider.toggleUserSelection(user.id),
-                      child: MouseRegion(
-                        cursor: SystemMouseCursors.click,
-                        child: SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: Checkbox(
-                            value: isSelected,
-                            onChanged: (_) => provider.toggleUserSelection(user.id),
-                            activeColor: AppTheme.primary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            side: BorderSide(
-                              color: isSelected ? AppTheme.primary : AppTheme.textMuted,
-                            ),
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
+        const SizedBox(width: 8),
+        Expanded(child: _bulkBtn('Suspend', Icons.pause_circle_rounded, Colors.white.withOpacity(0.15), Colors.white,
+            () => provider.suspendSelectedUsers(context))),
+        const SizedBox(width: 6),
+        Expanded(child: _bulkBtn('Delete', Icons.delete_rounded, AppTheme.errorLight, AppTheme.error,
+            () => provider.deleteSelectedUsers(context))),
+        const SizedBox(width: 4),
+        IconButton(
+          onPressed: provider.clearSelection,
+          icon: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+          constraints: const BoxConstraints(),
+          padding: const EdgeInsets.all(4),
+          tooltip: 'Clear selection',
+        ),
+      ],
+    );
+  }
 
-                    // Avatar with online dot indicator
-                    Stack(
-                      clipBehavior: Clip.none,
-                      children: [
-                        GestureDetector(
-                          onTap: () => _navigateToUserDetails(user),
-                          child: Container(
-                            width: 52,
-                            height: 52,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: user.hasProfilePicture ? null : AppTheme.primaryGradient,
-                              border: Border.all(color: AppTheme.border, width: 1.5),
-                            ),
-                            child: user.hasProfilePicture
-                                ? ClipOval(
-                                    child: Image.network(
-                                      user.profilePicture!,
-                                      fit: BoxFit.cover,
-                                      errorBuilder: (_, __, ___) => _defaultAvatar(user),
-                                    ),
-                                  )
-                                : _defaultAvatar(user),
-                          ),
-                        ),
-                        if (user.isOnline == 1)
-                          Positioned(
-                            right: 1,
-                            bottom: 1,
-                            child: Container(
-                              width: 12,
-                              height: 12,
-                              decoration: BoxDecoration(
-                                color: AppTheme.success,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 1.5),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: AppTheme.success.withOpacity(0.4),
-                                    blurRadius: 4,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(width: 12),
-
-                    // Name + email + badges
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Expanded(
-                                child: Text(
-                                  user.fullName,
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppTheme.textPrimary,
-                                    letterSpacing: -0.2,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              if (user.isVerified == 1) ...[
-                                const SizedBox(width: 4),
-                                const Tooltip(
-                                  message: 'Verified',
-                                  child: Icon(
-                                    Icons.verified_rounded,
-                                    size: 15,
-                                    color: AppTheme.info,
-                                  ),
-                                ),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            user.email,
-                            style: const TextStyle(
-                              fontSize: 12,
-                              color: AppTheme.textSecondary,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 7),
-                          Wrap(
-                            spacing: 5,
-                            runSpacing: 4,
-                            children: [
-                              _statusBadge(user.formattedStatus, user.status),
-                              _typeBadge(user.usertype),
-                              if (user.gender.isNotEmpty) _genderBadge(user.gender),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    // More actions menu
-                    PopupMenuButton<String>(
-                      icon: const Icon(
-                        Icons.more_vert_rounded,
-                        size: 20,
-                        color: AppTheme.textSecondary,
-                      ),
-                      shape: RoundedRectangleBorder(borderRadius: AppTheme.radiusMd),
-                      offset: const Offset(0, 32),
-                      itemBuilder: (context) => [
-                        _popupItem('view', Icons.person_rounded, 'View Profile', AppTheme.primary),
-                        _popupItem('message', Icons.chat_bubble_outline_rounded, 'Send Message', AppTheme.info),
-                        _popupItem('email', Icons.email_outlined, 'Send Email', AppTheme.warning),
-                        const PopupMenuDivider(),
-                        _popupItem('block', Icons.block_rounded, 'Block Member', AppTheme.error),
-                      ],
-                      onSelected: (value) {
-                        if (value == 'view') _navigateToUserDetails(user);
-                        if (value == 'email') _sendEmail(user.email);
-                        if (value == 'block') _blockUser(user);
-                      },
-                    ),
-                  ],
-                ),
-
-                // ── Info Strip ────────────────────────────────────────────
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: AppTheme.scaffoldBg,
-                    borderRadius: AppTheme.radiusMd,
-                    border: Border.all(color: AppTheme.borderLight),
-                  ),
-                  child: Row(
-                    children: [
-                      _infoCell(
-                        icon: user.gender == 'Female'
-                            ? Icons.female_rounded
-                            : Icons.male_rounded,
-                        iconColor: user.gender == 'Female' ? AppTheme.primary : AppTheme.info,
-                        value: user.gender,
-                      ),
-                      _vertDivider(),
-                      Expanded(
-                        child: _infoCell(
-                          icon: Icons.access_time_rounded,
-                          iconColor: AppTheme.textMuted,
-                          value: _formatLastLogin(user.lastLogin),
-                        ),
-                      ),
-                      _vertDivider(),
-                      _infoCell(
-                        icon: Icons.tag_rounded,
-                        iconColor: AppTheme.textMuted,
-                        value: '#${user.id}',
-                      ),
-                    ],
-                  ),
-                ),
-
-                // ── Action Buttons ────────────────────────────────────────
-                const SizedBox(height: 10),
-                if (isPending) ...[
-                  Row(
-                    children: [
-                      Expanded(
-                        child: _actionButton(
-                          label: 'Approve',
-                          icon: Icons.check_circle_outline_rounded,
-                          foreground: AppTheme.success,
-                          background: AppTheme.successLight,
-                          onTap: () {
-                            _approveUserDocument(user);
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _actionButton(
-                          label: 'Reject',
-                          icon: Icons.cancel_outlined,
-                          foreground: AppTheme.error,
-                          background: AppTheme.errorLight,
-                          onTap: () {
-                            _rejectUserDocument(user);
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      _iconActionButton(
-                        icon: Icons.person_outline_rounded,
-                        color: AppTheme.primary,
-                        tooltip: 'View Profile',
-                        onTap: () => _navigateToUserDetails(user),
-                      ),
-                    ],
-                  ),
-                ] else ...[
-                  OutlinedButton.icon(
-                    onPressed: () => _navigateToUserDetails(user),
-                    icon: const Icon(Icons.person_outline_rounded, size: 15),
-                    label: const Text('View Full Profile'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppTheme.primary,
-                      side: const BorderSide(color: AppTheme.primary),
-                      padding: const EdgeInsets.symmetric(vertical: 9),
-                      minimumSize: const Size.fromHeight(0),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                      shape: RoundedRectangleBorder(borderRadius: AppTheme.radiusSm),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
+  Widget _buildStatCards(UserProvider provider) {
+    final statusStats = provider.getStatusStats();
+    final typeStats = provider.getUserTypeStats();
+    final onlineCount = provider.allUsers.where((u) => u.isOnline == 1).length;
+    final verifiedCount = provider.allUsers.where((u) => u.isVerified == 1).length;
+    final counts = [
+      provider.totalCount, verifiedCount,
+      statusStats['pending'] ?? 0, statusStats['approved'] ?? 0,
+      typeStats['paid'] ?? 0, onlineCount,
+    ];
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: List.generate(_statCards.length, (i) {
+            final cfg = _statCards[i];
+            final isActive = provider.statFilter == cfg.key;
+            return Padding(
+              padding: EdgeInsets.only(right: i < _statCards.length - 1 ? 8 : 0),
+              child: _buildStatCard(cfg, counts[i], isActive, provider),
+            );
+          }),
         ),
       ),
     );
   }
 
-  PopupMenuItem<String> _popupItem(
-      String value, IconData icon, String label, Color color) {
-    return PopupMenuItem(
-      value: value,
-      child: Row(
+  Widget _buildStatCard(_StatConfig cfg, int count, bool isActive, UserProvider provider) {
+    return GestureDetector(
+      onTap: () => provider.setStatFilter(cfg.key),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isActive ? cfg.color : Colors.white,
+          borderRadius: AppTheme.radiusMd,
+          border: Border.all(color: isActive ? cfg.color : AppTheme.border, width: isActive ? 1.5 : 1),
+          boxShadow: isActive
+              ? [BoxShadow(color: cfg.color.withOpacity(0.22), blurRadius: 8, offset: const Offset(0, 2))]
+              : [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, offset: const Offset(0, 1))],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: isActive ? Colors.white.withOpacity(0.25) : cfg.bg,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(cfg.icon, size: 14, color: isActive ? Colors.white : cfg.color),
+            ),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(count.toString(),
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800,
+                        color: isActive ? Colors.white : AppTheme.textPrimary, height: 1.1)),
+                Text(cfg.label,
+                    style: TextStyle(fontSize: 11,
+                        color: isActive ? Colors.white.withOpacity(0.85) : AppTheme.textMuted,
+                        fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSearchFilterBar(UserProvider provider) {
+    final hasFilters = provider.statusFilter != 'all' || provider.userTypeFilter != 'all' || provider.genderFilter != 'all';
+    return Container(
+      color: AppTheme.scaffoldBg,
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      child: Column(
         children: [
-          Icon(icon, size: 17, color: color),
-          const SizedBox(width: 10),
-          Text(label, style: const TextStyle(fontSize: 13)),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _searchController,
+                  style: const TextStyle(fontSize: 13, color: AppTheme.textPrimary),
+                  decoration: InputDecoration(
+                    hintText: 'Search name, email or ID\u2026',
+                    hintStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                    prefixIcon: const Icon(Icons.search_rounded, color: AppTheme.primary, size: 18),
+                    filled: true,
+                    fillColor: Colors.white,
+                    isDense: true,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
+                    border: OutlineInputBorder(borderRadius: AppTheme.radiusMd, borderSide: const BorderSide(color: AppTheme.border)),
+                    enabledBorder: OutlineInputBorder(borderRadius: AppTheme.radiusMd, borderSide: const BorderSide(color: AppTheme.border)),
+                    focusedBorder: OutlineInputBorder(borderRadius: AppTheme.radiusMd, borderSide: const BorderSide(color: AppTheme.primary, width: 1.5)),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.close_rounded, size: 15, color: AppTheme.textMuted),
+                            onPressed: () { _searchController.clear(); provider.setSearchQuery(''); setState(() {}); },
+                          )
+                        : null,
+                  ),
+                  onChanged: (v) { provider.setSearchQuery(v); setState(() {}); },
+                ),
+              ),
+              if (hasFilters) ...[
+                const SizedBox(width: 8),
+                Tooltip(
+                  message: 'Clear all filters',
+                  child: GestureDetector(
+                    onTap: () { provider.clearFilters(); _searchController.clear(); setState(() {}); },
+                    child: Container(
+                      padding: const EdgeInsets.all(9),
+                      decoration: BoxDecoration(
+                        color: AppTheme.errorLight,
+                        borderRadius: AppTheme.radiusSm,
+                        border: Border.all(color: AppTheme.error.withOpacity(0.2)),
+                      ),
+                      child: const Icon(Icons.filter_alt_off_rounded, size: 17, color: AppTheme.error),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 7),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _compactDropdown<String>(
+                  value: provider.statusFilter,
+                  items: const {'all': 'All Status', 'approved': 'Approved', 'pending': 'Pending', 'rejected': 'Rejected', 'not_uploaded': 'Not Uploaded'},
+                  onChanged: provider.setStatusFilter,
+                ),
+                const SizedBox(width: 8),
+                _compactDropdown<String>(
+                  value: provider.userTypeFilter,
+                  items: const {'all': 'All Plans', 'paid': 'Paid', 'free': 'Free'},
+                  onChanged: provider.setUserTypeFilter,
+                ),
+                const SizedBox(width: 8),
+                _compactDropdown<String>(
+                  value: provider.genderFilter,
+                  items: const {'all': 'All Gender', 'Male': 'Male', 'Female': 'Female'},
+                  onChanged: provider.setGenderFilter,
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _actionButton({
-    required String label,
-    required IconData icon,
-    required Color foreground,
-    required Color background,
-    required VoidCallback onTap,
-  }) {
+  Widget _compactDropdown<T>({required T value, required Map<T, String> items, required ValueChanged<T> onChanged}) {
+    return Container(
+      height: 34,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: AppTheme.radiusSm, border: Border.all(color: AppTheme.border)),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<T>(
+          value: value,
+          isDense: true,
+          icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 14, color: AppTheme.textSecondary),
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textPrimary),
+          onChanged: (v) { if (v != null) onChanged(v); },
+          items: items.entries.map((e) => DropdownMenuItem<T>(value: e.key, child: Text(e.value))).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSelectAllRow(UserProvider provider) {
+    if (provider.filteredUsers.isEmpty) return const SizedBox.shrink();
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 4, 12, 2),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(color: Colors.white, borderRadius: AppTheme.radiusSm, border: Border.all(color: AppTheme.borderLight)),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 20, height: 20,
+            child: Checkbox(
+              value: provider.areAllFilteredSelected,
+              onChanged: (_) => provider.selectAllUsers(),
+              activeColor: AppTheme.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+              side: const BorderSide(color: AppTheme.textMuted),
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(provider.areAllFilteredSelected ? 'Deselect All' : 'Select All',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+          const SizedBox(width: 5),
+          Text('(${provider.filteredCount})', style: const TextStyle(fontSize: 11, color: AppTheme.textMuted)),
+          const Spacer(),
+          if (provider.selectedCount > 0)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+              decoration: BoxDecoration(color: AppTheme.primary.withOpacity(0.1), borderRadius: AppTheme.radiusSm),
+              child: Text('${provider.selectedCount} selected',
+                  style: const TextStyle(fontSize: 11, color: AppTheme.primary, fontWeight: FontWeight.w700)),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMemberRow(User user, UserProvider provider) {
+    final isSelected = provider.isUserSelected(user.id);
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
+      decoration: BoxDecoration(
+        color: isSelected ? AppTheme.primary.withOpacity(0.04) : Colors.white,
+        borderRadius: AppTheme.radiusMd,
+        border: Border.all(
+          color: isSelected ? AppTheme.primary.withOpacity(0.3) : AppTheme.borderLight,
+          width: isSelected ? 1.5 : 1,
+        ),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 4, offset: const Offset(0, 1))],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 20, height: 20,
+              child: Checkbox(
+                value: isSelected,
+                onChanged: (_) => provider.toggleUserSelection(user.id),
+                activeColor: AppTheme.primary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                side: const BorderSide(color: AppTheme.textMuted),
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+            ),
+            const SizedBox(width: 8),
+            GestureDetector(
+              onTap: () => _openPreview(user),
+              child: Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 38, height: 38,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: user.hasProfilePicture ? null : AppTheme.primaryGradient,
+                      border: Border.all(color: AppTheme.border, width: 1),
+                    ),
+                    child: user.hasProfilePicture
+                        ? ClipOval(child: Image.network(user.profilePicture!, fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _defaultAvatar(user)))
+                        : _defaultAvatar(user),
+                  ),
+                  if (user.isOnline == 1)
+                    Positioned(
+                      right: 0, bottom: 0,
+                      child: Container(
+                        width: 9, height: 9,
+                        decoration: BoxDecoration(
+                          color: AppTheme.success, shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1.5),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(
+                        child: Text(user.fullName,
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ),
+                      if (user.isVerified == 1) ...[
+                        const SizedBox(width: 3),
+                        const Tooltip(message: 'Verified',
+                            child: Icon(Icons.verified_rounded, size: 12, color: AppTheme.info)),
+                      ],
+                      const SizedBox(width: 4),
+                      Text('#${user.id}',
+                          style: const TextStyle(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.w500)),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Wrap(
+                    spacing: 4, runSpacing: 3,
+                    children: [
+                      _statusBadge(user.formattedStatus, user.status),
+                      _typeBadge(user.usertype),
+                      if (user.gender.isNotEmpty) _genderBadge(user.gender),
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      const Icon(Icons.access_time_rounded, size: 10, color: AppTheme.textMuted),
+                      const SizedBox(width: 3),
+                      Text(_formatLastLogin(user.lastLogin),
+                          style: const TextStyle(fontSize: 10, color: AppTheme.textMuted)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _iconBtn(Icons.visibility_rounded, AppTheme.info, 'View Profile', () => _openPreview(user)),
+                if (user.isPending) ...[
+                  const SizedBox(width: 2),
+                  _iconBtn(Icons.check_rounded, AppTheme.success, 'Approve', () => _approveUserDocument(user)),
+                  const SizedBox(width: 2),
+                  _iconBtn(Icons.close_rounded, AppTheme.error, 'Reject', () => _rejectUserDocument(user)),
+                ],
+                const SizedBox(width: 2),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert_rounded, size: 17, color: AppTheme.textSecondary),
+                  shape: RoundedRectangleBorder(borderRadius: AppTheme.radiusMd),
+                  offset: const Offset(0, 28),
+                  tooltip: 'More options',
+                  padding: EdgeInsets.zero,
+                  constraints: const BoxConstraints(),
+                  itemBuilder: (_) => [
+                    _popupItem('view', Icons.person_rounded, 'View Full Profile', AppTheme.primary),
+                    _popupItem('email', Icons.email_outlined, 'Send Email', AppTheme.warning),
+                    const PopupMenuDivider(),
+                    _popupItem('block', Icons.block_rounded, 'Block Member', AppTheme.error),
+                  ],
+                  onSelected: (v) {
+                    if (v == 'view') _navigateToUserDetails(user);
+                    if (v == 'email') _sendEmail(user.email);
+                    if (v == 'block') _blockUser(user);
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSidePanel(User user) {
+    return Stack(
+      children: [
+        GestureDetector(onTap: _closePreview, child: Container(color: Colors.black.withOpacity(0.35))),
+        Align(
+          alignment: Alignment.centerRight,
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: Container(
+              width: 300,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                boxShadow: [BoxShadow(color: Colors.black26, blurRadius: 24, offset: Offset(-4, 0))],
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    color: AppTheme.primary,
+                    padding: const EdgeInsets.fromLTRB(16, 10, 8, 10),
+                    child: Row(
+                      children: [
+                        const Text('Member Profile',
+                            style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w700)),
+                        const Spacer(),
+                        IconButton(
+                          onPressed: _closePreview,
+                          icon: const Icon(Icons.close_rounded, color: Colors.white, size: 18),
+                          constraints: const BoxConstraints(),
+                          padding: const EdgeInsets.all(4),
+                          tooltip: 'Close',
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Center(
+                            child: Column(
+                              children: [
+                                Stack(
+                                  clipBehavior: Clip.none,
+                                  children: [
+                                    Container(
+                                      width: 72, height: 72,
+                                      decoration: BoxDecoration(
+                                        shape: BoxShape.circle,
+                                        gradient: user.hasProfilePicture ? null : AppTheme.primaryGradient,
+                                        border: Border.all(color: AppTheme.border, width: 2),
+                                      ),
+                                      child: user.hasProfilePicture
+                                          ? ClipOval(child: Image.network(user.profilePicture!, fit: BoxFit.cover,
+                                              errorBuilder: (_, __, ___) => _defaultAvatar(user, size: 24)))
+                                          : _defaultAvatar(user, size: 24),
+                                    ),
+                                    if (user.isVerified == 1)
+                                      Positioned(
+                                        right: 0, bottom: 0,
+                                        child: Container(
+                                          padding: const EdgeInsets.all(2),
+                                          decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                                          child: const Icon(Icons.verified_rounded, size: 16, color: AppTheme.info),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                                const SizedBox(height: 10),
+                                Text(user.fullName,
+                                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+                                    textAlign: TextAlign.center),
+                                const SizedBox(height: 2),
+                                Text(user.email,
+                                    style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+                                    textAlign: TextAlign.center),
+                                const SizedBox(height: 8),
+                                Wrap(
+                                  spacing: 4, runSpacing: 4,
+                                  alignment: WrapAlignment.center,
+                                  children: [
+                                    _statusBadge(user.formattedStatus, user.status),
+                                    _typeBadge(user.usertype),
+                                    if (user.gender.isNotEmpty) _genderBadge(user.gender),
+                                    if (user.isOnline == 1) _pillBadge('Online', AppTheme.success, AppTheme.successLight),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          const Divider(color: AppTheme.borderLight),
+                          const SizedBox(height: 10),
+                          _panelInfoRow(Icons.tag_rounded, AppTheme.textMuted, 'Member ID', '#${user.id}'),
+                          _panelInfoRow(Icons.access_time_rounded, AppTheme.textMuted, 'Last Active', _formatLastLogin(user.lastLogin)),
+                          _panelInfoRow(
+                            user.gender == 'Female' ? Icons.female_rounded : Icons.male_rounded,
+                            user.gender == 'Female' ? AppTheme.primary : AppTheme.info,
+                            'Gender', user.gender,
+                          ),
+                          _panelInfoRow(
+                            Icons.workspace_premium_rounded,
+                            user.usertype == 'paid' ? const Color(0xFF9333EA) : AppTheme.textMuted,
+                            'Plan', user.usertype.toUpperCase(),
+                          ),
+                          _panelInfoRow(Icons.shield_rounded, AppTheme.textMuted, 'Privacy', user.privacy.toUpperCase()),
+                          const SizedBox(height: 14),
+                          const Divider(color: AppTheme.borderLight),
+                          const SizedBox(height: 10),
+                          const Text('QUICK ACTIONS',
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: AppTheme.textMuted, letterSpacing: 0.8)),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(child: _panelActionBtn('Full Profile', Icons.person_rounded, AppTheme.primary,
+                                  () { _closePreview(); _navigateToUserDetails(user); })),
+                              const SizedBox(width: 6),
+                              if (user.isPending) ...[
+                                Expanded(child: _panelActionBtn('Approve', Icons.check_rounded, AppTheme.success,
+                                    () { _closePreview(); _approveUserDocument(user); })),
+                                const SizedBox(width: 6),
+                                Expanded(child: _panelActionBtn('Reject', Icons.close_rounded, AppTheme.error,
+                                    () { _closePreview(); _rejectUserDocument(user); })),
+                              ] else ...[
+                                Expanded(child: _panelActionBtn('Email', Icons.email_rounded, AppTheme.warning,
+                                    () => _sendEmail(user.email))),
+                                const SizedBox(width: 6),
+                                Expanded(child: _panelActionBtn('Block', Icons.block_rounded, AppTheme.error,
+                                    () { _closePreview(); _blockUser(user); })),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState(UserProvider provider) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 56, horizontal: 24),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 68, height: 68,
+            decoration: const BoxDecoration(gradient: AppTheme.primaryGradient, shape: BoxShape.circle),
+            child: const Icon(Icons.people_alt_rounded, size: 32, color: Colors.white),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            provider.searchQuery.isNotEmpty ? 'No results for "${provider.searchQuery}"' : 'No members found',
+            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppTheme.textPrimary),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          const Text('Try adjusting your search or filters',
+              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary), textAlign: TextAlign.center),
+          if (provider.statusFilter != 'all' || provider.userTypeFilter != 'all' || provider.genderFilter != 'all')
+            Padding(
+              padding: const EdgeInsets.only(top: 14),
+              child: OutlinedButton.icon(
+                onPressed: provider.clearFilters,
+                icon: const Icon(Icons.filter_alt_off_rounded, size: 15),
+                label: const Text('Clear Filters'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppTheme.primary,
+                  side: const BorderSide(color: AppTheme.primary),
+                  shape: RoundedRectangleBorder(borderRadius: AppTheme.radiusSm),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _iconBtn(IconData icon, Color color, String tooltip, VoidCallback onTap) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(6),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(6),
+          child: Padding(padding: const EdgeInsets.all(6), child: Icon(icon, size: 16, color: color)),
+        ),
+      ),
+    );
+  }
+
+  Widget _panelInfoRow(IconData icon, Color iconColor, String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 13, color: iconColor),
+          const SizedBox(width: 8),
+          Text(label, style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary)),
+          const Spacer(),
+          Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppTheme.textPrimary)),
+        ],
+      ),
+    );
+  }
+
+  Widget _panelActionBtn(String label, IconData icon, Color color, VoidCallback onTap) {
     return Material(
-      color: background,
+      color: color.withOpacity(0.08),
       borderRadius: AppTheme.radiusSm,
       child: InkWell(
         onTap: onTap,
         borderRadius: AppTheme.radiusSm,
         child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 10),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
+          padding: const EdgeInsets.symmetric(vertical: 9),
+          child: Column(
             children: [
-              Icon(icon, size: 15, color: foreground),
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: foreground,
-                ),
-              ),
+              Icon(icon, size: 16, color: color),
+              const SizedBox(height: 3),
+              Text(label, style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: color)),
             ],
           ),
         ),
@@ -1037,40 +867,115 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  Widget _iconActionButton({
-    required IconData icon,
-    required Color color,
-    required String tooltip,
-    required VoidCallback onTap,
-  }) {
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: color.withOpacity(0.1),
+  Widget _pillBadge(String label, Color fg, Color bg) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+      decoration: BoxDecoration(color: bg, borderRadius: AppTheme.radiusSm),
+      child: Text(label, style: TextStyle(fontSize: 9, color: fg, fontWeight: FontWeight.w700)),
+    );
+  }
+
+  Widget _bulkBtn(String label, IconData icon, Color bg, Color fg, VoidCallback onTap) {
+    return Material(
+      color: bg,
+      borderRadius: AppTheme.radiusSm,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: AppTheme.radiusSm,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: AppTheme.radiusSm,
-          child: Padding(
-            padding: const EdgeInsets.all(9),
-            child: Icon(icon, size: 18, color: color),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 7),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: 13, color: fg),
+              const SizedBox(width: 4),
+              Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: fg)),
+            ],
           ),
         ),
       ),
     );
   }
 
-  Widget _defaultAvatar(User user) {
+  PopupMenuItem<String> _popupItem(String value, IconData icon, String label, Color color) {
+    return PopupMenuItem(
+      value: value,
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: color),
+          const SizedBox(width: 10),
+          Text(label, style: const TextStyle(fontSize: 13)),
+        ],
+      ),
+    );
+  }
+
+  Widget _statusBadge(String label, String status) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: AppTheme.statusBgColor(status),
+        borderRadius: AppTheme.radiusSm,
+        border: Border.all(color: AppTheme.statusColor(status).withOpacity(0.25)),
+      ),
+      child: Text(label,
+          style: TextStyle(fontSize: 9, color: AppTheme.statusColor(status), fontWeight: FontWeight.w700)),
+    );
+  }
+
+  Widget _typeBadge(String type) {
+    final isPaid = type.toLowerCase() == 'paid';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: isPaid ? const Color(0xFFFAF5FF) : AppTheme.borderLight,
+        borderRadius: AppTheme.radiusSm,
+        border: isPaid ? Border.all(color: const Color(0xFF9333EA).withOpacity(0.3)) : null,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (isPaid) ...[
+            const Icon(Icons.workspace_premium_rounded, size: 9, color: Color(0xFF9333EA)),
+            const SizedBox(width: 2),
+          ],
+          Text(type.toUpperCase(),
+              style: TextStyle(fontSize: 9,
+                  color: isPaid ? const Color(0xFF9333EA) : AppTheme.textSecondary,
+                  fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
+
+  Widget _genderBadge(String gender) {
+    final isFemale = gender.toLowerCase() == 'female';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: isFemale ? AppTheme.primary.withOpacity(0.08) : AppTheme.info.withOpacity(0.08),
+        borderRadius: AppTheme.radiusSm,
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(isFemale ? Icons.female_rounded : Icons.male_rounded, size: 10,
+              color: isFemale ? AppTheme.primary : AppTheme.info),
+          const SizedBox(width: 2),
+          Text(gender,
+              style: TextStyle(fontSize: 9,
+                  color: isFemale ? AppTheme.primary : AppTheme.info,
+                  fontWeight: FontWeight.w600)),
+        ],
+      ),
+    );
+  }
+
+  Widget _defaultAvatar(User user, {double size = 16}) {
     return Center(
       child: Text(
-        user.fullName.isNotEmpty
-            ? String.fromCharCode(user.fullName.runes.first).toUpperCase()
-            : '?',
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 20,
-          fontWeight: FontWeight.w700,
-        ),
+        user.fullName.isNotEmpty ? String.fromCharCode(user.fullName.runes.first).toUpperCase() : '?',
+        style: TextStyle(color: Colors.white, fontSize: size, fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -1091,416 +996,56 @@ class _UsersPageState extends State<UsersPage> {
     }
   }
 
-  Widget _statusBadge(String label, String status) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration: BoxDecoration(
-        color: AppTheme.statusBgColor(status),
-        borderRadius: AppTheme.radiusSm,
-        border: Border.all(color: AppTheme.statusColor(status).withOpacity(0.25)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 10,
-          color: AppTheme.statusColor(status),
-          fontWeight: FontWeight.w700,
-        ),
-      ),
-    );
-  }
-
-  Widget _typeBadge(String type) {
-    final isPaid = type.toLowerCase() == 'paid';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        gradient: isPaid ? AppTheme.goldGradient : null,
-        color: isPaid ? null : AppTheme.borderLight,
-        borderRadius: AppTheme.radiusSm,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (isPaid) ...[
-            const Icon(Icons.workspace_premium_rounded, size: 10, color: Colors.white),
-            const SizedBox(width: 3),
-          ],
-          Text(
-            type.toUpperCase(),
-            style: TextStyle(
-              fontSize: 10,
-              color: isPaid ? Colors.white : AppTheme.textSecondary,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.3,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _genderBadge(String gender) {
-    final isFemale = gender.toLowerCase() == 'female';
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-        color: isFemale
-            ? AppTheme.primary.withOpacity(0.1)
-            : AppTheme.info.withOpacity(0.1),
-        borderRadius: AppTheme.radiusSm,
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            isFemale ? Icons.female_rounded : Icons.male_rounded,
-            size: 11,
-            color: isFemale ? AppTheme.primary : AppTheme.info,
-          ),
-          const SizedBox(width: 2),
-          Text(
-            gender,
-            style: TextStyle(
-              fontSize: 10,
-              color: isFemale ? AppTheme.primary : AppTheme.info,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _infoCell({
-    required IconData icon,
-    required Color iconColor,
-    required String value,
-  }) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 13, color: iconColor),
-        const SizedBox(width: 4),
-        Text(
-          value,
-          style: const TextStyle(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: AppTheme.textSecondary,
-          ),
-          overflow: TextOverflow.ellipsis,
-        ),
-      ],
-    );
-  }
-
-  Widget _vertDivider() {
-    return Container(
-      width: 1,
-      height: 20,
-      margin: const EdgeInsets.symmetric(horizontal: 8),
-      color: AppTheme.borderLight,
-    );
-  }
-
-  // _buildBulkActionBar removed — functionality merged into _buildPageHeader.
-
-  Widget _bulkActionButton({
-    required String label,
-    required IconData icon,
-    required VoidCallback onTap,
-    required Color color,
-    required Color textColor,
-    required Color borderColor,
-  }) {
-    return Material(
-      color: color,
-      borderRadius: AppTheme.radiusSm,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: AppTheme.radiusSm,
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            border: Border.all(color: borderColor),
-            borderRadius: AppTheme.radiusSm,
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 14, color: textColor),
-              const SizedBox(width: 5),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: textColor,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ─── Select All Row ──────────────────────────────────────────────────────────
-
-  Widget _buildSelectAllRow(UserProvider provider) {
-    if (provider.filteredUsers.isEmpty) return const SizedBox.shrink();
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppTheme.cardBg,
-        borderRadius: AppTheme.radiusMd,
-        border: Border.all(color: AppTheme.borderLight),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 24,
-            height: 24,
-            child: Checkbox(
-              value: provider.areAllFilteredSelected,
-              onChanged: (_) => provider.selectAllUsers(),
-              activeColor: AppTheme.primary,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-              side: const BorderSide(color: AppTheme.textMuted),
-              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            provider.areAllFilteredSelected ? 'Deselect All' : 'Select All',
-            style: const TextStyle(
-              fontWeight: FontWeight.w600,
-              fontSize: 13,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            decoration: BoxDecoration(
-              color: AppTheme.borderLight,
-              borderRadius: AppTheme.radiusSm,
-            ),
-            child: Text(
-              '${provider.filteredCount} members',
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppTheme.textSecondary,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-          const Spacer(),
-          if (provider.selectedCount > 0)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-              decoration: BoxDecoration(
-                color: AppTheme.primary.withOpacity(0.1),
-                borderRadius: AppTheme.radiusSm,
-                border: Border.all(color: AppTheme.primary.withOpacity(0.25)),
-              ),
-              child: Text(
-                '${provider.selectedCount} selected',
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppTheme.primary,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // ─── Empty State ─────────────────────────────────────────────────────────────
-
-  Widget _buildEmptyState(UserProvider provider) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 60, horizontal: 24),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              gradient: AppTheme.primaryGradient,
-              shape: BoxShape.circle,
-              boxShadow: AppTheme.primaryShadow,
-            ),
-            child: const Icon(Icons.people_alt_rounded, size: 38, color: Colors.white),
-          ),
-          const SizedBox(height: 20),
-          Text(
-            provider.searchQuery.isNotEmpty
-                ? 'No results for "${provider.searchQuery}"'
-                : 'No members found',
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimary,
-            ),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Try adjusting your search or filters',
-            style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
-            textAlign: TextAlign.center,
-          ),
-          if (provider.statusFilter != 'all' ||
-              provider.userTypeFilter != 'all' ||
-              provider.genderFilter != 'all')
-            Padding(
-              padding: const EdgeInsets.only(top: 16),
-              child: OutlinedButton.icon(
-                onPressed: provider.clearFilters,
-                icon: const Icon(Icons.filter_alt_off_rounded, size: 16),
-                label: const Text('Clear Filters'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.primary,
-                  side: const BorderSide(color: AppTheme.primary),
-                  shape: RoundedRectangleBorder(borderRadius: AppTheme.radiusSm),
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
-
-  // ─── Build ───────────────────────────────────────────────────────────────────
-
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<UserProvider>();
-
-    return Column(
+    return Stack(
+      fit: StackFit.expand,
       children: [
-        // ── Fixed: Page Header ─────────────────────────────────────────────────
-        _buildPageHeader(context, provider),
-
-        // ── Fixed: Search + Filter + Bulk Actions toolbar ─────────────────────
-        Container(
-          decoration: BoxDecoration(
-            color: AppTheme.scaffoldBg,
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.07),
-                blurRadius: 6,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildSearchBar(provider),
-              _buildFilterPanel(provider),
-            ],
-          ),
-        ),
-
-        // ── Scrollable body ────────────────────────────────────────────────────
-        Expanded(
-          child: provider.isLoading
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const CircularProgressIndicator(
-                        valueColor: AlwaysStoppedAnimation(AppTheme.primary),
-                        strokeWidth: 2.5,
+        Column(
+          children: [
+            _buildHeader(provider),
+            _buildStatCards(provider),
+            _buildSearchFilterBar(provider),
+            Expanded(
+              child: provider.isLoading
+                  ? const Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(
+                            valueColor: AlwaysStoppedAnimation(AppTheme.primary),
+                            strokeWidth: 2.5,
+                          ),
+                          SizedBox(height: 12),
+                          Text('Loading members\u2026',
+                              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13)),
+                        ],
                       ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Loading members…',
-                        style: TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 13,
+                    )
+                  : RefreshIndicator(
+                      onRefresh: () => provider.fetchUsers(forceRefresh: true),
+                      color: AppTheme.primary,
+                      child: SingleChildScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _buildSelectAllRow(provider),
+                            if (provider.filteredUsers.isEmpty)
+                              _buildEmptyState(provider)
+                            else
+                              ...provider.filteredUsers.map((u) => _buildMemberRow(u, provider)).toList(),
+                            const SizedBox(height: 20),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: () => provider.fetchUsers(forceRefresh: true),
-                  color: AppTheme.primary,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Select all row
-                        _buildSelectAllRow(provider),
-
-                        // Member list or empty state
-                        if (provider.filteredUsers.isEmpty)
-                          _buildEmptyState(provider)
-                        else ...[
-                          Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                            child: Row(
-                              children: [
-                                const Text(
-                                  'Members',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: AppTheme.textPrimary,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: AppTheme.primary.withOpacity(0.1),
-                                    borderRadius: AppTheme.radiusSm,
-                                  ),
-                                  child: Text(
-                                    '${provider.filteredUsers.length}',
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppTheme.primary,
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          ...provider.filteredUsers
-                              .map((u) => _buildUserCard(u, provider)),
-                          const SizedBox(height: 24),
-                        ],
-                      ],
                     ),
-                  ),
-                ),
+            ),
+          ],
         ),
+        if (_previewUser != null) _buildSidePanel(_previewUser!),
       ],
     );
   }
-}
-
-// ─── Helper model for stat cards ─────────────────────────────────────────────
-
-class _StatItem {
-  final String label;
-  final int count;
-  final IconData icon;
-  final Gradient gradient;
-  final String filterKey;
-
-  const _StatItem(this.label, this.count, this.icon, this.gradient, this.filterKey);
 }
