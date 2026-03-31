@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:adminmrz/adminchat/services/MatchedProfileService.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
@@ -55,6 +56,9 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
   // ── scroll ────────────────────────────────────────────────────────────────
   final ScrollController _scrollController = ScrollController();
 
+  // ── online status polling ─────────────────────────────────────────────────
+  Timer? _onlineStatusTimer;
+
   // ─────────────────────────────────────────────────────────────────────────
   @override
   void initState() {
@@ -63,6 +67,15 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
       setState(() => _searchQuery = _searchController.text.toLowerCase());
     });
     _scrollController.addListener(_onScroll);
+    // Poll online status for matched profiles every 30 seconds
+    _onlineStatusTimer = Timer.periodic(
+      const Duration(seconds: 30),
+      (_) {
+        if (!mounted || !_matchesLoaded) return;
+        Provider.of<MatchedProfileProvider>(context, listen: false)
+            .refreshOnlineStatuses();
+      },
+    );
   }
 
   void _onScroll() {
@@ -95,6 +108,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
   @override
   void dispose() {
     _searchController.dispose();
+    _onlineStatusTimer?.cancel();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
     super.dispose();
