@@ -61,7 +61,7 @@ class PackageService {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-        body: jsonEncode(package.toJson()),
+        body: jsonEncode(package.toUpdateJson()),
       );
 
       if (response.statusCode == 200) {
