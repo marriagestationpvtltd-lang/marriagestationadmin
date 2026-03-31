@@ -364,7 +364,7 @@ class _UsersPageState extends State<UsersPage> {
         provider.genderFilter != 'all';
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
       child: Row(
         children: [
           Expanded(
@@ -464,7 +464,7 @@ class _UsersPageState extends State<UsersPage> {
         provider.genderFilter != 'all';
 
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 6),
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppTheme.cardBg,
@@ -1112,7 +1112,7 @@ class _UsersPageState extends State<UsersPage> {
     if (provider.selectedCount == 0) return const SizedBox.shrink();
 
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         gradient: AppTheme.primaryGradient,
@@ -1351,10 +1351,32 @@ class _UsersPageState extends State<UsersPage> {
 
     return Column(
       children: [
-        // Page Header
+        // ── Fixed: Page Header ─────────────────────────────────────────────────
         _buildPageHeader(provider),
 
-        // Main scrollable content
+        // ── Fixed: Search + Filter + Bulk Actions toolbar ─────────────────────
+        Container(
+          decoration: BoxDecoration(
+            color: AppTheme.scaffoldBg,
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.07),
+                blurRadius: 6,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildSearchBar(provider),
+              _buildFilterPanel(provider),
+              _buildBulkActionBar(context, provider),
+            ],
+          ),
+        ),
+
+        // ── Scrollable body ────────────────────────────────────────────────────
         Expanded(
           child: provider.isLoading
               ? Center(
@@ -1384,17 +1406,8 @@ class _UsersPageState extends State<UsersPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Stats
+                        // Stats grid
                         _buildStatsGrid(provider),
-
-                        // Search bar
-                        _buildSearchBar(provider),
-
-                        // Filter panel (collapsible)
-                        _buildFilterPanel(provider),
-
-                        // Bulk action bar
-                        _buildBulkActionBar(context, provider),
 
                         // Select all row
                         _buildSelectAllRow(provider),
@@ -1404,7 +1417,7 @@ class _UsersPageState extends State<UsersPage> {
                           _buildEmptyState(provider)
                         else ...[
                           Padding(
-                            padding: const EdgeInsets.fromLTRB(16, 10, 16, 4),
+                            padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
                             child: Row(
                               children: [
                                 const Text(
