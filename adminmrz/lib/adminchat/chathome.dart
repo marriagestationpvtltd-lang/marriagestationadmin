@@ -56,6 +56,10 @@ class _ChatWindowState extends State<ChatWindow> {
   QuerySnapshot? _lastSnapshot;
   String? _lastUploadedImageUrl;
 
+  // Voice typing state
+  String _selectedLanguage = 'en-US'; // 'en-US' or 'ne-NP'
+  String _textBeforeVoice = ''; // text already in field before listening started
+
   // Match-related data
   Map<String, dynamic>? _matchDetails;
   bool _isLoadingMatchDetails = false;
@@ -68,6 +72,9 @@ class _ChatWindowState extends State<ChatWindow> {
     _initializeRecorder();
     _printFirebaseConfig();
     _fetchMatchDetails();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      FocusScope.of(context).requestFocus(_messageFocusNode);
+    });
   }
 
   void _printFirebaseConfig() {
@@ -109,16 +116,39 @@ class _ChatWindowState extends State<ChatWindow> {
       _webSpeechRecognition = html.SpeechRecognition();
       _webSpeechRecognition!.continuous = true;
       _webSpeechRecognition!.interimResults = true;
-      _webSpeechRecognition!.lang = 'en-US';
+      _webSpeechRecognition!.lang = _selectedLanguage;
 
       _webSpeechRecognition!.onResult.listen((event) {
-        if (event.results!.isNotEmpty) {
-          var result = event.results!.last;
-          String transcript = js.JsObject.fromBrowserObject(result)[0]['transcript'] as String;
+        if (event.results != null) {
+          String interimTranscript = '';
+          String finalTranscript = '';
+
+          final results = js.JsObject.fromBrowserObject(event.results!);
+          final length = results['length'] as int;
+          for (int i = 0; i < length; i++) {
+            final result = results.callMethod('item', [i]) as js.JsObject;
+            final transcript = result.callMethod('item', [0])['transcript'] as String;
+            final isFinal = result['isFinal'] as bool;
+            if (isFinal) {
+              finalTranscript += transcript;
+            } else {
+              interimTranscript += transcript;
+            }
+          }
+
+          // Accumulate final transcripts into the base text
+          if (finalTranscript.isNotEmpty) {
+            _textBeforeVoice = _textBeforeVoice + finalTranscript;
+          }
+
+          final displayText = interimTranscript.isNotEmpty
+              ? _textBeforeVoice + interimTranscript
+              : _textBeforeVoice;
+
           setState(() {
-            _messageController.text = transcript;
+            _messageController.text = displayText;
             _messageController.selection = TextSelection.fromPosition(
-              TextPosition(offset: _messageController.text.length),
+              TextPosition(offset: displayText.length),
             );
           });
         }
@@ -129,9 +159,32 @@ class _ChatWindowState extends State<ChatWindow> {
       });
 
       _webSpeechRecognition!.onError.listen((event) {
-        setState(() => _isListening = false);
+        // Reset the text field to what it was before voice input started,
+        // so no partial/stale transcription remains in the field.
+        final resetText = _textBeforeVoice.trimRight();
+        setState(() {
+          _isListening = false;
+          _messageController.text = resetText;
+          _messageController.selection = TextSelection.fromPosition(
+            TextPosition(offset: resetText.length),
+          );
+        });
+        String errorMsg;
+        switch (event.error) {
+          case 'not-allowed':
+          case 'service-not-allowed':
+            errorMsg = 'Microphone access denied. Please allow microphone permission in your browser settings.';
+            break;
+          case 'no-speech':
+            errorMsg = 'No speech detected. Please try again.';
+            break;
+          case 'aborted':
+            return; // user-initiated stop, no message needed
+          default:
+            errorMsg = 'Speech error: ${event.error}';
+        }
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Speech error: ${event.error}")),
+          SnackBar(content: Text(errorMsg)),
         );
       });
     }
@@ -144,17 +197,19 @@ class _ChatWindowState extends State<ChatWindow> {
     }
   }
 
-  void _startListening() async {
+  void _startListening() {
     if (_webSpeechRecognition != null && !_isListening) {
-      try {
-        await html.window.navigator.getUserMedia(audio: true);
-        _webSpeechRecognition!.start();
-        setState(() => _isListening = true);
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text("Microphone access denied")),
-        );
+      // Save current text as base so transcript is appended, not replaced.
+      // Do NOT call getUserMedia() here — the Web Speech API handles its own
+      // microphone permission internally. Calling getUserMedia first creates a
+      // double permission prompt which causes browsers to report "access denied".
+      _textBeforeVoice = _messageController.text;
+      if (_textBeforeVoice.isNotEmpty && !_textBeforeVoice.endsWith(' ')) {
+        _textBeforeVoice += ' ';
       }
+      _webSpeechRecognition!.lang = _selectedLanguage;
+      _webSpeechRecognition!.start();
+      setState(() => _isListening = true);
     }
   }
 
@@ -1188,8 +1243,45 @@ class _ChatWindowState extends State<ChatWindow> {
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 padding: EdgeInsets.zero,
               ),
-              const SizedBox(width: 2),
+              // Language selector button
+              Tooltip(
+                message: _selectedLanguage == 'en-US' ? 'Switch to Nepali' : 'Switch to English',
+                child: GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _selectedLanguage = _selectedLanguage == 'en-US' ? 'ne-NP' : 'en-US';
+                      if (_webSpeechRecognition != null) {
+                        _webSpeechRecognition!.lang = _selectedLanguage;
+                      }
+                    });
+                  },
+                  child: Container(
+                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    margin: EdgeInsets.symmetric(horizontal: 2),
+                    decoration: BoxDecoration(
+                      color: _isListening
+                          ? (_selectedLanguage == 'ne-NP' ? Colors.red.shade50 : Colors.blue.shade50)
+                          : Colors.grey.shade100,
+                      border: Border.all(
+                        color: _selectedLanguage == 'ne-NP' ? Colors.red.shade300 : Colors.blue.shade300,
+                        width: 1,
+                      ),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      _selectedLanguage == 'en-US' ? 'EN' : 'ने',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: _selectedLanguage == 'ne-NP' ? Colors.red.shade700 : Colors.blue.shade700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              // Mic button
               IconButton(
+                tooltip: _isListening ? 'Stop voice typing' : 'Start voice typing',
                 icon: Icon(
                   _isListening ? Icons.mic_off : Icons.mic,
                   color: _isListening ? kPrimary : kMuted,
@@ -1201,37 +1293,18 @@ class _ChatWindowState extends State<ChatWindow> {
               ),
               const SizedBox(width: 6),
               Expanded(
-                child: ValueListenableBuilder<TextEditingValue>(
-                  valueListenable: _messageController,
-                  builder: (context, value, child) {
-                    return TextField(
-                      controller: _messageController,
-                      focusNode: _messageFocusNode,
-                      textInputAction: TextInputAction.send,
-                      onSubmitted: (_) => _sendMessage(),
-                      style: const TextStyle(fontSize: 13),
-                      decoration: InputDecoration(
-                        hintText: "Type a message...",
-                        hintStyle: const TextStyle(fontSize: 13, color: kMuted),
-                        filled: true,
-                        fillColor: const Color(0xFFF8FAFC),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: const BorderSide(color: kBorder),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: const BorderSide(color: kBorder),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(20),
-                          borderSide: const BorderSide(color: kPrimary),
-                        ),
-                        contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 16),
-                        isDense: true,
-                      ),
-                    );
-                  },
+                child: TextField(
+                  controller: _messageController,
+                  focusNode: _messageFocusNode,
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _sendMessage(),
+                  decoration: InputDecoration(
+                    hintText: _selectedLanguage == 'ne-NP'
+                        ? "सन्देश टाइप गर्नुहोस्"
+                        : "Type a message",
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
+                    contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                  ),
                 ),
               ),
               const SizedBox(width: 6),
@@ -1344,6 +1417,11 @@ class _ChatWindowState extends State<ChatWindow> {
 
     String messageText = _messageController.text.trim();
 
+    // Clear immediately so the UI feels instant
+    _messageController.clear();
+    _textBeforeVoice = '';
+    FocusScope.of(context).requestFocus(_messageFocusNode);
+
     try {
       await _firestore.collection('adminchat').add({
         'message': messageText,
@@ -1380,10 +1458,15 @@ class _ChatWindowState extends State<ChatWindow> {
         'lastTimestamp': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
 
-      _messageController.clear();
-      FocusScope.of(context).requestFocus(_messageFocusNode);
-
     } catch (e) {
+      // Restore message text so user doesn't lose their content
+      if (_messageController.text.isEmpty) {
+        _messageController.text = messageText;
+        _messageController.selection = TextSelection.fromPosition(
+          TextPosition(offset: messageText.length),
+        );
+        _textBeforeVoice = messageText;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text("Failed to send message")),
       );
