@@ -712,7 +712,7 @@ class _DashboardHomeState extends State<DashboardHome> {
                             color: AppTheme.primary.withOpacity(0.20)),
                       ),
                       child: Text(
-                        '${c.country}  ${c.total}',
+                        '${c.country} · ${c.total}',
                         style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -770,62 +770,67 @@ class _DashboardHomeState extends State<DashboardHome> {
               subtitle: 'Latest platform events'),
           const SizedBox(height: 18),
           ...items.asMap().entries.map(
-                (entry) => Column(
-                  children: [
-                    if (entry.key > 0)
-                      Divider(
-                          color: AppTheme.borderLight, height: 1),
-                    if (entry.key > 0) const SizedBox(height: 12),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            gradient: entry.value.$3,
-                            borderRadius: AppTheme.radiusSm,
-                          ),
-                          child: Icon(entry.value.$1,
-                              size: 16, color: Colors.white),
-                        ),
-                        const SizedBox(width: 14),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                entry.value.$2,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppTheme.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 3),
-                              Text(
-                                entry.value.$3,
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: AppTheme.textSecondary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          entry.value.$4,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppTheme.textMuted,
-                          ),
-                        ),
+                (entry) {
+                  final icon = entry.value.$1;
+                  final gradient = entry.value.$2;
+                  final title = entry.value.$3;
+                  final description = entry.value.$4;
+                  final time = entry.value.$5;
+                  return Column(
+                    children: [
+                      if (entry.key > 0) ...[
+                        Divider(color: AppTheme.borderLight, height: 1),
+                        const SizedBox(height: 12),
                       ],
-                    ),
-                    const SizedBox(height: 12),
-                  ],
-                ),
-              ),
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(10),
+                            decoration: BoxDecoration(
+                              gradient: gradient,
+                              borderRadius: AppTheme.radiusSm,
+                            ),
+                            child: Icon(icon, size: 16, color: Colors.white),
+                          ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  style: const TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppTheme.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 3),
+                                Text(
+                                  description,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Text(
+                            time,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+                  );
+                }),
         ],
       ),
     );
