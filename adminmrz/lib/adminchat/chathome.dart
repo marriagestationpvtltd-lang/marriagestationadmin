@@ -21,6 +21,7 @@ import 'package:flutter_sound/flutter_sound.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show Uint8List, kIsWeb;
+import 'chat_theme.dart';
 import 'left.dart';
 import 'dart:html' as html;
 import 'dart:js' as js;
@@ -624,22 +625,20 @@ class _ChatWindowState extends State<ChatWindow> {
     bool active = false,
     Color? iconColor,
   }) {
-    const kPrimary = Color(0xFFD81B60);
-    const kPrimaryLight = Color(0xFFFCE4EC);
-    const kMuted = Color(0xFF64748B);
+    final c = ChatColors.of(context);
     return GestureDetector(
       onTap: onTap,
       child: Container(
         width: 34,
         height: 34,
         decoration: BoxDecoration(
-          color: active ? kPrimaryLight : const Color(0xFFF8FAFC),
+          color: active ? c.primaryLight : c.searchFill,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(
           icon,
           size: 18,
-          color: iconColor ?? (active ? kPrimary : kMuted),
+          color: iconColor ?? (active ? c.primary : c.muted),
         ),
       ),
     );
@@ -647,12 +646,7 @@ class _ChatWindowState extends State<ChatWindow> {
 
   @override
   Widget build(BuildContext context) {
-    const kPrimary = Color(0xFFD81B60);
-    const kPrimaryLight = Color(0xFFFCE4EC);
-    const kText = Color(0xFF1E293B);
-    const kMuted = Color(0xFF64748B);
-    const kBorder = Color(0xFFE2E8F0);
-    const kOnline = Color(0xFF22C55E);
+    final c = ChatColors.of(context);
 
     final chatProvider = Provider.of<ChatProvider>(context);
 
@@ -688,15 +682,15 @@ class _ChatWindowState extends State<ChatWindow> {
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F2F5),
+      backgroundColor: c.bg,
       appBar: PreferredSize(
         preferredSize: const Size.fromHeight(60),
         child: Container(
           height: 60,
           padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(bottom: BorderSide(color: kBorder, width: 1)),
+          decoration: BoxDecoration(
+            color: c.header,
+            border: Border(bottom: BorderSide(color: c.border, width: 1)),
           ),
           child: Row(
             children: [
@@ -748,7 +742,7 @@ class _ChatWindowState extends State<ChatWindow> {
                             style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: chatProvider.ispaid ? kPrimary : kText,
+                              color: chatProvider.ispaid ? c.primary : c.text,
                             ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -758,18 +752,18 @@ class _ChatWindowState extends State<ChatWindow> {
                             margin: const EdgeInsets.only(left: 6),
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
-                              color: kPrimaryLight,
+                              color: c.primaryLight,
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.favorite, color: kPrimary, size: 10),
+                                Icon(Icons.favorite, color: c.primary, size: 10),
                                 const SizedBox(width: 2),
                                 Text(
                                   '${chatProvider.matchesCount}',
-                                  style: const TextStyle(
-                                    color: kPrimary,
+                                  style: TextStyle(
+                                    color: c.primary,
                                     fontSize: 10,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -787,7 +781,7 @@ class _ChatWindowState extends State<ChatWindow> {
                           margin: const EdgeInsets.only(right: 4),
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: _userIsTyping ? kPrimary : (chatProvider.online ? kOnline : kMuted),
+                            color: _userIsTyping ? c.primary : (chatProvider.online ? c.online : c.muted),
                           ),
                         ),
                         Text(
@@ -797,20 +791,20 @@ class _ChatWindowState extends State<ChatWindow> {
                           style: TextStyle(
                             fontSize: 11,
                             color: _userIsTyping
-                                ? kPrimary
-                                : (chatProvider.online ? kOnline : kMuted),
+                                ? c.primary
+                                : (chatProvider.online ? c.online : c.muted),
                           ),
                         ),
                         if (chatProvider.id != null)
                           Row(
                             children: [
-                              const Icon(Icons.tag, size: 10, color: kMuted),
+                              Icon(Icons.tag, size: 10, color: c.muted),
                               const SizedBox(width: 2),
                               Text(
                                 '${chatProvider.id}',
-                                style: const TextStyle(
+                                style: TextStyle(
                                   fontSize: 10,
-                                  color: kMuted,
+                                  color: c.muted,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),
@@ -826,13 +820,13 @@ class _ChatWindowState extends State<ChatWindow> {
               _iconBtn(
                 icon: _showMatchInfo ? Icons.favorite : Icons.favorite_border,
                 active: _showMatchInfo,
-                iconColor: _showMatchInfo ? kPrimary : kMuted,
+                iconColor: _showMatchInfo ? c.primary : c.muted,
                 onTap: () => setState(() => _showMatchInfo = !_showMatchInfo),
               ),
               const SizedBox(width: 6),
               _iconBtn(
                 icon: Icons.video_call_outlined,
-                iconColor: kPrimary,
+                iconColor: c.primary,
                 onTap: () => _launchVideoCall(chatProvider),
               ),
               const SizedBox(width: 6),
@@ -858,7 +852,7 @@ class _ChatWindowState extends State<ChatWindow> {
               const SizedBox(width: 6),
               _iconBtn(
                 icon: Icons.notifications_outlined,
-                iconColor: kMuted,
+                iconColor: c.muted,
                 onTap: () {},
               ),
             ],
@@ -877,21 +871,21 @@ class _ChatWindowState extends State<ChatWindow> {
                   controller: _searchController,
                   decoration: InputDecoration(
                     hintText: "Search messages...",
-                    hintStyle: const TextStyle(fontSize: 12, color: kMuted),
-                    prefixIcon: const Icon(Icons.search, size: 16, color: kMuted),
+                    hintStyle: TextStyle(fontSize: 12, color: c.muted),
+                    prefixIcon: Icon(Icons.search, size: 16, color: c.muted),
                     filled: true,
-                    fillColor: const Color(0xFFF8FAFC),
+                    fillColor: c.searchFill,
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(20),
-                      borderSide: const BorderSide(color: kBorder),
+                      borderSide: BorderSide(color: c.border),
                     ),
                     enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(20),
-                      borderSide: const BorderSide(color: kBorder),
+                      borderSide: BorderSide(color: c.border),
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(20),
-                      borderSide: const BorderSide(color: kPrimary),
+                      borderSide: BorderSide(color: c.primary),
                     ),
                     contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
                     isDense: true,
@@ -926,13 +920,13 @@ class _ChatWindowState extends State<ChatWindow> {
                           child: Text(
                             snapshot.error.toString(),
                             textAlign: TextAlign.center,
-                            style: const TextStyle(fontSize: 11, color: kMuted),
+                            style: TextStyle(fontSize: 11, color: c.muted),
                           ),
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: kPrimary,
+                            backgroundColor: c.primary,
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
@@ -945,7 +939,7 @@ class _ChatWindowState extends State<ChatWindow> {
                 }
 
                 if (snapshot.connectionState == ConnectionState.waiting && _lastSnapshot == null) {
-                  return const Center(child: CircularProgressIndicator(color: kPrimary));
+                  return Center(child: CircularProgressIndicator(color: c.primary));
                 }
 
                 final messages = _isSearching && _filteredMessages.isNotEmpty
@@ -979,12 +973,12 @@ class _ChatWindowState extends State<ChatWindow> {
                         const SizedBox(height: 12),
                         const Text(
                           "No messages yet",
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: kMuted),
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: c.muted),
                         ),
                         const SizedBox(height: 4),
-                        const Text(
+                        Text(
                           "Start a conversation!",
-                          style: TextStyle(fontSize: 11, color: kMuted),
+                          style: TextStyle(fontSize: 11, color: c.muted),
                         ),
                       ],
                     ),
@@ -1008,20 +1002,20 @@ class _ChatWindowState extends State<ChatWindow> {
                         padding: const EdgeInsets.symmetric(vertical: 12),
                         child: Center(
                           child: _isLoadingMore
-                              ? const SizedBox(
+                              ? SizedBox(
                                   width: 20,
                                   height: 20,
                                   child: CircularProgressIndicator(
                                     strokeWidth: 2,
-                                    color: kPrimary,
+                                    color: c.primary,
                                   ),
                                 )
                               : TextButton.icon(
                                   onPressed: _loadMoreMessages,
-                                  icon: const Icon(Icons.history, size: 14, color: kPrimary),
-                                  label: const Text(
+                                  icon: Icon(Icons.history, size: 14, color: c.primary),
+                                  label: Text(
                                     'Load older messages',
-                                    style: TextStyle(fontSize: 12, color: kPrimary),
+                                    style: TextStyle(fontSize: 12, color: c.primary),
                                   ),
                                 ),
                         ),
@@ -1076,15 +1070,13 @@ class _ChatWindowState extends State<ChatWindow> {
   }
 
   Widget _buildMatchInfoPanel(ChatProvider chatProvider) {
-    const kPrimary = Color(0xFFD81B60);
-    const kPrimaryLight = Color(0xFFFCE4EC);
-    const kMuted = Color(0xFF64748B);
+    final c = ChatColors.of(context);
 
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: const BoxDecoration(
-        color: Color(0xFFFFF1F5),
-        border: Border(bottom: BorderSide(color: Color(0xFFFFCDD2), width: 1)),
+      decoration: BoxDecoration(
+        color: c.selectedRow,
+        border: Border(bottom: BorderSide(color: c.primaryLight, width: 1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1092,22 +1084,22 @@ class _ChatWindowState extends State<ChatWindow> {
         children: [
           Row(
             children: [
-              const Icon(Icons.favorite, color: kPrimary, size: 16),
+              Icon(Icons.favorite, color: c.primary, size: 16),
               const SizedBox(width: 6),
-              const Text(
+              Text(
                 'Match Information',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: kPrimary,
+                  color: c.primary,
                 ),
               ),
               const Spacer(),
               if (_isLoadingMatchDetails)
-                const SizedBox(
+                SizedBox(
                   height: 14,
                   width: 14,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: kPrimary),
+                  child: CircularProgressIndicator(strokeWidth: 2, color: c.primary),
                 ),
             ],
           ),
@@ -1118,19 +1110,19 @@ class _ChatWindowState extends State<ChatWindow> {
               margin: const EdgeInsets.only(bottom: 8),
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: c.cardBg,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Match Score: ', style: TextStyle(fontSize: 12, color: kMuted)),
+                  Text('Match Score: ', style: TextStyle(fontSize: 12, color: c.muted)),
                   Text(
                     '${_matchDetails!['percentage']}%',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
-                      color: kPrimary,
+                      color: c.primary,
                     ),
                   ),
                 ],
@@ -1145,12 +1137,12 @@ class _ChatWindowState extends State<ChatWindow> {
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: kPrimaryLight,
+                    color: c.primaryLight,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     interest,
-                    style: const TextStyle(fontSize: 10, color: kPrimary),
+                    style: TextStyle(fontSize: 10, color: c.primary),
                   ),
                 );
               }).toList(),
@@ -1158,9 +1150,9 @@ class _ChatWindowState extends State<ChatWindow> {
 
           if (_mutualMatches.isNotEmpty) ...[
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Mutual Matches:',
-              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kMuted),
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: c.muted),
             ),
             const SizedBox(height: 4),
             SizedBox(
@@ -1189,7 +1181,7 @@ class _ChatWindowState extends State<ChatWindow> {
                         const SizedBox(height: 2),
                         Text(
                           match['name'] ?? '',
-                          style: const TextStyle(fontSize: 8, color: kMuted),
+                          style: TextStyle(fontSize: 8, color: c.muted),
                           overflow: TextOverflow.ellipsis,
                           maxLines: 1,
                         ),
@@ -1209,8 +1201,8 @@ class _ChatWindowState extends State<ChatWindow> {
                 icon: const Icon(Icons.send, size: 12),
                 label: const Text('Send Match Profile', style: TextStyle(fontSize: 11)),
                 style: TextButton.styleFrom(
-                  backgroundColor: kPrimaryLight,
-                  foregroundColor: kPrimary,
+                  backgroundColor: c.primaryLight,
+                  foregroundColor: c.primary,
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   minimumSize: const Size(0, 28),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
