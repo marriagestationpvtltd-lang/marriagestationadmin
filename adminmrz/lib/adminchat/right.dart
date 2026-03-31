@@ -394,7 +394,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
-                        p.totalCount > 0 ? '${p.totalCount}' : '${p.ids.length}',
+                        '${p.ids.length}',
                         style: const TextStyle(
                             fontSize: 11,
                             fontWeight: FontWeight.w700,
@@ -908,7 +908,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Center(
         child: Text(
-          'सबै ${provider.totalCount > 0 ? provider.totalCount : provider.ids.length} म्याच देखाइयो',
+          'सबै ${provider.ids.length} म्याच देखाइयो',
           style: const TextStyle(fontSize: 10, color: _kMuted),
         ),
       ),
