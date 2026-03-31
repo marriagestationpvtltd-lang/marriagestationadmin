@@ -370,15 +370,18 @@ class _DashboardPageState extends State<DashboardPage> {
 
   // ─── Main content area ──────────────────────────────────────────────────────
   Widget _buildMainContent() {
+    final bool isChatPage = _selectedIndex == 5;
     return Column(
       children: [
-        _buildTopBar(),
+        if (!isChatPage) _buildTopBar(),
         Expanded(
-          child: Container(
-            color: _kContentBg,
-            padding: const EdgeInsets.all(24),
-            child: _pages[_selectedIndex],
-          ),
+          child: isChatPage
+              ? _pages[_selectedIndex]
+              : Container(
+                  color: _kContentBg,
+                  padding: const EdgeInsets.all(24),
+                  child: _pages[_selectedIndex],
+                ),
         ),
       ],
     );
