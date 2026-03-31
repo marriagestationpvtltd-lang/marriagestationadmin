@@ -10,22 +10,12 @@ class Loading extends StatefulWidget {
 }
 
 class _LoadingState extends State<Loading> {
-  late final ChatProvider _chatProvider;
-
   @override
   void initState() {
     super.initState();
-    _chatProvider = Provider.of<ChatProvider>(context, listen: false);
-    Future.microtask(() {
-      _chatProvider.fetchChatList();
-      _chatProvider.startAutoRefresh();
-    });
-  }
 
-  @override
-  void dispose() {
-    _chatProvider.stopAutoRefresh();
-    super.dispose();
+    Future.microtask(() =>
+        Provider.of<ChatProvider>(context, listen: false).fetchChatList());
   }
 
   @override

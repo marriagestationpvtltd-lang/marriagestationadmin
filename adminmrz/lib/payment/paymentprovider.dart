@@ -1,4 +1,3 @@
-import 'package:adminmrz/core/app_constants.dart';
 import 'package:adminmrz/payment/paymentmodel.dart';
 import 'package:adminmrz/payment/paymentservice.dart';
 import 'package:flutter/material.dart';
@@ -18,13 +17,6 @@ class PaymentProvider with ChangeNotifier {
   DateTime? _startDate;
   DateTime? _endDate;
 
-  // Cache tracking
-  DateTime? _lastFetchTime;
-
-  bool get _isCacheValid =>
-      _lastFetchTime != null &&
-      DateTime.now().difference(_lastFetchTime!) < AppConstants.cacheDuration;
-
   PaymentSummary? get summary => _summary;
   List<Payment> get payments => _filteredPayments;
   List<Payment> get allPayments => _allPayments;
@@ -36,9 +28,7 @@ class PaymentProvider with ChangeNotifier {
   DateTime? get startDate => _startDate;
   DateTime? get endDate => _endDate;
 
-  Future<void> fetchPayments({bool forceRefresh = false}) async {
-    if (!forceRefresh && _isCacheValid && _allPayments.isNotEmpty) return;
-
+  Future<void> fetchPayments() async {
     _isLoading = true;
     _error = '';
     notifyListeners();
@@ -47,7 +37,6 @@ class PaymentProvider with ChangeNotifier {
       final response = await _paymentService.getPaymentHistory();
       _summary = response.summary;
       _allPayments = response.data;
-      _lastFetchTime = DateTime.now();
       _applyFilters();
     } catch (e) {
       _error = e.toString();
@@ -72,7 +61,6 @@ class PaymentProvider with ChangeNotifier {
 
       _summary = response.summary;
       _allPayments = response.data;
-      _lastFetchTime = DateTime.now();
       _applyFilters();
     } catch (e) {
       _error = e.toString();
@@ -115,6 +103,7 @@ class PaymentProvider with ChangeNotifier {
   void _applyFilters() {
     List<Payment> filtered = List<Payment>.from(_allPayments);
 
+    // Apply search filter
     if (_searchQuery.isNotEmpty) {
       filtered = filtered.where((payment) {
         return payment.fullName.toLowerCase().contains(_searchQuery) ||
@@ -124,18 +113,21 @@ class PaymentProvider with ChangeNotifier {
       }).toList();
     }
 
+    // Apply payment method filter
     if (_paymentMethodFilter != 'all') {
       filtered = filtered.where((payment) =>
       payment.paidBy.toLowerCase() == _paymentMethodFilter.toLowerCase())
           .toList();
     }
 
+    // Apply status filter
     if (_statusFilter != 'all') {
       filtered = filtered.where((payment) =>
       payment.packageStatus.toLowerCase() == _statusFilter.toLowerCase())
           .toList();
     }
 
+    // Apply date filter
     if (_startDate != null) {
       filtered = filtered.where((payment) =>
           payment.purchaseDateTime.isAfter(_startDate!.subtract(const Duration(days: 1))))
@@ -152,44 +144,56 @@ class PaymentProvider with ChangeNotifier {
     notifyListeners();
   }
 
+  // Get unique payment methods from data
   List<String> getPaymentMethods() {
     final methods = _allPayments.map((p) => p.paidBy).toSet().toList();
     methods.sort();
     return methods;
   }
 
+  // Get status options
   List<String> getStatusOptions() {
     return ['active', 'expired', 'pending'];
   }
 
+  // Get payment statistics by method
   Map<String, double> getPaymentMethodStats() {
     final Map<String, double> stats = {};
+
     for (var payment in _allPayments) {
       final method = payment.paidBy;
       final price = payment.numericPrice;
+
       stats[method] = (stats[method] ?? 0) + price;
     }
+
     return stats;
   }
 
+  // Get payments by user
   List<Payment> getPaymentsByUserId(int userId) {
     return _allPayments.where((p) => p.userId == userId).toList();
   }
 
+  // Get payments by package
   List<Payment> getPaymentsByPackageId(int packageId) {
     return _allPayments.where((p) => p.packageId == packageId).toList();
   }
 
+  // Calculate total filtered amount
   double get filteredTotalAmount {
     return _filteredPayments.fold(0.0, (sum, payment) => sum + payment.numericPrice);
   }
 
+  // Get monthly earnings
   Map<String, double> getMonthlyEarnings() {
     final Map<String, double> monthly = {};
+
     for (var payment in _allPayments) {
       final monthKey = '${payment.purchaseDateTime.year}-${payment.purchaseDateTime.month.toString().padLeft(2, '0')}';
       monthly[monthKey] = (monthly[monthKey] ?? 0) + payment.numericPrice;
     }
+
     return monthly;
   }
 }

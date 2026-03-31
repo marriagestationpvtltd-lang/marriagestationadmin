@@ -1,4 +1,3 @@
-import 'package:adminmrz/core/app_constants.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
@@ -6,28 +5,24 @@ import 'package:http/http.dart' as http;
 
 import 'docmodel.dart';
 
+
 class DocumentsProvider with ChangeNotifier {
   List<Document> _documents = [];
   bool _isLoading = false;
   String? _error;
+
   bool _isActionLoading = false;
-
-  DateTime? _lastFetchTime;
-
-  bool get _isCacheValid =>
-      _lastFetchTime != null &&
-      DateTime.now().difference(_lastFetchTime!) < AppConstants.cacheDuration;
 
   List<Document> get documents => _documents;
   bool get isLoading => _isLoading;
   String? get error => _error;
   bool get isActionLoading => _isActionLoading;
-
   void clearError() {
     _error = null;
     notifyListeners();
   }
 
+  // Filter getters
   List<Document> get pendingDocuments =>
       _documents.where((doc) => doc.isPending).toList();
 
@@ -37,41 +32,39 @@ class DocumentsProvider with ChangeNotifier {
   List<Document> get rejectedDocuments =>
       _documents.where((doc) => doc.isRejected).toList();
 
-  Future<Map<String, String>> _authHeaders() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString('token');
-    return {
-      'Accept': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
-    };
-  }
-
-  Future<Map<String, String>> _jsonAuthHeaders() async {
-    return {
-      ...await _authHeaders(),
-      'Content-Type': 'application/json',
-    };
-  }
-
-  Future<bool> fetchDocuments({bool forceRefresh = false}) async {
-    if (!forceRefresh && _isCacheValid && _documents.isNotEmpty) return true;
-
+  Future<bool> fetchDocuments() async {
     _isLoading = true;
     _error = null;
     notifyListeners();
 
     try {
-      final url = Uri.parse('${AppConstants.apiBaseUrl}/get_documents.php');
-      final response = await http
-          .get(url, headers: await _authHeaders())
-          .timeout(AppConstants.requestTimeout);
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      if (token == null) {
+        _error = 'Not authenticated';
+        _isLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      final url = Uri.parse('https://digitallami.com/api9/get_documents.php');
+
+      final response = await http.get(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Accept': 'application/json',
+        },
+      );
+
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
+
         if (responseData['success'] == true) {
           final List<dynamic> data = responseData['data'] ?? [];
           _documents = data.map((doc) => Document.fromJson(doc)).toList();
-          _lastFetchTime = DateTime.now();
           _isLoading = false;
           notifyListeners();
           return true;
@@ -104,27 +97,43 @@ class DocumentsProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      final url = Uri.parse('${AppConstants.apiBaseUrl}/update_document_status.php');
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('token');
+
+      if (token == null) {
+        _error = 'Not authenticated';
+        _isActionLoading = false;
+        notifyListeners();
+        return false;
+      }
+
+      final url = Uri.parse('https://digitallami.com/api9/update_document_status.php');
 
       final Map<String, dynamic> body = {
         'user_id': userId,
         'action': action,
       };
+
       if (action == 'reject' && rejectReason != null) {
         body['reject_reason'] = rejectReason;
       }
 
-      final response = await http
-          .post(
-            url,
-            headers: await _jsonAuthHeaders(),
-            body: json.encode(body),
-          )
-          .timeout(AppConstants.requestTimeout);
+      final response = await http.post(
+        url,
+        headers: {
+          'Authorization': 'Bearer $token',
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: json.encode(body),
+      );
+
 
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
+
         if (responseData['success'] == true) {
+          // Update local document status
           final index = _documents.indexWhere((doc) => doc.userId == userId);
           if (index != -1) {
             final updatedDoc = Document(
@@ -142,6 +151,7 @@ class DocumentsProvider with ChangeNotifier {
             );
             _documents[index] = updatedDoc;
           }
+
           _isActionLoading = false;
           notifyListeners();
           return true;
