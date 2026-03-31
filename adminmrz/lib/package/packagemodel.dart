@@ -57,9 +57,19 @@ class Package {
   Map<String, dynamic> toCreateJson() {
     return {
       'name': name,
-      'duration': duration.replaceAll(' Month', '').trim(),
+      'duration': durationInMonths.toString(),
       'description': description,
-      'price': price.replaceAll('Rs ', '').replaceAll(',', '').trim(),
+      'price': numericPrice.toStringAsFixed(2),
+    };
+  }
+
+  Map<String, dynamic> toUpdateJson() {
+    return {
+      'id': id,
+      'name': name,
+      'duration': durationInMonths.toString(),
+      'description': description,
+      'price': numericPrice.toStringAsFixed(2),
     };
   }
 
