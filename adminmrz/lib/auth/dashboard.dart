@@ -1,18 +1,34 @@
 import 'package:adminmrz/auth/service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 
-import '../adminchat/left.dart';
 import '../adminchat/loading.dart';
 import '../dashboard/dashboardhome.dart';
-import '../dashboard/dashmodel.dart';
-import '../dashboard/dashservice.dart';
 import '../document/screens/docscreen.dart';
 import '../package/packageScreen.dart';
 import '../payment/paymentscreen.dart';
 import '../users/userscreen.dart';
 
+// ─── Design tokens ────────────────────────────────────────────────────────────
+const _kSidebarBg     = Color(0xFF0F172A);
+const _kSidebarBorder = Color(0xFF1E293B);
+const _kAccent        = Color(0xFF6366F1);
+const _kAccentLight   = Color(0xFF818CF8);
+const _kTextPrimary   = Color(0xFFE2E8F0);
+const _kTextSecondary = Color(0xFF94A3B8);
+const _kTextMuted     = Color(0xFF64748B);
+const _kContentBg     = Color(0xFFF1F5F9);
+const _kTopBarBg      = Colors.white;
+const _kTopBarBorder  = Color(0xFFE2E8F0);
+
+// ─── Nav item model ───────────────────────────────────────────────────────────
+class _NavItem {
+  final IconData icon;
+  final String label;
+  const _NavItem({required this.icon, required this.label});
+}
+
+// ─── Page ────────────────────────────────────────────────────────────────────
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -23,7 +39,6 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   int _selectedIndex = 0;
   bool _isSidebarExpanded = true;
-  String _pageTitle = 'Dashboard';
 
   final List<Widget> _pages = [
     const DashboardHome(),
@@ -31,312 +46,373 @@ class _DashboardPageState extends State<DashboardPage> {
     const DocumentsPage(),
     const PackagesPage(),
     const PaymentsPage(),
-     Loading(),
+    Loading(),
   ];
 
-  final List<String> _pageTitles = [
-    'Dashboard',
-    'Users',
-    'Documents',
-    'Packages',
-    'Payments',
-    'Chat'
+  static const List<_NavItem> _navItems = [
+    _NavItem(icon: Icons.grid_view_rounded,   label: 'Dashboard'),
+    _NavItem(icon: Icons.people_alt_rounded,  label: 'Members'),
+    _NavItem(icon: Icons.description_rounded, label: 'Documents'),
+    _NavItem(icon: Icons.inventory_2_rounded, label: 'Packages'),
+    _NavItem(icon: Icons.payments_rounded,    label: 'Payments'),
+    _NavItem(icon: Icons.chat_bubble_rounded, label: 'Chat'),
   ];
 
-  final List<IconData> _navIcons = [
-    Icons.dashboard,
-    Icons.people,
-    Icons.analytics,
-    Icons.settings,
-    Icons.money,
-    Icons.chat,
-  ];
+  void _onItemTapped(int index) => setState(() => _selectedIndex = index);
+  void _toggleSidebar()        => setState(() => _isSidebarExpanded = !_isSidebarExpanded);
 
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-      _pageTitle = _pageTitles[index];
-    });
-  }
-
-  void _toggleSidebar() {
-    setState(() {
-      _isSidebarExpanded = !_isSidebarExpanded;
-    });
-  }
-
+  // ─── Build ──────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
-    final adminData = authProvider.adminData;
+    final adminData    = authProvider.adminData;
 
     return Scaffold(
       body: Row(
         children: [
-          // Sidebar Navigation - Minimizable
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeInOut,
-            width: _isSidebarExpanded ? 260 : 80,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(right: BorderSide(color: Color(0xFFe9ecef))),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Logo/Header with toggle button
-                Container(
-                  padding: EdgeInsets.all(_isSidebarExpanded ? 20 : 16),
-                  decoration: const BoxDecoration(
-                    border: Border(bottom: BorderSide(color: Color(0xFFe9ecef))),
-                  ),
-                  child: Row(
-                    children: [
-                      if (!_isSidebarExpanded)
-                        IconButton(
-                          icon: const Icon(Icons.menu),
-                          onPressed: _toggleSidebar,
-                          color: const Color(0xFF667eea),
-                        )
-                      else
-                        Expanded(
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.admin_panel_settings,
-                                color: Color(0xFF667eea),
-                                size: 32,
-                              ),
-                              const SizedBox(width: 12),
-                              const Expanded(
-                                child: Text(
-                                  'Admin Panel',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: Color(0xFF333333),
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.chevron_left),
-                                onPressed: _toggleSidebar,
-                                color: Colors.grey[600],
-                                iconSize: 20,
-                              ),
-                            ],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-
-                if (_isSidebarExpanded) ...[
-                  const SizedBox(height: 20),
-                  // Admin Info - Only show when expanded
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          adminData?['name'] ?? 'Admin',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          adminData?['email'] ?? 'admin@email.com',
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 12,
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Chip(
-                          label: Text(
-                            adminData?['role']?.toString().replaceAll('_', ' ').toUpperCase() ?? 'ADMIN',
-                            style: const TextStyle(
-                              fontSize: 10,
-                              color: Colors.white,
-                            ),
-                          ),
-                          backgroundColor: const Color(0xFF667eea),
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 30),
-                ] else
-                  const SizedBox(height: 20),
-
-                // Navigation Items
-                Expanded(
-                  child: ListView.builder(
-                    padding: EdgeInsets.symmetric(horizontal: _isSidebarExpanded ? 0 : 8),
-                    itemCount: _navIcons.length,
-                    itemBuilder: (context, index) {
-                      return _buildNavItem(
-                        _navIcons[index],
-                        _pageTitles[index],
-                        index,
-                      );
-                    },
-                  ),
-                ),
-
-                // Logout Button
-                Container(
-                  padding: EdgeInsets.all(_isSidebarExpanded ? 20 : 16),
-                  decoration: const BoxDecoration(
-                    border: Border(top: BorderSide(color: Color(0xFFe9ecef))),
-                  ),
-                  child: _isSidebarExpanded
-                      ? ElevatedButton.icon(
-                    onPressed: () async {
-                      await authProvider.logout();
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.red,
-                      elevation: 0,
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        side: BorderSide(color: Colors.red.shade200),
-                      ),
-                    ),
-                    icon: const Icon(Icons.logout, size: 18),
-                    label: const Text('Logout'),
-                  )
-                      : IconButton(
-                    onPressed: () async {
-                      await authProvider.logout();
-                    },
-                    icon: const Icon(Icons.logout),
-                    color: Colors.red,
-                    tooltip: 'Logout',
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Main Content Area - Takes remaining space
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Top Bar
-                Container(
-                  height: 70,
-                  padding: const EdgeInsets.symmetric(horizontal: 30),
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    border: Border(bottom: BorderSide(color: Color(0xFFe9ecef))),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      // Show menu button when sidebar is collapsed
-                      if (!_isSidebarExpanded)
-                        IconButton(
-                          icon: const Icon(Icons.menu),
-                          onPressed: _toggleSidebar,
-                          color: Colors.grey[600],
-                        ),
-                      Text(
-                        _pageTitle,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      IconButton(
-                        onPressed: () {},
-                        icon: const Icon(Icons.notifications),
-                        color: Colors.grey[600],
-                      ),
-                    ],
-                  ),
-                ),
-                // Main Content
-                Expanded(
-                  child: Container(
-                    padding: const EdgeInsets.all(30),
-                    color: const Color(0xFFf8f9fa),
-                    child: _pages[_selectedIndex],
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _buildSidebar(adminData, authProvider),
+          Expanded(child: _buildMainContent()),
         ],
       ),
     );
   }
 
-  Widget _buildNavItem(IconData icon, String title, int index) {
-    return Container(
-      margin: EdgeInsets.symmetric(
-        horizontal: _isSidebarExpanded ? 12 : 8,
-        vertical: 4,
+  // ─── Sidebar ────────────────────────────────────────────────────────────────
+  Widget _buildSidebar(
+    Map<String, dynamic>? adminData,
+    AuthProvider authProvider,
+  ) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeInOut,
+      width: _isSidebarExpanded ? 240 : 68,
+      decoration: const BoxDecoration(color: _kSidebarBg),
+      child: Column(
+        children: [
+          _buildSidebarHeader(),
+          Expanded(child: _buildNavList()),
+          _buildSidebarFooter(adminData, authProvider),
+        ],
       ),
+    );
+  }
+
+  Widget _buildSidebarHeader() {
+    return Container(
+      height: 64,
+      padding: EdgeInsets.symmetric(horizontal: _isSidebarExpanded ? 14 : 0),
+      decoration: const BoxDecoration(
+        border: Border(bottom: BorderSide(color: _kSidebarBorder)),
+      ),
+      child: _isSidebarExpanded
+          ? Row(
+              children: [
+                _logoMark(),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text(
+                        'Marriage Station',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: _kTextPrimary,
+                          letterSpacing: -0.2,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      SizedBox(height: 1),
+                      Text(
+                        'Admin Panel',
+                        style: TextStyle(fontSize: 10, color: _kTextMuted),
+                      ),
+                    ],
+                  ),
+                ),
+                _sidebarToggleButton(),
+              ],
+            )
+          : Center(
+              child: GestureDetector(
+                onTap: _toggleSidebar,
+                child: _logoMark(),
+              ),
+            ),
+    );
+  }
+
+  Widget _logoMark() {
+    return Container(
+      width: 34,
+      height: 34,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(9),
+      ),
+      child: const Icon(Icons.favorite_rounded, color: Colors.white, size: 18),
+    );
+  }
+
+  Widget _sidebarToggleButton() {
+    return SizedBox(
+      width: 28,
+      height: 28,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: _toggleSidebar,
+          borderRadius: BorderRadius.circular(6),
+          child: const Icon(
+            Icons.chevron_left_rounded,
+            size: 18,
+            color: _kTextMuted,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNavList() {
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      itemCount: _navItems.length,
+      itemBuilder: (_, i) => _buildNavTile(i),
+    );
+  }
+
+  Widget _buildNavTile(int index) {
+    final isActive = _selectedIndex == index;
+    final item     = _navItems[index];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
       child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: () => _onItemTapped(index),
           borderRadius: BorderRadius.circular(8),
-          child: Container(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
             padding: EdgeInsets.symmetric(
-              horizontal: _isSidebarExpanded ? 16 : 12,
-              vertical: 12,
+              horizontal: _isSidebarExpanded ? 10 : 0,
+              vertical: 10,
             ),
             decoration: BoxDecoration(
-              color: _selectedIndex == index
-                  ? const Color(0xFFf0f4ff)
-                  : Colors.transparent,
+              color: isActive ? _kAccent.withOpacity(0.14) : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  icon,
-                  color: _selectedIndex == index
-                      ? const Color(0xFF667eea)
-                      : Colors.grey[600],
-                  size: 22,
+              border: Border(
+                left: BorderSide(
+                  color: isActive ? _kAccent : Colors.transparent,
+                  width: 3,
                 ),
-                if (_isSidebarExpanded) ...[
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: TextStyle(
-                        fontWeight: _selectedIndex == index
-                            ? FontWeight.w600
-                            : FontWeight.normal,
-                        color: _selectedIndex == index
-                            ? const Color(0xFF667eea)
-                            : Colors.grey[700],
-                        fontSize: 14,
+              ),
+            ),
+            child: _isSidebarExpanded
+                ? Row(
+                    children: [
+                      const SizedBox(width: 2),
+                      Icon(
+                        item.icon,
+                        size: 18,
+                        color: isActive ? _kAccentLight : _kTextSecondary,
                       ),
-                      overflow: TextOverflow.ellipsis,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          item.label,
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: isActive
+                                ? FontWeight.w600
+                                : FontWeight.w400,
+                            color: isActive ? _kTextPrimary : _kTextSecondary,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      if (isActive)
+                        Container(
+                          width: 6,
+                          height: 6,
+                          decoration: const BoxDecoration(
+                            color: _kAccentLight,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                    ],
+                  )
+                : Center(
+                    child: Tooltip(
+                      message: item.label,
+                      child: Icon(
+                        item.icon,
+                        size: 20,
+                        color: isActive ? _kAccentLight : _kTextSecondary,
+                      ),
                     ),
                   ),
-                ],
-              ],
-            ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildSidebarFooter(
+    Map<String, dynamic>? adminData,
+    AuthProvider authProvider,
+  ) {
+    final name   = adminData?['name']?.toString() ?? 'Admin';
+    final role   = adminData?['role']?.toString() ?? 'admin';
+    final initials = name.isNotEmpty ? name[0].toUpperCase() : 'A';
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: const BoxDecoration(
+        border: Border(top: BorderSide(color: _kSidebarBorder)),
+      ),
+      child: _isSidebarExpanded
+          ? Row(
+              children: [
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: _kAccent.withOpacity(0.2),
+                  child: Text(
+                    initials,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _kAccentLight,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _kTextPrimary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        role,
+                        style: const TextStyle(
+                          fontSize: 10,
+                          color: _kTextMuted,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () async => await authProvider.logout(),
+                      borderRadius: BorderRadius.circular(6),
+                      child: const Icon(
+                        Icons.logout_rounded,
+                        size: 16,
+                        color: _kTextMuted,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : Center(
+              child: Tooltip(
+                message: 'Logout',
+                child: GestureDetector(
+                  onTap: () async => await authProvider.logout(),
+                  child: const Icon(
+                    Icons.logout_rounded,
+                    size: 18,
+                    color: _kTextMuted,
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
+
+  // ─── Main content area ──────────────────────────────────────────────────────
+  Widget _buildMainContent() {
+    return Column(
+      children: [
+        _buildTopBar(),
+        Expanded(
+          child: Container(
+            color: _kContentBg,
+            padding: const EdgeInsets.all(24),
+            child: _pages[_selectedIndex],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTopBar() {
+    final title = _navItems[_selectedIndex].label;
+    return Container(
+      height: 64,
+      padding: const EdgeInsets.symmetric(horizontal: 24),
+      decoration: const BoxDecoration(
+        color: _kTopBarBg,
+        border: Border(bottom: BorderSide(color: _kTopBarBorder)),
+      ),
+      child: Row(
+        children: [
+          // Breadcrumb
+          const Icon(Icons.home_outlined, size: 14, color: _kTextSecondary),
+          const SizedBox(width: 6),
+          const Text('/', style: TextStyle(fontSize: 12, color: _kTextSecondary)),
+          const SizedBox(width: 6),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF334155),
+            ),
+          ),
+          const Spacer(),
+          // Notification bell
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: _kTopBarBorder),
+            ),
+            child: IconButton(
+              onPressed: () {},
+              icon: const Icon(
+                Icons.notifications_outlined,
+                size: 18,
+                color: _kTextMuted,
+              ),
+              padding: EdgeInsets.zero,
+              tooltip: 'Notifications',
+            ),
+          ),
+        ],
       ),
     );
   }
