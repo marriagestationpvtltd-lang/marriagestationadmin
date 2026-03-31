@@ -494,12 +494,12 @@ class _ChatSidebarState extends State<ChatSidebar> {
                             _selectedChat = user;
                             _updateSelectedChat();
                           });
-                          Future.microtask(() {
-                            if (chatProvider.id != null) {
-                              Provider.of<MatchedProfileProvider>(context, listen: false)
-                                  .fetchMatchedProfiles(chatProvider.id!);
-                            }
-                          });
+                          // Fetch matched profiles for the newly selected user
+                          final newId = int.tryParse(user["id"].toString()) ?? 0;
+                          if (newId > 0) {
+                            Provider.of<MatchedProfileProvider>(context, listen: false)
+                                .fetchMatchedProfiles(newId);
+                          }
                         },
                       );
                     },

@@ -1,13 +1,10 @@
 import 'package:adminmrz/adminchat/right.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'chathome.dart';
 import 'chatprovider.dart';
-import 'constant.dart';
 import 'left.dart';
-import 'main.dart';
 
 class ChatScreen extends StatefulWidget {
   // var nama;
@@ -34,11 +31,6 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Only rebuild the ProfileSidebar header when the selected user id changes.
-    // ChatWindow and ChatSidebar read the provider themselves, so we only need
-    // the id here for ProfileSidebar's didUpdateWidget check.
-    final receiverId = context.select<ChatProvider, int?>((p) => p.id) ?? 0;
-
     return Scaffold(
       backgroundColor: const Color(0xFFF0F2F5),
       body: Row(
@@ -54,7 +46,7 @@ class _ChatScreenState extends State<ChatScreen> {
               setState(() {
                 selectedTab = index;
               });
-            }, id: receiverId,
+            },
           ), // Right Sidebar
         ],
       ),
