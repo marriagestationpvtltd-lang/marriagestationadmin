@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'chatprovider.dart';
+import 'dart:html' as html;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Design tokens
@@ -686,6 +687,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
 
             return _ProfileCard(
               key: ValueKey(profileId),
+              profileId:   profileId,
               fullName:    fullName,
               firstName:   provider.firstNames[idx],
               lastName:    provider.lastNames[idx],
@@ -789,6 +791,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
 //  Profile Card widget (extracted for performance via const constructor)
 // ─────────────────────────────────────────────────────────────────────────────
 class _ProfileCard extends StatelessWidget {
+  final int     profileId;
   final String  fullName;
   final String  firstName;
   final String  lastName;
@@ -808,6 +811,7 @@ class _ProfileCard extends StatelessWidget {
 
   const _ProfileCard({
     Key? key,
+    required this.profileId,
     required this.fullName,
     required this.firstName,
     required this.lastName,
@@ -1042,7 +1046,7 @@ class _ProfileCard extends StatelessWidget {
 
                   const SizedBox(height: 2),
 
-                  // Member ID + share button
+                  // Member ID row
                   Row(
                     children: [
                       const Icon(Icons.badge_outlined, size: 10,
@@ -1058,6 +1062,49 @@ class _ProfileCard extends StatelessWidget {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 6),
+
+                  // View Profile + Share buttons
+                  Row(
+                    children: [
+                      // View Profile button
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => html.window.open(
+                            'https://digitallami.com/profile.php?id=$profileId',
+                            '_blank',
+                          ),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 4),
+                            decoration: BoxDecoration(
+                              border: Border.all(color: _kPrimary, width: 1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.open_in_new_rounded,
+                                    size: 9, color: _kPrimary),
+                                SizedBox(width: 3),
+                                Text(
+                                  'View Profile',
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w600,
+                                    color: _kPrimary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
                       // Share button
                       GestureDetector(
                         onTap: isShared ? null : onShare,
