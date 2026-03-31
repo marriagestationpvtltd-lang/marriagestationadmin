@@ -339,7 +339,11 @@ class _UsersPageState extends State<UsersPage> {
   Widget _defaultAvatar(User user) {
     return Center(
       child: Text(
-        user.fullName.isNotEmpty ? user.fullName[0].toUpperCase() : '?',
+        user.fullName.isNotEmpty
+            ? String.fromCharCode(
+                user.fullName.runes.first,
+              ).toUpperCase()
+            : '?',
         style: const TextStyle(
           color: Colors.white,
           fontSize: 20,
@@ -719,13 +723,13 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  Widget _miniChip(String label, int count, Color fg, Color bg) {
+  Widget _miniChip(String label, int count, Color foregroundColor, Color backgroundColor) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: bg,
+        color: backgroundColor,
         borderRadius: AppTheme.radiusSm,
-        border: Border.all(color: fg.withOpacity(0.25)),
+        border: Border.all(color: foregroundColor.withOpacity(0.25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -733,14 +737,14 @@ class _UsersPageState extends State<UsersPage> {
           Container(
             width: 6,
             height: 6,
-            decoration: BoxDecoration(shape: BoxShape.circle, color: fg),
+            decoration: BoxDecoration(shape: BoxShape.circle, color: foregroundColor),
           ),
           const SizedBox(width: 5),
           Text(
             '$count $label',
             style: TextStyle(
               fontSize: 11,
-              color: fg,
+              color: foregroundColor,
               fontWeight: FontWeight.w700,
             ),
           ),
