@@ -474,7 +474,7 @@ class _UsersPageState extends State<UsersPage> {
 
   Widget _buildUserCard(User user, UserProvider provider) {
     final isSelected = provider.isUserSelected(user.id);
-    final isPending = user.status.toLowerCase() == 'pending';
+    final isPending = user.isPending;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
@@ -859,19 +859,19 @@ class _UsersPageState extends State<UsersPage> {
     }
   }
 
-  Widget _statusBadge(String label, String rawStatus) {
+  Widget _statusBadge(String label, String status) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: AppTheme.statusBgColor(rawStatus),
+        color: AppTheme.statusBgColor(status),
         borderRadius: AppTheme.radiusSm,
-        border: Border.all(color: AppTheme.statusColor(rawStatus).withOpacity(0.25)),
+        border: Border.all(color: AppTheme.statusColor(status).withOpacity(0.25)),
       ),
       child: Text(
         label,
         style: TextStyle(
           fontSize: 10,
-          color: AppTheme.statusColor(rawStatus),
+          color: AppTheme.statusColor(status),
           fontWeight: FontWeight.w700,
         ),
       ),

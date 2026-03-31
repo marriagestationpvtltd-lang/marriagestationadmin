@@ -76,6 +76,8 @@ class User {
 
   bool get hasProfilePicture => profilePicture != null && profilePicture!.isNotEmpty;
 
+  bool get isPending => status.toLowerCase() == 'pending';
+
   String get formattedStatus {
     return status.replaceAll('_', ' ').toUpperCase();
   }
