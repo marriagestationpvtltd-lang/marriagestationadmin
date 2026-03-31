@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:adminmrz/adminchat/services/pushservice.dart';
+import 'package:adminmrz/settings/call_settings_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:provider/provider.dart';
 import 'tokengenerator.dart';
 
 class CallScreen extends StatefulWidget {
@@ -55,6 +57,7 @@ class _CallScreenState extends State<CallScreen> {
 
   late AudioPlayer _ringtonePlayer;
   bool _isPlayingRingtone = false;
+  Timer? _ringtoneRepeatTimer;
 
   // ================= INIT =================
   @override
@@ -67,30 +70,55 @@ class _CallScreenState extends State<CallScreen> {
 
   // ================= AUDIO =================
   void _setupAudio() {
+    _ringtonePlayer.setReleaseMode(ReleaseMode.stop);
     _ringtonePlayer.onPlayerStateChanged.listen((state) {
       if (!mounted) return;
       setState(() => _isPlayingRingtone = state == PlayerState.playing);
+      // When the tone finishes, schedule the next repeat
+      if (state == PlayerState.completed && widget.isOutgoingCall && !_ending) {
+        _scheduleRepeat();
+      }
     });
+  }
+
+  void _scheduleRepeat() {
+    if (!mounted || _ending) return;
+    final settings = context.read<CallSettingsProvider>();
+    final interval = settings.repeatIntervalSeconds;
+    _ringtoneRepeatTimer = Timer(Duration(seconds: interval), () {
+      if (!mounted || _ending) return;
+      _playRingtoneSingle();
+    });
+  }
+
+  Future<void> _playRingtoneSingle() async {
+    if (!widget.isOutgoingCall || _ending) return;
+    try {
+      final settings = context.read<CallSettingsProvider>();
+      await _ringtonePlayer.stop();
+      await _ringtonePlayer.play(
+        AssetSource(settings.selectedTone.asset),
+        volume: 1.0,
+      );
+    } catch (_) {}
   }
 
   Future<void> _playRingtone() async {
     if (!widget.isOutgoingCall) return;
-
     try {
       await _ringtonePlayer.stop();
-
+      final settings = context.read<CallSettingsProvider>();
       await _ringtonePlayer.play(
-        AssetSource('images/outcall.mp3'),
+        AssetSource(settings.selectedTone.asset),
         volume: 1.0,
       );
-
-      await _ringtonePlayer.setReleaseMode(ReleaseMode.loop);
     } catch (e) {
     }
   }
 
   Future<void> _stopRingtone() async {
     try {
+      _ringtoneRepeatTimer?.cancel();
       await _ringtonePlayer.stop();
       if (mounted) setState(() => _isPlayingRingtone = false);
     } catch (e) {
@@ -307,6 +335,7 @@ class _CallScreenState extends State<CallScreen> {
   void dispose() {
     _callTimer?.cancel();
     _timeoutTimer?.cancel();
+    _ringtoneRepeatTimer?.cancel();
 
     try {
       _engine.leaveChannel();

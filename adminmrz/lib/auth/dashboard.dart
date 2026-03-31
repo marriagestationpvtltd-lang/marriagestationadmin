@@ -9,6 +9,7 @@ import '../dashboard/dashboardhome.dart';
 import '../document/screens/docscreen.dart';
 import '../package/packageScreen.dart';
 import '../payment/paymentscreen.dart';
+import '../settings/call_settings_screen.dart';
 import '../users/userscreen.dart';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -54,6 +55,7 @@ class _DashboardPageState extends State<DashboardPage> {
       const PackagesPage(),
       const PaymentsPage(),
       Loading(),
+      const CallSettingsScreen(),
     ];
   }
 
@@ -74,6 +76,7 @@ class _DashboardPageState extends State<DashboardPage> {
     _NavItem(icon: Icons.inventory_2_rounded, label: 'Packages'),
     _NavItem(icon: Icons.payments_rounded,    label: 'Payments'),
     _NavItem(icon: Icons.chat_bubble_rounded, label: 'Chat'),
+    _NavItem(icon: Icons.tune_rounded,        label: 'Call Settings'),
   ];
 
   void _onItemTapped(int index) => setState(() => _selectedIndex = index);

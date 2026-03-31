@@ -7,6 +7,7 @@ import 'adminchat/chatprovider.dart';
 import 'adminchat/services/MatchedProfileService.dart';
 import 'adminchat/services/callmanager.dart';
 import 'auth/dashboard.dart';
+import 'settings/call_settings_provider.dart';
 import 'auth/login.dart';
 import 'auth/service.dart';
 import 'core/theme_provider.dart';
@@ -52,6 +53,7 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(create: (context) => ChatProvider()),
         ChangeNotifierProvider(create: (context) => MatchedProfileProvider()),
         ChangeNotifierProvider(create: (_) => CallManager()),
+        ChangeNotifierProvider(create: (_) => CallSettingsProvider()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) => MaterialApp(
