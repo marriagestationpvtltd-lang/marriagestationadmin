@@ -8,8 +8,14 @@ class DashboardResponse {
   });
 
   factory DashboardResponse.fromJson(Map<String, dynamic> json) {
+    final rawSuccess = json['success'];
+    final rawString = rawSuccess?.toString().toLowerCase();
+    final success = rawSuccess == true ||
+        rawSuccess == 1 ||
+        rawString == '1' ||
+        rawString == 'true';
     return DashboardResponse(
-      success: json['success'] == true || json['success'] == 1,
+      success: success,
       dashboard: DashboardData.fromJson(json['dashboard'] ?? {}),
     );
   }

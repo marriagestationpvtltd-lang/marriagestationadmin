@@ -7,8 +7,6 @@ import 'package:intl/intl.dart';
 import '../adminchat/left.dart';
 import '../adminchat/loading.dart';
 import '../dashboard/dashboardhome.dart';
-import '../dashboard/dashmodel.dart';
-import '../dashboard/dashservice.dart';
 import '../document/screens/docscreen.dart';
 import '../package/packageScreen.dart';
 import '../payment/paymentscreen.dart';
