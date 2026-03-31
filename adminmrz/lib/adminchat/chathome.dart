@@ -61,6 +61,13 @@ class _ChatWindowState extends State<ChatWindow> {
   String _selectedLanguage = 'en-US'; // 'en-US' or 'ne-NP'
   String _textBeforeVoice = ''; // text already in field before listening started
 
+  // Pagination
+  static const int _pageSize = 20;
+  int _currentLimit = 20;
+  bool _isLoadingMore = false;
+  bool _hasMoreMessages = true;
+  int? _prevUserId;
+
   // Match-related data
   Map<String, dynamic>? _matchDetails;
   bool _isLoadingMatchDetails = false;
@@ -73,9 +80,42 @@ class _ChatWindowState extends State<ChatWindow> {
     _initializeRecorder();
     _printFirebaseConfig();
     _fetchMatchDetails();
+    _scrollController.addListener(_onScrollForPagination);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FocusScope.of(context).requestFocus(_messageFocusNode);
     });
+  }
+
+  /// Triggered when the selected user changes to reset pagination state.
+  void _resetPagination() {
+    setState(() {
+      _currentLimit = _pageSize;
+      _isLoadingMore = false;
+      _hasMoreMessages = true;
+      _lastSnapshot = null;
+    });
+  }
+
+  /// Scroll listener: load older messages when the user scrolls to the top
+  /// (in a reversed list the "top" is the end of the scroll extent).
+  void _onScrollForPagination() {
+    if (!_scrollController.hasClients) return;
+    final pos = _scrollController.position;
+    if (pos.pixels >= pos.maxScrollExtent - 200 && !_isLoadingMore && _hasMoreMessages) {
+      _loadMoreMessages();
+    }
+  }
+
+  Future<void> _loadMoreMessages() async {
+    if (_isLoadingMore || !_hasMoreMessages) return;
+    setState(() {
+      _isLoadingMore = true;
+      _currentLimit += _pageSize;
+    });
+    // The StreamBuilder automatically re-subscribes with the new limit.
+    // _hasMoreMessages is updated once the new snapshot arrives.
+    await Future.delayed(const Duration(milliseconds: 300));
+    if (mounted) setState(() => _isLoadingMore = false);
   }
 
   void _printFirebaseConfig() {
@@ -335,6 +375,12 @@ class _ChatWindowState extends State<ChatWindow> {
 
     final chatProvider = Provider.of<ChatProvider>(context);
 
+    // Reset pagination when the selected user changes.
+    if (chatProvider.id != _prevUserId) {
+      _prevUserId = chatProvider.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) => _resetPagination());
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF0F2F5),
       appBar: PreferredSize(
@@ -559,6 +605,7 @@ class _ChatWindowState extends State<ChatWindow> {
                   .where('senderid', whereIn: [senderId.toString(), chatProvider.id.toString()])
                   .where('receiverid', whereIn: [senderId.toString(), chatProvider.id.toString()])
                   .orderBy('timestamp', descending: true)
+                  .limit(_currentLimit)
                   .snapshots(),
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
@@ -606,6 +653,13 @@ class _ChatWindowState extends State<ChatWindow> {
 
                 if (snapshot.hasData) {
                   _lastSnapshot = snapshot.data;
+                  // If we received fewer docs than requested, there are no older messages.
+                  final bool noMore = snapshot.data!.docs.length < _currentLimit;
+                  if (noMore != !_hasMoreMessages) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) setState(() => _hasMoreMessages = !noMore);
+                    });
+                  }
                 }
 
                 if (messages.isEmpty) {
@@ -630,13 +684,42 @@ class _ChatWindowState extends State<ChatWindow> {
                 }
 
                 final itemCount = messages.length;
+                // Extra slot at the end of the reversed list (= visual top) for the
+                // load-more indicator.
+                final listItemCount = itemCount + (_hasMoreMessages || _isLoadingMore ? 1 : 0);
 
                 return ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
                   reverse: true,
-                  itemCount: itemCount,
+                  itemCount: listItemCount,
                   itemBuilder: (context, index) {
+                    // The last item in the reversed list is the oldest-message indicator.
+                    if (index == itemCount) {
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: Center(
+                          child: _isLoadingMore
+                              ? const SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: kPrimary,
+                                  ),
+                                )
+                              : TextButton.icon(
+                                  onPressed: _loadMoreMessages,
+                                  icon: const Icon(Icons.history, size: 14, color: kPrimary),
+                                  label: const Text(
+                                    'Load older messages',
+                                    style: TextStyle(fontSize: 12, color: kPrimary),
+                                  ),
+                                ),
+                        ),
+                      );
+                    }
+
                     var doc = messages[index];
                     var data = doc.data() as Map<String, dynamic>;
                     bool isSentByMe = data['senderid'] == senderId.toString();
@@ -1608,6 +1691,7 @@ class _ChatWindowState extends State<ChatWindow> {
 
   @override
   void dispose() {
+    _scrollController.removeListener(_onScrollForPagination);
     _scrollController.dispose();
     _messageFocusNode.dispose();
     _messageController.dispose();
