@@ -1445,8 +1445,34 @@ class _ChatWindowState extends State<ChatWindow> {
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Column(
                         children: [
+                          // ── User ID (mandatory) ──────────────────────────
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: kCardPrimary.withOpacity(0.07),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: kCardPrimary.withOpacity(0.25), width: 0.8),
+                            ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.tag_rounded, size: 10, color: kCardPrimary),
+                                const SizedBox(width: 4),
+                                const Text(
+                                  'User ID',
+                                  style: TextStyle(fontSize: 9.5, color: kCardPrimary, fontWeight: FontWeight.w600),
+                                ),
+                                const Spacer(),
+                                Text(
+                                  '#${profileData['id']}',
+                                  style: const TextStyle(fontSize: 9.5, color: kCardPrimary, fontWeight: FontWeight.w700),
+                                ),
+                              ],
+                            ),
+                          ),
                           _buildInfoRow(Icons.badge_rounded, 'Member ID', profileData['Member ID'], kInfoLabel, kInfoValue),
                           _buildInfoRow(Icons.wc_rounded, 'Gender', profileData['gender'], kInfoLabel, kInfoValue),
+                          _buildInfoRow(Icons.location_on_rounded, 'Country', profileData['country'], kInfoLabel, kInfoValue),
                           _buildInfoRow(Icons.work_rounded, 'Occupation', profileData['occupation'], kInfoLabel, kInfoValue),
                           _buildInfoRow(Icons.school_rounded, 'Education', profileData['education'], kInfoLabel, kInfoValue),
                           _buildInfoRow(Icons.favorite_border_rounded, 'Marital', profileData['marit'], kInfoLabel, kInfoValue),

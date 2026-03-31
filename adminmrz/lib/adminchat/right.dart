@@ -235,6 +235,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
     String firstName,
     String lastName,
     String? profilePicture,
+    String country,
   ) async {
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
     try {
@@ -252,6 +253,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
         'last':         lastName,
         'first':        firstName,
         'is_paid':      chatProvider.ispaid,
+        'country':      country,
       };
 
       await _firestore.collection('adminchat').add({
@@ -782,6 +784,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
                 provider.firstNames[idx],
                 provider.lastNames[idx],
                 pic,
+                provider.country[idx],
               ),
               timeAgo: _timeAgo,
             );
