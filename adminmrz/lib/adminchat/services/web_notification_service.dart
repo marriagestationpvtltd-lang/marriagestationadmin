@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:js' as js;
@@ -9,6 +10,12 @@ import 'dart:js' as js;
 class WebNotificationService {
   WebNotificationService._();
 
+  static bool _permissionListenerAttached = false;
+  static bool _permissionRequestInFlight = false;
+  static StreamSubscription<html.Event>? _permissionClickSub;
+  static StreamSubscription<html.KeyboardEvent>? _permissionKeySub;
+  static StreamSubscription<html.Event>? _permissionTouchSub;
+
   // ------------------------------------------------------------------
   // Permission
   // ------------------------------------------------------------------
@@ -19,6 +26,38 @@ class WebNotificationService {
     if (!html.Notification.supported) return;
     if (html.Notification.permission == 'granted') return;
     await html.Notification.requestPermission();
+    _disposePermissionListeners();
+  }
+
+  /// Ensures we request permission on the next user gesture (click/tap/key).
+  /// Required because some browsers block permission prompts without a gesture.
+  static void ensurePermissionOnUserGesture() {
+    if (!html.Notification.supported) return;
+    if (html.Notification.permission != 'default') return;
+    if (_permissionListenerAttached) return;
+
+    _permissionListenerAttached = true;
+
+    Future<void> handleRequest([dynamic _]) async {
+      if (_permissionRequestInFlight) return;
+      _permissionRequestInFlight = true;
+      await requestPermission();
+      _permissionRequestInFlight = false;
+    }
+
+    _permissionClickSub = html.document.onClick.listen(handleRequest);
+    _permissionKeySub = html.document.onKeyDown.listen(handleRequest);
+    _permissionTouchSub = html.document.onTouchStart.listen(handleRequest);
+  }
+
+  static void _disposePermissionListeners() {
+    _permissionClickSub?.cancel();
+    _permissionKeySub?.cancel();
+    _permissionTouchSub?.cancel();
+    _permissionClickSub = null;
+    _permissionKeySub = null;
+    _permissionTouchSub = null;
+    _permissionListenerAttached = false;
   }
 
   // ------------------------------------------------------------------
@@ -53,6 +92,10 @@ class WebNotificationService {
     bool showInForeground = false,
   }) {
     if (!html.Notification.supported) return;
+    if (html.Notification.permission == 'default') {
+      ensurePermissionOnUserGesture();
+      return;
+    }
     if (html.Notification.permission != 'granted') return;
     if (!showInForeground && !isAppInBackground()) return;
 

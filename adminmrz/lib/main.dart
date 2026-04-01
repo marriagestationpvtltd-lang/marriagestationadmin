@@ -27,9 +27,11 @@ Future<void> main() async {
 
 
 
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+
+  WebNotificationService.ensurePermissionOnUserGesture();
 
   // Request browser notification permission so background notifications work.
   await WebNotificationService.requestPermission();
