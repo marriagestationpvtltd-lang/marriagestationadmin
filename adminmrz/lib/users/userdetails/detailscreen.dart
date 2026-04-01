@@ -7,14 +7,20 @@ import 'package:provider/provider.dart';
 import 'detailmodel.dart';
 
 // ─────────────────────────── colour palette ───────────────────────────────────
-const _kPrimary   = Color(0xFF6366F1);
-const _kPersonal  = Color(0xFF6366F1);
-const _kEducation = Color(0xFF059669);
-const _kFamily    = Color(0xFF7C3AED);
-const _kLifestyle = Color(0xFFF59E0B);
-const _kPartner   = Color(0xFFDB2777);
-const _kDocs      = Color(0xFF0EA5E9);
-const _kPageBg    = Color(0xFFF1F5F9);
+const _kPrimary      = Color(0xFF6366F1); // indigo-500
+const _kPrimaryDark  = Color(0xFF4F46E5);
+const _kViolet       = Color(0xFF8B5CF6);
+const _kEmerald      = Color(0xFF10B981);
+const _kAmber        = Color(0xFFF59E0B);
+const _kRose         = Color(0xFFEF4444);
+const _kSky          = Color(0xFF0EA5E9);
+const _kPersonal     = _kPrimary;
+const _kEducation    = _kEmerald;
+const _kFamily       = _kViolet;
+const _kLifestyle    = _kAmber;
+const _kPartner      = Color(0xFFDB2777);
+const _kDocs         = _kSky;
+const _kPageBg       = Color(0xFFF1F5F9);
 
 // ──────────────────────────── Screen ─────────────────────────────────────────
 class UserDetailsScreen extends StatefulWidget {
@@ -129,7 +135,7 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
             controller: _rejectDocCtrl,
             maxLines: 3,
             decoration: const InputDecoration(
-              hintText: 'Reason (optional)',
+              hintText: 'Reason for rejection',
             ),
           ),
           actions: [
@@ -139,7 +145,7 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
             ),
             ElevatedButton(
               onPressed: () => Navigator.pop(context, _rejectDocCtrl.text.trim()),
-              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+              style: ElevatedButton.styleFrom(backgroundColor: _kRose),
               child: const Text('Reject'),
             ),
           ],
@@ -147,6 +153,18 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
       );
       if (res == null) return;
       reason = res;
+      if (reason.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('Please provide a rejection reason'),
+            backgroundColor: _kRose,
+            behavior: SnackBarBehavior.floating,
+            margin: const EdgeInsets.all(16),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+        return;
+      }
     }
 
     final ok = await prov.handleProfilePhotoRequest(action: action, reason: reason);
@@ -155,7 +173,7 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
         SnackBar(
           content: Text(ok ? 'Photo ${action == 'approve' ? 'approved' : 'rejected'}' : 'Action failed'),
           backgroundColor: ok
-              ? (action == 'approve' ? const Color(0xFF10B981) : const Color(0xFFEF4444))
+              ? (action == 'approve' ? _kEmerald : _kRose)
               : Colors.red.shade700,
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.all(16),
@@ -163,6 +181,26 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
         ),
       );
     }
+  }
+
+  Future<void> _requestPhotoUpload(PersonalDetail p) async {
+    if (!mounted) return;
+    final prov = context.read<UserDetailsProvider>();
+    final ok = await prov.sendAdminNotification(
+      title: 'Please upload your profile photo',
+      message:
+          'Hi ${p.firstName}, please upload a clear profile photo so our team can verify and approve your profile faster.',
+    );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok ? 'Upload request sent to user' : 'Failed to send request'),
+        backgroundColor: ok ? _kPrimary : _kRose,
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.all(16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+    );
   }
 
   Future<void> _showSendNotificationDialog() async {
@@ -384,6 +422,39 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
         ),
       );
 
+  Widget _chipButton({
+    required String label,
+    required IconData icon,
+    required VoidCallback onTap,
+    Color color = _kPrimary,
+    Color? bg,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: bg ?? color.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: color.withOpacity(0.25)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: color),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                  fontSize: 12.5, fontWeight: FontWeight.w700, color: color),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ── section wrapper ──────────────────────────────────────────────────────────
 
   Widget _section({
@@ -391,6 +462,7 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
     required IconData icon,
     required Color color,
     required List<Widget> rows,
+    Widget? trailing,
   }) {
     return Container(
       decoration: BoxDecoration(
@@ -415,6 +487,8 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
                     letterSpacing: 0.2,
                   ),
                 ),
+                const Spacer(),
+                if (trailing != null) trailing,
               ],
             ),
           ),
@@ -432,16 +506,16 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.07),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: color.withOpacity(0.25)),
+        color: color.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.18)),
       ),
       child: Row(
         children: [
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.18),
+              color: color.withOpacity(0.20),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, size: 16, color: color),
@@ -451,13 +525,297 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(label,
-                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+                  style: TextStyle(fontSize: 12, color: Colors.blueGrey.shade600, fontWeight: FontWeight.w700)),
               const SizedBox(height: 2),
               Text(value,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _activityStatGrid(UserDetailsProvider prov) {
+    final stats = prov.activityStats;
+    if (prov.isLoadingActivity && stats == null) {
+      return const SizedBox(
+        height: 60,
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    final s = stats ?? ActivityStats.empty();
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: [
+        _activityStatCard('Requests Sent', '${s.requestsSent}', _kPrimary, Icons.send_rounded),
+        _activityStatCard('Requests Received', '${s.requestsReceived}', _kViolet, Icons.inbox_outlined),
+        _activityStatCard('Chat Sent', '${s.chatRequestsSent}', _kSky, Icons.chat_bubble_outline),
+        _activityStatCard('Chat Accepted', '${s.chatRequestsAccepted}', _kEmerald, Icons.check_circle_outline),
+        _activityStatCard('Profile Views', '${s.profileViews}', _kAmber, Icons.visibility_outlined),
+        _activityStatCard('Matches', '${s.matchesCount}', _kPartner, Icons.favorite_outline),
+      ],
+    );
+  }
+
+  Widget _statusPill(String label, Color color, {IconData? icon}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(icon, size: 13, color: color),
+            const SizedBox(width: 6),
+          ],
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: color,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMediaAndActivity(PersonalDetail p, UserDetailsProvider prov) {
+    final isPhotoMissing = !p.hasProfilePicture;
+    final photoStatus = p.photoRequest.isNotEmpty
+        ? p.photoRequest
+        : (isPhotoMissing ? 'No profile photo' : 'Uploaded');
+
+    Widget mediaCard = Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _statusPill(
+                photoStatus.toUpperCase(),
+                isPhotoMissing
+                    ? _kAmber
+                    : photoStatus.toLowerCase().contains('approve')
+                        ? _kEmerald
+                        : photoStatus.toLowerCase().contains('reject')
+                            ? _kRose
+                            : _kSky,
+                icon: Icons.photo_camera_outlined,
+              ),
+              const Spacer(),
+              IconButton(
+                tooltip: 'Refresh',
+                icon: const Icon(Icons.refresh, size: 16),
+                onPressed: () => prov.fetchUserDetails(widget.userId, widget.myId),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 200,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              gradient: LinearGradient(
+                colors: [
+                  _kPrimary.withOpacity(0.08),
+                  _kViolet.withOpacity(0.08),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              border: Border.all(color: _kPrimary.withOpacity(0.18)),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: p.hasProfilePicture
+                ? Stack(
+                    children: [
+                      Positioned.fill(
+                        child: Image.network(
+                          p.profilePicture,
+                          fit: BoxFit.cover,
+                          loadingBuilder: (_, child, prog) =>
+                              prog == null ? child : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                          errorBuilder: (_, __, ___) => const Center(
+                            child: Icon(Icons.broken_image, size: 48, color: Colors.grey),
+                          ),
+                        ),
+                      ),
+                      Positioned(
+                        top: 12,
+                        right: 12,
+                        child: _statusPill(photoStatus, _kPrimaryDark, icon: Icons.verified_user),
+                      ),
+                    ],
+                  )
+                : Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(Icons.photo_camera_outlined, size: 42, color: _kPrimaryDark),
+                        SizedBox(height: 8),
+                        Text(
+                          'No profile photo yet',
+                          style: TextStyle(fontSize: 13, color: Color(0xFF475569), fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+          ),
+          const SizedBox(height: 12),
+          if (isPhotoMissing)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                icon: const Icon(Icons.send_outlined, size: 16),
+                label: const Text('Request profile photo'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _kPrimary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  elevation: 0,
+                ),
+                onPressed: prov.isSendingNotification ? null : () => _requestPhotoUpload(p),
+              ),
+            )
+          else
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.verified_outlined, size: 16),
+                    label: const Text('Approve'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: _kEmerald,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      elevation: 0,
+                    ),
+                    onPressed: prov.isPhotoActioning ? null : () => _handlePhotoAction('approve'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.cancel_outlined, size: 16),
+                    label: const Text('Reject'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: _kRose,
+                      side: const BorderSide(color: _kRose),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                    onPressed: prov.isPhotoActioning ? null : () => _handlePhotoAction('reject'),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      ),
+    );
+
+    Widget activityCard = Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 16,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'Engagement & Activity',
+                style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+              ),
+              if (prov.isLoadingActivity) ...[
+                const SizedBox(width: 8),
+                const SizedBox(
+                  height: 14,
+                  width: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ],
+              const Spacer(),
+              IconButton(
+                tooltip: 'Reload activity',
+                icon: const Icon(Icons.refresh, size: 16),
+                onPressed: () => prov.fetchActivityStats(widget.userId),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _activityStatGrid(prov),
+        ],
+      ),
+    );
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            _kPrimary.withOpacity(0.06),
+            _kViolet.withOpacity(0.06),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _kPrimary.withOpacity(0.12)),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isWide = constraints.maxWidth > 760;
+          if (isWide) {
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(flex: 4, child: mediaCard),
+                const SizedBox(width: 14),
+                Expanded(flex: 6, child: activityCard),
+              ],
+            );
+          }
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              mediaCard,
+              const SizedBox(height: 12),
+              activityCard,
+            ],
+          );
+        },
       ),
     );
   }
@@ -513,10 +871,6 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
   }
 
   Widget _buildAdminActions(PersonalDetail p, UserDetailsProvider prov) {
-    final photoState = p.photoRequest.toLowerCase();
-    final hasPendingPhoto = photoState.contains('pending') ||
-        photoState.contains('request') ||
-        (photoState.isNotEmpty && photoState != 'approved');
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Column(
@@ -563,33 +917,6 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
                     ? () => widget.onOpenChat!(widget.userId)
                     : null,
               ),
-              if (hasPendingPhoto)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.verified_outlined, size: 16),
-                      label: const Text('Approve Photo'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF10B981),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      ),
-                      onPressed: prov.isPhotoActioning ? null : () => _handlePhotoAction('approve'),
-                    ),
-                    const SizedBox(width: 8),
-                    OutlinedButton.icon(
-                      icon: const Icon(Icons.cancel_outlined, size: 16),
-                      label: const Text('Reject'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFFEF4444),
-                        side: const BorderSide(color: Color(0xFFEF4444)),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      ),
-                      onPressed: prov.isPhotoActioning ? null : () => _handlePhotoAction('reject'),
-                    ),
-                  ],
-                ),
             ],
           ),
         ],
@@ -614,8 +941,8 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
                 height: 92,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: Colors.blue.shade200, width: 3),
-                  color: Colors.blue.shade50,
+                  border: Border.all(color: _kPrimary.withOpacity(0.25), width: 3),
+                  color: _kPrimary.withOpacity(0.08),
                 ),
                 child: ClipOval(
                   child: p.hasProfilePicture
@@ -647,9 +974,9 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
                     Text(
                       p.fullName,
                       style: const TextStyle(
-                        fontSize: 21,
-                        fontWeight: FontWeight.w700,
-                        color: Color(0xFF1E3A8A),
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: _kPrimaryDark,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -674,16 +1001,16 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
                         _badge(
                           label: p.userType.isEmpty ? 'FREE' : p.userType.toUpperCase(),
                           icon: p.userType == 'paid' ? Icons.workspace_premium : Icons.person_outline,
-                          bg: p.userType == 'paid' ? Colors.amber.shade50 : Colors.grey.shade100,
-                          border: p.userType == 'paid' ? Colors.amber.shade400 : Colors.grey.shade300,
-                          fg: p.userType == 'paid' ? Colors.amber.shade900 : Colors.grey.shade700,
+                          bg: p.userType == 'paid' ? _kAmber.withOpacity(0.15) : Colors.grey.shade100,
+                          border: p.userType == 'paid' ? _kAmber.withOpacity(0.6) : Colors.grey.shade300,
+                          fg: p.userType == 'paid' ? const Color(0xFF92400E) : Colors.grey.shade700,
                         ),
                         _badge(
                           label: p.isVerified == 1 ? 'Verified' : 'Pending Verification',
                           icon: p.isVerified == 1 ? Icons.verified_user : Icons.pending_actions,
-                          bg: p.isVerified == 1 ? Colors.green.shade50 : Colors.orange.shade50,
-                          border: p.isVerified == 1 ? Colors.green.shade300 : Colors.orange.shade300,
-                          fg: p.isVerified == 1 ? Colors.green.shade800 : Colors.orange.shade800,
+                          bg: p.isVerified == 1 ? _kEmerald.withOpacity(0.12) : _kAmber.withOpacity(0.12),
+                          border: p.isVerified == 1 ? _kEmerald.withOpacity(0.4) : _kAmber.withOpacity(0.4),
+                          fg: p.isVerified == 1 ? const Color(0xFF065F46) : const Color(0xFFB45309),
                         ),
                         if (p.privacy.isNotEmpty)
                           _badge(
@@ -840,10 +1167,226 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
         ],
       );
 
+  Future<void> _openPartnerEdit(PartnerPreference pp) async {
+    final prov = context.read<UserDetailsProvider>();
+    final fields = [
+      {'key': 'minAge', 'label': 'Min Age', 'api': 'minage', 'initial': pp.minAge == 0 ? '' : pp.minAge.toString(), 'type': TextInputType.number},
+      {'key': 'maxAge', 'label': 'Max Age', 'api': 'maxage', 'initial': pp.maxAge == 0 ? '' : pp.maxAge.toString(), 'type': TextInputType.number},
+      {'key': 'minWeight', 'label': 'Min Weight', 'api': 'minweight', 'initial': pp.minWeight == 0 ? '' : pp.minWeight.toString(), 'type': TextInputType.number},
+      {'key': 'maxWeight', 'label': 'Max Weight', 'api': 'maxweight', 'initial': pp.maxWeight == 0 ? '' : pp.maxWeight.toString(), 'type': TextInputType.number},
+      {'key': 'maritalStatus', 'label': 'Marital Status', 'api': 'maritalstatus', 'initial': pp.maritalStatus, 'type': TextInputType.text},
+      {'key': 'profileWithChild', 'label': 'Profile With Child', 'api': 'profilewithchild', 'initial': pp.profileWithChild, 'type': TextInputType.text},
+      {'key': 'familyType', 'label': 'Family Type', 'api': 'familytype', 'initial': pp.familyType, 'type': TextInputType.text},
+      {'key': 'religion', 'label': 'Religion', 'api': 'religion', 'initial': pp.religion, 'type': TextInputType.text},
+      {'key': 'caste', 'label': 'Caste', 'api': 'caste', 'initial': pp.caste, 'type': TextInputType.text},
+      {'key': 'motherTongue', 'label': 'Mother Tongue', 'api': 'mothertoungue', 'initial': pp.motherTongue, 'type': TextInputType.text},
+      {'key': 'country', 'label': 'Country', 'api': 'country', 'initial': pp.country, 'type': TextInputType.text},
+      {'key': 'state', 'label': 'State', 'api': 'state', 'initial': pp.state, 'type': TextInputType.text},
+      {'key': 'city', 'label': 'City', 'api': 'city', 'initial': pp.city, 'type': TextInputType.text},
+      {'key': 'qualification', 'label': 'Qualification', 'api': 'qualification', 'initial': pp.qualification, 'type': TextInputType.text},
+      {'key': 'educationMedium', 'label': 'Education Medium', 'api': 'educationmedium', 'initial': pp.educationMedium, 'type': TextInputType.text},
+      {'key': 'profession', 'label': 'Profession', 'api': 'proffession', 'initial': pp.profession, 'type': TextInputType.text},
+      {'key': 'workingWith', 'label': 'Working With', 'api': 'workingwith', 'initial': pp.workingWith, 'type': TextInputType.text},
+      {'key': 'annualIncome', 'label': 'Annual Income', 'api': 'annualincome', 'initial': pp.annualIncome, 'type': TextInputType.text},
+      {'key': 'diet', 'label': 'Diet', 'api': 'diet', 'initial': pp.diet, 'type': TextInputType.text},
+      {'key': 'smokeAccept', 'label': 'Smoke Acceptable', 'api': 'smokeaccept', 'initial': pp.smokeAccept, 'type': TextInputType.text},
+      {'key': 'drinkAccept', 'label': 'Drink Acceptable', 'api': 'drinkaccept', 'initial': pp.drinkAccept, 'type': TextInputType.text},
+      {'key': 'disabilityAccept', 'label': 'Disability Acceptable', 'api': 'disabilityaccept', 'initial': pp.disabilityAccept, 'type': TextInputType.text},
+      {'key': 'complexion', 'label': 'Complexion', 'api': 'complexion', 'initial': pp.complexion, 'type': TextInputType.text},
+      {'key': 'bodyType', 'label': 'Body Type', 'api': 'bodytype', 'initial': pp.bodyType, 'type': TextInputType.text},
+      {'key': 'manglik', 'label': 'Manglik', 'api': 'manglik', 'initial': pp.manglik, 'type': TextInputType.text},
+      {'key': 'hersCopeBelief', 'label': 'Horoscope Belief', 'api': 'herscopeblief', 'initial': pp.hersCopeBelief, 'type': TextInputType.text},
+      {'key': 'otherExpectation', 'label': 'Other Expectations', 'api': 'otherexpectation', 'initial': pp.otherExpectation, 'type': TextInputType.multiline},
+    ];
+
+    final controllers = {
+      for (final f in fields)
+        f['key'] as String: TextEditingController(
+          text: (f['initial'] as String).isNotEmpty && (f['initial'] as String) != 'Not available'
+              ? f['initial'] as String
+              : '',
+        )
+    };
+
+    bool isSaving = false;
+    String? error;
+
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        final viewInsets = MediaQuery.of(ctx).viewInsets.bottom;
+        return Padding(
+          padding: EdgeInsets.only(bottom: viewInsets),
+          child: StatefulBuilder(
+            builder: (ctx, setSheetState) {
+              Future<void> submit() async {
+                setSheetState(() {
+                  isSaving = true;
+                  error = null;
+                });
+
+                for (final f in fields) {
+                  final key = f['key'] as String;
+                  final api = f['api'] as String;
+                  final section = 'partner';
+                  final value = controllers[key]!.text.trim();
+                  final initial = f['initial'] as String;
+                  if (value == initial) continue;
+                  final ok = await prov.updateField(
+                    section: section,
+                    field: api,
+                    value: value,
+                  );
+                  if (!ok) {
+                    setSheetState(() {
+                      error = prov.updateError.isNotEmpty ? prov.updateError : 'Failed to update ${f['label']}';
+                      isSaving = false;
+                    });
+                    return;
+                  }
+                }
+
+                setSheetState(() => isSaving = false);
+                Navigator.pop(ctx, true);
+              }
+
+              return SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: const [
+                        Icon(Icons.favorite, size: 18, color: _kPartner),
+                        SizedBox(width: 8),
+                        Text(
+                          'Edit Partner Preferences',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Update all partner expectations in one place. Changes save field-by-field.',
+                      style: TextStyle(fontSize: 13, color: Color(0xFF475569)),
+                    ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: fields.map((f) {
+                        final key = f['key'] as String;
+                        final type = f['type'] as TextInputType;
+                        return SizedBox(
+                          width: MediaQuery.of(ctx).size.width > 720 ? 320 : double.infinity,
+                          child: TextField(
+                            controller: controllers[key],
+                            keyboardType: type == TextInputType.multiline ? TextInputType.multiline : type,
+                            maxLines: type == TextInputType.multiline ? 3 : 1,
+                            decoration: InputDecoration(
+                              labelText: f['label'] as String,
+                              filled: true,
+                              fillColor: Colors.grey.shade50,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: _kPrimary, width: 1.4),
+                              ),
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            ),
+                            style: const TextStyle(fontSize: 13.5),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    if (error != null) ...[
+                      const SizedBox(height: 12),
+                      Text(error!, style: const TextStyle(color: _kRose, fontWeight: FontWeight.w600)),
+                    ],
+                    const SizedBox(height: 18),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: isSaving ? null : () => Navigator.pop(ctx, false),
+                            style: OutlinedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              side: const BorderSide(color: Color(0xFFE2E8F0)),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                            child: const Text('Cancel'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: isSaving ? null : submit,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: _kPartner,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 14),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              elevation: 0,
+                            ),
+                            child: isSaving
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Text('Save All'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+
+    for (final ctrl in controllers.values) {
+      ctrl.dispose();
+    }
+
+    if (saved == true && mounted) {
+      await prov.fetchUserDetails(widget.userId, widget.myId);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text('Partner preferences updated'),
+          backgroundColor: _kPartner,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+    }
+  }
+
   Widget _buildPartner(PartnerPreference pp) => _section(
         title: 'Partner Preferences',
         icon: Icons.favorite,
         color: _kPartner,
+        trailing: _chipButton(
+          label: 'Edit all',
+          icon: Icons.edit_outlined,
+          onTap: () => _openPartnerEdit(pp),
+          color: _kPartner,
+        ),
         rows: [
           _row('pp_age', 'Age Range', pp.ageRange, section: 'partner', apiField: 'age_range', icon: Icons.calendar_today, highlight: true),
           _row('pp_weight', 'Weight Range', pp.weightRange, section: 'partner', apiField: 'weight_range', icon: Icons.monitor_weight_outlined),
@@ -1471,8 +2014,8 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
             child: Column(
               children: [
                 _buildHeader(p),
+                _buildMediaAndActivity(p, provider),
                 _buildAdminActions(p, provider),
-                _buildActivityStats(provider),
                 const Divider(height: 1, thickness: 1),
                 _buildPersonal(p),
                 const Divider(height: 1, thickness: 1),
