@@ -235,6 +235,7 @@ class _ChatWindowState extends State<ChatWindow> {
         'participants': [senderId.toString(), receiverId],
         'lastMessage': label,
         'lastTimestamp': FieldValue.serverTimestamp(),
+        'lastSenderId': senderId.toString(),
       }, SetOptions(merge: true));
     } catch (_) {}
   }
@@ -452,6 +453,7 @@ class _ChatWindowState extends State<ChatWindow> {
         'participants': [senderId.toString(), chatProvider.id.toString()],
         'lastMessage': 'Sent a match profile',
         'lastTimestamp': FieldValue.serverTimestamp(),
+        'lastSenderId': senderId.toString(),
       }, SetOptions(merge: true));
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -2253,6 +2255,7 @@ class _ChatWindowState extends State<ChatWindow> {
         'participants': [senderId.toString(), chatProvider.id.toString()],
         'lastMessage': messageText,
         'lastTimestamp': FieldValue.serverTimestamp(),
+        'lastSenderId': senderId.toString(),
       }, SetOptions(merge: true));
 
     } catch (e) {

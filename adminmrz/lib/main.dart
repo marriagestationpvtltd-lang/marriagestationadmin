@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'adminchat/chatprovider.dart';
 import 'adminchat/services/MatchedProfileService.dart';
 import 'adminchat/services/callmanager.dart';
+import 'adminchat/services/web_notification_service.dart';
 import 'auth/dashboard.dart';
 import 'settings/call_settings_provider.dart';
 import 'auth/login.dart';
@@ -30,7 +31,8 @@ Future<void> main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
 
-
+  // Request browser notification permission so background notifications work.
+  await WebNotificationService.requestPermission();
 
   runApp(const MyApp());
 }
