@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:ui';
 import 'package:adminmrz/adminchat/services/pushservice.dart';
 import 'package:adminmrz/settings/call_settings_provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -8,12 +9,20 @@ import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
 import 'tokengenerator.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 
 // No need for dart:html import
 
 // Video call state progression: calling → ringing → connected
 enum _VCallStatus { calling, ringing, connected }
+
+const _kPrimary = Color(0xFF6366F1);
+const _kPrimaryDark = Color(0xFF4F46E5);
+const _kViolet = Color(0xFF8B5CF6);
+const _kEmerald = Color(0xFF10B981);
+const _kAmber = Color(0xFFF59E0B);
+const _kRose = Color(0xFFEF4444);
+const _kSlate = Color(0xFF0F172A);
+const _kSlateDark = Color(0xFF1E293B);
 
 class VideoCallScreen extends StatefulWidget {
   final String currentUserId;
@@ -392,57 +401,42 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final size = MediaQuery.of(context).size;
+    final double localWidth =
+        (size.width * 0.28).clamp(120.0, 200.0).toDouble();
+    final double localHeight =
+        (localWidth * 1.35).clamp(170.0, 280.0).toDouble();
+    final double topBarRightInset = _videoEnabled ? localWidth + 32 : 16;
+
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: _kSlate,
       body: SafeArea(
         child: Stack(
           children: [
-            // Remote video fills the screen
-            if (_remoteVideoView != null)
-              Positioned.fill(child: _remoteVideoView!)
-            else
-              const Center(
-                child: CircularProgressIndicator(color: Colors.white),
-              ),
-
-            // Local video overlay
-            if (_localVideoView != null && _videoEnabled)
-              Positioned(
-                top: 20,
-                right: 20,
-                width: 150,
-                height: 220,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: _localVideoView!,
-                ),
-              )
-            else if (_videoEnabled)
-            // Placeholder while waiting for camera
-              Positioned(
-                top: 20,
-                right: 20,
-                width: 150,
-                height: 220,
-                child: Container(
-                  color: Colors.grey[900],
-                  child: const Icon(Icons.videocam, color: Colors.white54, size: 40),
-                ),
-              ),
-
-            // Bottom controls
+            Positioned.fill(
+              child:
+                  _remoteVideoView ?? _buildRemotePlaceholder(),
+            ),
+            Positioned.fill(child: IgnorePointer(child: _buildVignette())),
             Positioned(
-              bottom: 20,
+              top: 12,
+              left: 16,
+              right: topBarRightInset,
+              child: _buildTopBar(),
+            ),
+            if (_videoEnabled)
+              Positioned(
+                top: 84,
+                right: 16,
+                width: localWidth,
+                height: localHeight,
+                child: _buildLocalPreview(),
+              ),
+            Positioned(
+              bottom: 16,
               left: 0,
               right: 0,
               child: _buildControls(),
-            ),
-
-            // Top status
-            Positioned(
-              top: 20,
-              left: 20,
-              child: _buildStatus(),
             ),
           ],
         ),
@@ -450,36 +444,203 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     );
   }
 
-  Widget _buildStatus() {
-    String title;
-    String subtitle;
-    switch (_callStatus) {
-      case _VCallStatus.calling:
-        title = 'Calling ${widget.otherUserName}…';
-        subtitle = 'Connecting…';
-        break;
-      case _VCallStatus.ringing:
-        title = 'Calling ${widget.otherUserName}…';
-        subtitle = 'Ringing…';
-        break;
-      case _VCallStatus.connected:
-        title = 'Connected with ${widget.otherUserName}';
-        subtitle = _format(_duration);
-        break;
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.black54,
-        borderRadius: BorderRadius.circular(20),
+  Widget _buildTopBar() {
+    final String statusLabel = switch (_callStatus) {
+      _VCallStatus.calling => 'Calling',
+      _VCallStatus.ringing => 'Ringing',
+      _VCallStatus.connected => 'Live',
+    };
+    final String subtitle = switch (_callStatus) {
+      _VCallStatus.calling => 'Connecting…',
+      _VCallStatus.ringing => 'Ringing…',
+      _VCallStatus.connected => _format(_duration),
+    };
+    final Color statusColor =
+        _callStatus == _VCallStatus.connected ? _kEmerald : _kAmber;
+    final String trimmedName = widget.otherUserName.trim();
+    final String initial =
+        trimmedName.isNotEmpty ? trimmedName.substring(0, 1).toUpperCase() : '?';
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(26),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.35),
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: Colors.white.withOpacity(0.12)),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: const LinearGradient(
+                    colors: [_kPrimary, _kViolet],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: _kPrimaryDark.withOpacity(0.35),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  initial,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.otherUserName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.75),
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.18),
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: statusColor.withOpacity(0.45)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 6,
+                      height: 6,
+                      decoration: BoxDecoration(
+                        color: statusColor,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      statusLabel,
+                      style: TextStyle(
+                        color: statusColor,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(color: Colors.white, fontSize: 14)),
-          const SizedBox(height: 4),
-          Text(subtitle, style: const TextStyle(color: Colors.white70, fontSize: 12)),
+    );
+  }
+
+  Widget _buildRemotePlaceholder() {
+    final String label = _callStatus == _VCallStatus.connected
+        ? 'Reconnecting video…'
+        : 'Connecting video…';
+    return Container(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [_kSlate, _kSlateDark],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.videocam, color: Colors.white24, size: 72),
+            const SizedBox(height: 12),
+            Text(
+              label,
+              style: const TextStyle(color: Colors.white70, fontSize: 14),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocalPreview() {
+    return Container(
+      decoration: BoxDecoration(
+        color: _kSlateDark,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.white.withOpacity(0.18)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.35),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
         ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(18),
+        child: _localVideoView ??
+            Container(
+              color: _kSlateDark,
+              alignment: Alignment.center,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  Icon(Icons.videocam, color: Colors.white54, size: 36),
+                  SizedBox(height: 8),
+                  Text(
+                    'Camera starting…',
+                    style: TextStyle(color: Colors.white70, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+      ),
+    );
+  }
+
+  Widget _buildVignette() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            Colors.black.withOpacity(0.2),
+            Colors.black.withOpacity(0.55),
+          ],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          stops: const [0.0, 0.9],
+        ),
       ),
     );
   }
@@ -487,57 +648,119 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   Widget _buildControls() {
     final bool controlsEnabled = _callStatus != _VCallStatus.calling;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-        children: [
-          // Minimize button – only shown when hosted in an overlay
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final bool compact = constraints.maxWidth < 520;
+        final double buttonSize = compact ? 52 : 60;
+        final double endSize = compact ? 66 : 74;
+        final double spacing = compact ? 12 : 16;
+
+        final List<Widget> buttons = [
           if (widget.onMinimize != null)
-            IconButton(
-              icon: const Icon(Icons.picture_in_picture_alt, color: Colors.white, size: 36),
-              tooltip: 'Minimize call',
+            _controlButton(
+              icon: Icons.picture_in_picture_alt,
               onPressed: widget.onMinimize,
+              size: buttonSize,
+              backgroundColor: _kPrimary.withOpacity(0.22),
+              iconColor: Colors.white,
             ),
-          IconButton(
-            icon: Icon(
-              _micMuted ? Icons.mic_off : Icons.mic,
-              color: controlsEnabled ? Colors.white : Colors.white30,
-              size: 36,
-            ),
+          _controlButton(
+            icon: _micMuted ? Icons.mic_off : Icons.mic,
             onPressed: controlsEnabled ? _toggleMute : null,
+            size: buttonSize,
+            iconColor: _micMuted ? _kAmber : Colors.white,
           ),
-          IconButton(
-            icon: Icon(
-              _videoEnabled ? Icons.videocam : Icons.videocam_off,
-              color: controlsEnabled ? Colors.white : Colors.white30,
-              size: 36,
-            ),
+          _controlButton(
+            icon: _videoEnabled ? Icons.videocam : Icons.videocam_off,
             onPressed: controlsEnabled ? _toggleVideo : null,
+            size: buttonSize,
+            iconColor: _videoEnabled ? Colors.white : _kAmber,
           ),
-          IconButton(
-            icon: const Icon(Icons.call_end, color: Colors.red, size: 56),
+          _controlButton(
+            icon: Icons.call_end,
             onPressed: _endCall,
+            size: endSize,
+            backgroundColor: _kRose,
+            iconColor: Colors.white,
           ),
-          IconButton(
-            icon: Icon(
-              _speakerOn ? Icons.volume_up : Icons.volume_off,
-              color: controlsEnabled ? Colors.white : Colors.white30,
-              size: 36,
-            ),
+          _controlButton(
+            icon: _speakerOn ? Icons.volume_up : Icons.volume_off,
             onPressed: controlsEnabled ? _toggleSpeaker : null,
+            size: buttonSize,
+            iconColor: _speakerOn ? _kEmerald : Colors.white,
           ),
-          IconButton(
-            icon: Icon(
-              Icons.flip_camera_android,
-              color: (_videoEnabled && controlsEnabled)
-                  ? Colors.white
-                  : Colors.white30,
-              size: 36,
-            ),
+          _controlButton(
+            icon: Icons.flip_camera_android,
             onPressed: (_videoEnabled && controlsEnabled) ? _switchCamera : null,
+            size: buttonSize,
+            iconColor: _videoEnabled ? Colors.white : Colors.white54,
           ),
-        ],
+        ];
+
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(32),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+              child: Container(
+                padding: EdgeInsets.symmetric(
+                  vertical: compact ? 12 : 16,
+                  horizontal: compact ? 12 : 18,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.35),
+                  borderRadius: BorderRadius.circular(32),
+                  border: Border.all(color: Colors.white.withOpacity(0.12)),
+                ),
+                child: Wrap(
+                  alignment: WrapAlignment.center,
+                  spacing: spacing,
+                  runSpacing: 12,
+                  children: buttons,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _controlButton({
+    required IconData icon,
+    required VoidCallback? onPressed,
+    required double size,
+    Color? backgroundColor,
+    Color? iconColor,
+  }) {
+    final bool enabled = onPressed != null;
+    final Color resolvedBackground = backgroundColor ??
+        (enabled
+            ? Colors.black.withOpacity(0.35)
+            : Colors.black.withOpacity(0.2));
+    final Color resolvedIcon = iconColor ?? Colors.white;
+
+    return SizedBox(
+      width: size,
+      height: size,
+      child: Material(
+        color: resolvedBackground,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(size / 2),
+          side: BorderSide(
+            color: Colors.white.withOpacity(enabled ? 0.16 : 0.08),
+          ),
+        ),
+        child: InkWell(
+          onTap: onPressed,
+          borderRadius: BorderRadius.circular(size / 2),
+          child: Icon(
+            icon,
+            color: enabled ? resolvedIcon : Colors.white38,
+            size: size * 0.45,
+          ),
+        ),
       ),
     );
   }
