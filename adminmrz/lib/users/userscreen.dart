@@ -742,8 +742,7 @@ class _UsersPageState extends State<UsersPage> {
       final Color textColor =
           isDark
               ? Colors.white
-              : (Color.lerp(color, Colors.black, _kActionTextDarkenFactor) ??
-                  color);
+              : Color.lerp(color, Colors.black, _kActionTextDarkenFactor)!;
     return Tooltip(
       message: title,
       child: InkWell(
