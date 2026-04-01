@@ -55,6 +55,8 @@ class _UsersPageState extends State<UsersPage> {
             userId: user.id,
             myId: user.id,
             onOpenChat: widget.onOpenChat,
+            email: user.email,
+            phone: user.phone,
           ),
         ),
       ),

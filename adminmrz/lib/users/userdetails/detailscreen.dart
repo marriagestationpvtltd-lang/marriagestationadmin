@@ -6,6 +6,31 @@ import 'package:provider/provider.dart';
 
 import 'detailmodel.dart';
 
+class _BulkFieldConfig {
+  final String key;
+  final String label;
+  final String apiField;
+  final String section;
+  final String initial;
+  final TextInputType inputType;
+  final bool multiline;
+
+  const _BulkFieldConfig({
+    required this.key,
+    required this.label,
+    required this.apiField,
+    required this.section,
+    required this.initial,
+    this.inputType = TextInputType.text,
+    this.multiline = false,
+  });
+}
+
+String _cleanInitial(String value) {
+  if (value == 'Not available' || value == 'null') return '';
+  return value;
+}
+
 // ─────────────────────────── colour palette ───────────────────────────────────
 const _kPrimary      = Color(0xFF6366F1); // indigo-500
 const _kPrimaryDark  = Color(0xFF4F46E5);
@@ -27,12 +52,18 @@ class UserDetailsScreen extends StatefulWidget {
   final int userId;
   final int myId;
   final void Function(int userId)? onOpenChat;
+  final String? email;
+  final String? phone;
+  final String? whatsapp;
 
   const UserDetailsScreen({
     super.key,
     required this.userId,
     required this.myId,
     this.onOpenChat,
+    this.email,
+    this.phone,
+    this.whatsapp,
   });
 
   @override
@@ -926,7 +957,7 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
 
   // ── profile header ───────────────────────────────────────────────────────────
 
-  Widget _buildHeader(PersonalDetail p) {
+  Widget _buildHeader(PersonalDetail p, ContactDetail c) {
     return Container(
       color: Colors.white,
       padding: const EdgeInsets.all(28),
@@ -1022,6 +1053,8 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
                           ),
                       ],
                     ),
+                    const SizedBox(height: 12),
+                    _buildContactInfo(c),
                   ],
                 ),
               ),
@@ -1092,12 +1125,124 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
         ),
       );
 
+  Widget _buildContactInfo(ContactDetail c) {
+    final hasAny = c.hasEmail || c.hasPhone;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.blueGrey.shade50),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.03),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.contact_mail_outlined, size: 16, color: _kPrimary),
+              const SizedBox(width: 8),
+              const Text(
+                'Contact Information',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: _kPrimaryDark),
+              ),
+              if (!hasAny) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.amber.shade50,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text('Missing', style: TextStyle(fontSize: 11, color: Colors.amber.shade700)),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 16,
+            runSpacing: 10,
+            children: [
+              _contactTile(
+                icon: Icons.email_outlined,
+                label: 'Email',
+                value: c.hasEmail ? c.email : 'Not available',
+              ),
+              _contactTile(
+                icon: Icons.phone_outlined,
+                label: 'Phone',
+                value: c.hasPhone ? c.preferredPhone : 'Not available',
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _contactTile({
+    required IconData icon,
+    required String label,
+    required String value,
+  }) {
+    final missing = value.isEmpty || value == 'Not available' || value == 'null';
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: missing ? Colors.grey.shade50 : Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: missing ? Colors.grey.shade200 : Colors.blue.shade100),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: missing ? Colors.grey.shade500 : Colors.blue.shade700),
+          const SizedBox(width: 8),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade600,
+                    fontWeight: FontWeight.w600,
+                  )),
+              const SizedBox(height: 2),
+              Text(
+                missing ? 'Not available' : value,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: missing ? Colors.grey.shade500 : Colors.blueGrey.shade900,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   // ── section builders ─────────────────────────────────────────────────────────
 
   Widget _buildPersonal(PersonalDetail p) => _section(
         title: 'Personal Details',
         icon: Icons.person_outline,
         color: _kPersonal,
+        trailing: _chipButton(
+          label: 'Edit all',
+          icon: Icons.edit_outlined,
+          onTap: () => _openPersonalBulk(p),
+          color: _kPersonal,
+        ),
         rows: [
           _row('p_height', 'Height', p.heightName, section: 'personal', apiField: 'height_name', icon: Icons.height, highlight: true),
           _row('p_dob', 'Birth Date', p.birthDate, section: 'personal', apiField: 'birthDate', icon: Icons.cake),
@@ -1120,6 +1265,12 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
         title: 'Education & Career',
         icon: Icons.school_outlined,
         color: _kEducation,
+        trailing: _chipButton(
+          label: 'Edit all',
+          icon: Icons.edit_outlined,
+          onTap: () => _openEducationBulk(p),
+          color: _kEducation,
+        ),
         rows: [
           _row('e_type', 'Education Type', p.educationType, section: 'personal', apiField: 'educationtype', icon: Icons.school, highlight: true),
           _row('e_degree', 'Degree', p.degree, section: 'personal', apiField: 'degree', icon: Icons.military_tech_outlined),
@@ -1139,6 +1290,12 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
         title: 'Family Details',
         icon: Icons.family_restroom,
         color: _kFamily,
+        trailing: _chipButton(
+          label: 'Edit all',
+          icon: Icons.edit_outlined,
+          onTap: () => _openFamilyBulk(f),
+          color: _kFamily,
+        ),
         rows: [
           _row('f_type', 'Family Type', f.familyType, section: 'family', apiField: 'familytype', icon: Icons.home_outlined, highlight: true),
           _row('f_background', 'Family Background', f.familyBackground, section: 'family', apiField: 'familybackground', icon: Icons.history_edu),
@@ -1158,6 +1315,12 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
         title: 'Lifestyle',
         icon: Icons.emoji_food_beverage,
         color: _kLifestyle,
+        trailing: _chipButton(
+          label: 'Edit all',
+          icon: Icons.edit_outlined,
+          onTap: () => _openLifestyleBulk(ls),
+          color: _kLifestyle,
+        ),
         rows: [
           _row('l_diet', 'Diet', ls.diet, section: 'lifestyle', apiField: 'diet', icon: Icons.restaurant, highlight: true),
           _row('l_smoke', 'Smoking', ls.smoke, section: 'lifestyle', apiField: 'smoke', icon: Icons.smoking_rooms),
@@ -1166,6 +1329,174 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
           _row('l_drink_type', 'Drink Type', ls.drinkType, section: 'lifestyle', apiField: 'drinktype', icon: Icons.wine_bar),
         ],
       );
+
+  Future<void> _openBulkEditor({
+    required String title,
+    required Color color,
+    required List<_BulkFieldConfig> fields,
+    String description =
+        'Update multiple fields in one go. Each change saves field-by-field.',
+  }) async {
+    final prov = context.read<UserDetailsProvider>();
+    final controllers = {
+      for (final f in fields)
+        f.key: TextEditingController(text: _cleanInitial(f.initial)),
+    };
+    bool isSaving = false;
+    String? error;
+
+    final saved = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) {
+        final viewInsets = MediaQuery.of(ctx).viewInsets.bottom;
+        return Padding(
+          padding: EdgeInsets.only(bottom: viewInsets),
+          child: StatefulBuilder(
+            builder: (ctx, setSheetState) {
+              Future<void> submit() async {
+                setSheetState(() {
+                  isSaving = true;
+                  error = null;
+                });
+
+                for (final f in fields) {
+                  final value = controllers[f.key]!.text.trim();
+                  if (value == _cleanInitial(f.initial)) continue;
+                  final ok = await prov.updateField(
+                    section: f.section,
+                    field: f.apiField,
+                    value: value,
+                  );
+                  if (!ok) {
+                    setSheetState(() {
+                      error = prov.updateError.isNotEmpty
+                          ? prov.updateError
+                          : 'Failed to update ${f.label}';
+                      isSaving = false;
+                    });
+                    return;
+                  }
+                }
+
+                setSheetState(() => isSaving = false);
+                Navigator.pop(ctx, true);
+              }
+
+              return SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.tune, size: 18, color: color),
+                        const SizedBox(width: 8),
+                        Text(
+                          title,
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      description,
+                      style: const TextStyle(fontSize: 13, color: Color(0xFF475569)),
+                    ),
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: fields.map((f) {
+                        return SizedBox(
+                          width: MediaQuery.of(ctx).size.width > 720 ? 320 : double.infinity,
+                          child: TextField(
+                            controller: controllers[f.key],
+                            keyboardType: f.multiline ? TextInputType.multiline : f.inputType,
+                            maxLines: f.multiline ? 3 : 1,
+                            decoration: InputDecoration(
+                              labelText: f.label,
+                              filled: true,
+                              fillColor: Colors.grey.shade50,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                              ),
+                              enabledBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+                              ),
+                              focusedBorder: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(10),
+                                borderSide: BorderSide(color: color),
+                              ),
+                              isDense: true,
+                            ),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    if (error != null) ...[
+                      const SizedBox(height: 12),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF1F2),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: const Color(0xFFFECBD3)),
+                        ),
+                        child: Text(
+                          error ?? '',
+                          style: const TextStyle(color: Color(0xFFB91C1C), fontSize: 12.5),
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: isSaving ? null : submit,
+                        icon: isSaving
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.save_outlined, size: 16),
+                        label: Text(isSaving ? 'Saving...' : 'Save Changes'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: color,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                  ],
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+
+    if (saved == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('$title updated'),
+        backgroundColor: color,
+        behavior: SnackBarBehavior.floating,
+      ));
+    }
+  }
 
   Future<void> _openPartnerEdit(PartnerPreference pp) async {
     final prov = context.read<UserDetailsProvider>();
@@ -1416,6 +1747,87 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
             _row('pp_other', 'Other Expectations', pp.otherExpectation, section: 'partner', apiField: 'otherexpectation', icon: Icons.notes),
         ],
       );
+
+  Future<void> _openPersonalBulk(PersonalDetail p) {
+    return _openBulkEditor(
+      title: 'Edit Personal Details',
+      color: _kPersonal,
+      description: 'Quickly adjust core personal fields in a single sheet.',
+      fields: [
+        _BulkFieldConfig(key: 'height', label: 'Height', apiField: 'height_name', section: 'personal', initial: p.heightName),
+        _BulkFieldConfig(key: 'birthDate', label: 'Birth Date', apiField: 'birthDate', section: 'personal', initial: p.birthDate),
+        _BulkFieldConfig(key: 'birthTime', label: 'Birth Time', apiField: 'birthtime', section: 'personal', initial: p.birthtime),
+        _BulkFieldConfig(key: 'birthCity', label: 'Birth City', apiField: 'birthcity', section: 'personal', initial: p.birthcity),
+        _BulkFieldConfig(key: 'religion', label: 'Religion', apiField: 'religionName', section: 'personal', initial: p.religionName),
+        _BulkFieldConfig(key: 'community', label: 'Community', apiField: 'communityName', section: 'personal', initial: p.communityName),
+        _BulkFieldConfig(key: 'subCommunity', label: 'Sub Community', apiField: 'subCommunityName', section: 'personal', initial: p.subCommunityName),
+        _BulkFieldConfig(key: 'motherTongue', label: 'Mother Tongue', apiField: 'motherTongue', section: 'personal', initial: p.motherTongue),
+        _BulkFieldConfig(key: 'bloodGroup', label: 'Blood Group', apiField: 'bloodGroup', section: 'personal', initial: p.bloodGroup),
+        _BulkFieldConfig(key: 'maritalStatus', label: 'Marital Status', apiField: 'maritalStatusName', section: 'personal', initial: p.maritalStatusName),
+        _BulkFieldConfig(key: 'manglik', label: 'Manglik', apiField: 'manglik', section: 'personal', initial: p.manglik),
+        _BulkFieldConfig(key: 'disability', label: 'Disability', apiField: 'Disability', section: 'personal', initial: p.disability),
+        _BulkFieldConfig(key: 'photoRequest', label: 'Photo Request', apiField: 'photo_request', section: 'personal', initial: p.photoRequest),
+        _BulkFieldConfig(key: 'privacy', label: 'Privacy Setting', apiField: 'privacy', section: 'personal', initial: p.privacy),
+      ],
+    );
+  }
+
+  Future<void> _openEducationBulk(PersonalDetail p) {
+    return _openBulkEditor(
+      title: 'Edit Education & Career',
+      color: _kEducation,
+      description: 'Bulk edit education and career information.',
+      fields: [
+        _BulkFieldConfig(key: 'educationType', label: 'Education Type', apiField: 'educationtype', section: 'personal', initial: p.educationType),
+        _BulkFieldConfig(key: 'degree', label: 'Degree', apiField: 'degree', section: 'personal', initial: p.degree),
+        _BulkFieldConfig(key: 'faculty', label: 'Faculty', apiField: 'faculty', section: 'personal', initial: p.faculty),
+        _BulkFieldConfig(key: 'educationMedium', label: 'Education Medium', apiField: 'educationmedium', section: 'personal', initial: p.educationMedium),
+        _BulkFieldConfig(key: 'areYouWorking', label: 'Are You Working?', apiField: 'areyouworking', section: 'personal', initial: p.areYouWorking),
+        _BulkFieldConfig(key: 'occupationType', label: 'Occupation Type', apiField: 'occupationtype', section: 'personal', initial: p.occupationType),
+        _BulkFieldConfig(key: 'workingWith', label: 'Working With', apiField: 'workingwith', section: 'personal', initial: p.workingWith),
+        _BulkFieldConfig(key: 'companyName', label: 'Company Name', apiField: 'companyname', section: 'personal', initial: p.companyName),
+        _BulkFieldConfig(key: 'designation', label: 'Designation', apiField: 'designation', section: 'personal', initial: p.designation),
+        _BulkFieldConfig(key: 'businessName', label: 'Business Name', apiField: 'businessname', section: 'personal', initial: p.businessName),
+        _BulkFieldConfig(key: 'annualIncome', label: 'Annual Income', apiField: 'annualincome', section: 'personal', initial: p.annualIncome),
+      ],
+    );
+  }
+
+  Future<void> _openFamilyBulk(FamilyDetail f) {
+    return _openBulkEditor(
+      title: 'Edit Family Details',
+      color: _kFamily,
+      description: 'Manage family background fields together.',
+      fields: [
+        _BulkFieldConfig(key: 'familyType', label: 'Family Type', apiField: 'familytype', section: 'family', initial: f.familyType),
+        _BulkFieldConfig(key: 'familyBackground', label: 'Family Background', apiField: 'familybackground', section: 'family', initial: f.familyBackground),
+        _BulkFieldConfig(key: 'familyOrigin', label: 'Family Origin', apiField: 'familyorigin', section: 'family', initial: f.familyOrigin),
+        _BulkFieldConfig(key: 'fatherStatus', label: 'Father Status', apiField: 'fatherstatus', section: 'family', initial: f.fatherStatus),
+        _BulkFieldConfig(key: 'fatherName', label: 'Father Name', apiField: 'fathername', section: 'family', initial: f.fatherName),
+        _BulkFieldConfig(key: 'fatherEducation', label: 'Father Education', apiField: 'fathereducation', section: 'family', initial: f.fatherEducation),
+        _BulkFieldConfig(key: 'fatherOccupation', label: 'Father Occupation', apiField: 'fatheroccupation', section: 'family', initial: f.fatherOccupation),
+        _BulkFieldConfig(key: 'motherStatus', label: 'Mother Status', apiField: 'motherstatus', section: 'family', initial: f.motherStatus),
+        _BulkFieldConfig(key: 'motherCaste', label: 'Mother Caste', apiField: 'mothercaste', section: 'family', initial: f.motherCaste),
+        _BulkFieldConfig(key: 'motherEducation', label: 'Mother Education', apiField: 'mothereducation', section: 'family', initial: f.motherEducation),
+        _BulkFieldConfig(key: 'motherOccupation', label: 'Mother Occupation', apiField: 'motheroccupation', section: 'family', initial: f.motherOccupation),
+      ],
+    );
+  }
+
+  Future<void> _openLifestyleBulk(Lifestyle ls) {
+    return _openBulkEditor(
+      title: 'Edit Lifestyle',
+      color: _kLifestyle,
+      description: 'Update diet, smoking and drinking choices together.',
+      fields: [
+        _BulkFieldConfig(key: 'diet', label: 'Diet', apiField: 'diet', section: 'lifestyle', initial: ls.diet),
+        _BulkFieldConfig(key: 'smoke', label: 'Smoking', apiField: 'smoke', section: 'lifestyle', initial: ls.smoke),
+        _BulkFieldConfig(key: 'smokeType', label: 'Smoke Type', apiField: 'smoketype', section: 'lifestyle', initial: ls.smokeType),
+        _BulkFieldConfig(key: 'drinks', label: 'Drinking', apiField: 'drinks', section: 'lifestyle', initial: ls.drinks),
+        _BulkFieldConfig(key: 'drinkType', label: 'Drink Type', apiField: 'drinktype', section: 'lifestyle', initial: ls.drinkType),
+      ],
+    );
+  }
 
   // ── documents section ────────────────────────────────────────────────────────
 
@@ -1994,6 +2406,11 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
 
   Widget _buildBody(UserDetailsProvider provider, UserDetailsData data) {
     final p = data.personalDetail;
+    final contact = data.contactDetail.withFallback(
+      email: widget.email,
+      phone: widget.phone,
+      whatsapp: widget.whatsapp,
+    );
     return SingleChildScrollView(
       child: Center(
         child: ConstrainedBox(
@@ -2013,7 +2430,9 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
             ),
             child: Column(
               children: [
-                _buildHeader(p),
+                _buildHeader(p, contact),
+                _buildDocumentsSection(),
+                const Divider(height: 1, thickness: 1),
                 _buildMediaAndActivity(p, provider),
                 _buildAdminActions(p, provider),
                 const Divider(height: 1, thickness: 1),
@@ -2026,8 +2445,6 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
                 _buildLifestyle(data.lifestyle),
                 const Divider(height: 1, thickness: 1),
                 _buildPartner(data.partner),
-                const Divider(height: 1, thickness: 1),
-                _buildDocumentsSection(),
                 const SizedBox(height: 8),
               ],
             ),
