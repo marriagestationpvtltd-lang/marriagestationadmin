@@ -34,6 +34,9 @@ class WebNotificationService {
     if (result == 'denied') {
       debugPrint('Notification permission denied by the user.');
     }
+    if (result != 'default') {
+      _disposePermissionListeners();
+    }
   }
 
   /// Ensures we request permission on the next user gesture (click/tap/key).
@@ -43,6 +46,8 @@ class WebNotificationService {
     if (!html.Notification.supported) return;
     if (html.Notification.permission != 'default') return;
     if (_permissionRequestFuture != null) return;
+
+    _disposePermissionListeners();
 
     final gestureCompleter = Completer<void>();
 
@@ -61,13 +66,16 @@ class WebNotificationService {
 
     _permissionRequestFuture = gestureCompleter.future
         .then((_) => requestPermission())
-        .catchError((error, _) {
+        .catchError((error, stackTrace) {
           debugPrint(
             'Notification permission request failed: $error '
-            '(state: ${html.Notification.permission})',
+            '(state: ${html.Notification.permission})\n$stackTrace',
           );
         })
-        .whenComplete(() => _permissionRequestFuture = null);
+        .whenComplete(() {
+          _permissionRequestFuture = null;
+          _disposePermissionListeners();
+        });
   }
 
   static void _disposePermissionListeners() {
