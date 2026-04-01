@@ -1922,14 +1922,20 @@ class _ChatWindowState extends State<ChatWindow> {
 
   Widget _buildMessageInput(ChatProvider chatProvider) {
     const kPrimary = Color(0xFFD81B60);
-    const kMuted = Color(0xFF64748B);
-    const kBorder = Color(0xFFE2E8F0);
+    // Dark-mode tints for the language-selector chip
+    const kLangNepaliDarkBg     = Color(0xFF4A1A1A);
+    const kLangEnglishDarkBg    = Color(0xFF1A2A40);
+    const kLangNepaliDarkBorder = Color(0xFFCC4444);
+    const kLangEnglishDarkBorder= Color(0xFF4488CC);
+    const kLangNepaliDarkText   = Color(0xFFFF6B6B);
+    const kLangEnglishDarkText  = Color(0xFF64B5F6);
+    final colors = ChatColors.of(context);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(top: BorderSide(color: kBorder, width: 1)),
+      decoration: BoxDecoration(
+        color: colors.inputBg,
+        border: Border(top: BorderSide(color: colors.border, width: 1)),
       ),
       child: Column(
         children: [
@@ -1970,7 +1976,7 @@ class _ChatWindowState extends State<ChatWindow> {
                   ),
                   const SizedBox(width: 8),
                   IconButton(
-                    icon: const Icon(Icons.close, color: kMuted, size: 18),
+                    icon: Icon(Icons.close, color: colors.muted, size: 18),
                     onPressed: () {
                       setState(() {
                         _selectedImage = null;
@@ -1986,14 +1992,14 @@ class _ChatWindowState extends State<ChatWindow> {
           Row(
             children: [
               IconButton(
-                icon: const Icon(Icons.emoji_emotions, color: kMuted, size: 20),
+                icon: Icon(Icons.emoji_emotions, color: colors.muted, size: 20),
                 onPressed: _showEmojiPicker,
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 padding: EdgeInsets.zero,
               ),
               const SizedBox(width: 2),
               IconButton(
-                icon: const Icon(Icons.attach_file, color: kMuted, size: 20),
+                icon: Icon(Icons.attach_file, color: colors.muted, size: 20),
                 onPressed: _pickImage,
                 constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
                 padding: EdgeInsets.zero,
@@ -2011,14 +2017,18 @@ class _ChatWindowState extends State<ChatWindow> {
                     });
                   },
                   child: Container(
-                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                    margin: EdgeInsets.symmetric(horizontal: 2),
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
                     decoration: BoxDecoration(
                       color: _isListening
-                          ? (_selectedLanguage == 'ne-NP' ? Colors.red.shade50 : Colors.blue.shade50)
-                          : Colors.grey.shade100,
+                          ? (_selectedLanguage == 'ne-NP'
+                              ? (colors.isDark ? kLangNepaliDarkBg : Colors.red.shade50)
+                              : (colors.isDark ? kLangEnglishDarkBg : Colors.blue.shade50))
+                          : colors.cardBg,
                       border: Border.all(
-                        color: _selectedLanguage == 'ne-NP' ? Colors.red.shade300 : Colors.blue.shade300,
+                        color: _selectedLanguage == 'ne-NP'
+                            ? (colors.isDark ? kLangNepaliDarkBorder : Colors.red.shade300)
+                            : (colors.isDark ? kLangEnglishDarkBorder : Colors.blue.shade300),
                         width: 1,
                       ),
                       borderRadius: BorderRadius.circular(6),
@@ -2028,7 +2038,9 @@ class _ChatWindowState extends State<ChatWindow> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
-                        color: _selectedLanguage == 'ne-NP' ? Colors.red.shade700 : Colors.blue.shade700,
+                        color: _selectedLanguage == 'ne-NP'
+                            ? (colors.isDark ? kLangNepaliDarkText : Colors.red.shade700)
+                            : (colors.isDark ? kLangEnglishDarkText : Colors.blue.shade700),
                       ),
                     ),
                   ),
@@ -2039,7 +2051,7 @@ class _ChatWindowState extends State<ChatWindow> {
                 tooltip: _isListening ? 'Stop voice typing' : 'Start voice typing',
                 icon: Icon(
                   _isListening ? Icons.mic_off : Icons.mic,
-                  color: _isListening ? kPrimary : kMuted,
+                  color: _isListening ? kPrimary : colors.muted,
                   size: 20,
                 ),
                 onPressed: _isListening ? _stopListening : _startListening,
@@ -2058,12 +2070,27 @@ class _ChatWindowState extends State<ChatWindow> {
                       _updateAdminTypingStatus(text, chatProvider.id.toString());
                     }
                   },
+                  style: TextStyle(color: colors.text, fontSize: 14),
                   decoration: InputDecoration(
                     hintText: _selectedLanguage == 'ne-NP'
                         ? "सन्देश टाइप गर्नुहोस्"
                         : "Type a message",
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(16)),
-                    contentPadding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                    hintStyle: TextStyle(color: colors.muted, fontSize: 14),
+                    filled: true,
+                    fillColor: colors.searchFill,
+                    contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: colors.border, width: 1),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: kPrimary, width: 1.5),
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide(color: colors.border, width: 1),
+                    ),
                   ),
                 ),
               ),
@@ -2078,12 +2105,12 @@ class _ChatWindowState extends State<ChatWindow> {
                       width: 38,
                       height: 38,
                       decoration: BoxDecoration(
-                        color: hasText ? kPrimary : const Color(0xFFE2E8F0),
+                        color: hasText ? kPrimary : colors.border,
                         borderRadius: BorderRadius.circular(19),
                       ),
                       child: Icon(
                         Icons.send_rounded,
-                        color: hasText ? Colors.white : kMuted,
+                        color: hasText ? Colors.white : colors.muted,
                         size: 18,
                       ),
                     ),
