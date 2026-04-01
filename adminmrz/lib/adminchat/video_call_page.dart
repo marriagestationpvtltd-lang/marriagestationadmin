@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 import 'package:adminmrz/adminchat/services/pushservice.dart';
 import 'package:adminmrz/settings/call_settings_provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -67,6 +68,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   late AudioPlayer _ringtonePlayer;
   bool _isPlayingRingtone = false;
   Timer? _ringtoneRepeatTimer;
+
+  StreamSubscription<DocumentSnapshot>? _callSignalSubscription;
 
   // Video renderers
   Widget? _localVideoView;
@@ -164,6 +167,34 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
           callerUid: _localUid.toString(),
           agoraAppId: AgoraTokenService.appId,
           agoraCertificate: 'SERVER_ONLY',
+        );
+
+        // Write call signal to Firestore so the user app can signal rejection in real-time.
+        await FirebaseFirestore.instance
+            .collection('call_signals')
+            .doc(_channel)
+            .set({
+          'status': 'ringing',
+          'callerId': widget.currentUserId,
+          'receiverId': widget.otherUserId,
+          'type': 'video',
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+
+        // Listen for rejection from the user's app.
+        _callSignalSubscription = FirebaseFirestore.instance
+            .collection('call_signals')
+            .doc(_channel)
+            .snapshots()
+            .listen(
+          (snap) async {
+            if (!mounted || _ending) return;
+            final data = snap.data();
+            if (data != null && data['status'] == 'rejected') {
+              await _endCall();
+            }
+          },
+          onError: (_) {/* Firestore errors are non-fatal; timeout will still fire */},
         );
       }
 
@@ -284,6 +315,18 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
     _callTimer?.cancel();
     _timeoutTimer?.cancel();
+
+    await _callSignalSubscription?.cancel();
+    _callSignalSubscription = null;
+
+    // Clean up the Firestore call signal document.
+    if (widget.isOutgoingCall) {
+      FirebaseFirestore.instance
+          .collection('call_signals')
+          .doc(_channel)
+          .delete()
+          .catchError((_) {});
+    }
 
     await _stopRingtone();
 
@@ -500,9 +543,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
   @override
   void dispose() {
-   // _callTimer?.dispose();
+   // _callTimer?.cancel();
     _timeoutTimer?.cancel();
     _ringtoneRepeatTimer?.cancel();
+    _callSignalSubscription?.cancel();
     _ringtonePlayer.dispose();
     super.dispose();
   }
