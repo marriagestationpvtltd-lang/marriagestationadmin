@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:provider/provider.dart';
 
+import '../adminchat/chatprovider.dart';
 import 'dashmodel.dart';
 import 'dashservice.dart';
 
@@ -19,7 +23,10 @@ const _kUnknownLabel = 'Unknown';
 final _kBannerDateFmt = DateFormat('EEEE, MMMM d, yyyy');
 
 class DashboardHome extends StatefulWidget {
-  const DashboardHome({super.key});
+  /// Called when a card or section link is tapped with the target tab index.
+  final void Function(int tabIndex)? onNavigate;
+
+  const DashboardHome({super.key, this.onNavigate});
 
   @override
   State<DashboardHome> createState() => _DashboardHomeState();
@@ -30,30 +37,78 @@ class _DashboardHomeState extends State<DashboardHome> {
   bool _isLoading = true;
   String _error = '';
   final DashboardService _dashboardService = DashboardService();
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _fetchDashboardData();
+    // Auto-refresh every 60 s so counts stay fresh
+    _refreshTimer = Timer.periodic(
+      const Duration(seconds: 60),
+      (_) { if (mounted) _fetchDashboardData(); },
+    );
+    // Ensure ChatProvider has data for the live online count
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final chatProvider = context.read<ChatProvider>();
+      if (chatProvider.chatList.isEmpty) chatProvider.fetchChatList();
+    });
+  }
+
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _fetchDashboardData() async {
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
       _error = '';
     });
     try {
       final response = await _dashboardService.getDashboardData();
+      if (!mounted) return;
       if (response.success) {
         setState(() => _dashboardData = response.dashboard);
       } else {
         setState(() => _error = 'Failed to load dashboard data');
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() => _error = 'Unable to load dashboard data. Please try again.');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  // ─── Live dot ───────────────────────────────────────────────────────────────
+  Widget _buildLiveDot() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 7,
+          height: 7,
+          decoration: const BoxDecoration(
+            color: _kEmerald,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 4),
+        const Text(
+          'LIVE',
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+            color: _kEmerald,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ],
+    );
   }
 
   // ─── KPI card ───────────────────────────────────────────────────────────────
@@ -63,9 +118,11 @@ class _DashboardHomeState extends State<DashboardHome> {
     required IconData icon,
     required Color color,
     String? subtitle,
+    VoidCallback? onTap,
+    bool isLive = false,
   }) {
     final cardBg = Theme.of(context).colorScheme.surface;
-    return Container(
+    final content = Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: cardBg,
@@ -82,13 +139,26 @@ class _DashboardHomeState extends State<DashboardHome> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.10),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, color: color, size: 20),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(icon, color: color, size: 20),
+              ),
+              const Spacer(),
+              if (isLive) _buildLiveDot(),
+              if (!isLive && onTap != null)
+                Icon(
+                  Icons.open_in_new_rounded,
+                  size: 13,
+                  color: color.withOpacity(0.45),
+                ),
+            ],
           ),
           const SizedBox(height: 16),
           Text(
@@ -122,10 +192,19 @@ class _DashboardHomeState extends State<DashboardHome> {
         ],
       ),
     );
+    if (onTap == null) return content;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: content,
+      ),
+    );
   }
 
   // ─── Section header ─────────────────────────────────────────────────────────
-  Widget _buildSectionHeader(String title, {VoidCallback? onRefresh}) {
+  Widget _buildSectionHeader(String title, {VoidCallback? onRefresh, VoidCallback? onViewAll}) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -140,6 +219,35 @@ class _DashboardHomeState extends State<DashboardHome> {
             ),
           ),
           const Spacer(),
+          if (onViewAll != null)
+            MouseRegion(
+              cursor: SystemMouseCursors.click,
+              child: GestureDetector(
+                onTap: onViewAll,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    color: _kPrimary.withOpacity(0.08),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Row(
+                    children: [
+                      Text(
+                        'View All',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: _kPrimary,
+                        ),
+                      ),
+                      const SizedBox(width: 3),
+                      Icon(Icons.arrow_forward_rounded, size: 11, color: _kPrimary),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          if (onViewAll != null && onRefresh != null) const SizedBox(width: 6),
           if (onRefresh != null)
             GestureDetector(
               onTap: onRefresh,
@@ -174,15 +282,22 @@ class _DashboardHomeState extends State<DashboardHome> {
   Widget _buildUserStatsRow() {
     final u = _dashboardData?.users;
     if (u == null) return const SizedBox.shrink();
+
+    // Use live online count from ChatProvider; fall back to API value if not loaded yet
+    final chatList = context.watch<ChatProvider>().chatList;
+    final liveOnline = chatList.isNotEmpty
+        ? chatList.where((user) => user['online'] == 'true').length
+        : u.online;
+
     return Row(
       children: [
-        Expanded(child: _buildKpiCard(label: 'Total Members', value: '${u.total}', icon: Icons.people_alt_rounded, color: _kPrimary)),
+        Expanded(child: _buildKpiCard(label: 'Total Members', value: '${u.total}', icon: Icons.people_alt_rounded, color: _kPrimary, onTap: () => widget.onNavigate?.call(1))),
         const SizedBox(width: 14),
-        Expanded(child: _buildKpiCard(label: 'Active Users', value: '${u.active}', icon: Icons.check_circle_rounded, color: _kEmerald)),
+        Expanded(child: _buildKpiCard(label: 'Active Users', value: '${u.active}', icon: Icons.check_circle_rounded, color: _kEmerald, onTap: () => widget.onNavigate?.call(1))),
         const SizedBox(width: 14),
-        Expanded(child: _buildKpiCard(label: 'Online Now', value: '${u.online}', icon: Icons.wifi_rounded, color: _kSky)),
+        Expanded(child: _buildKpiCard(label: 'Online Now', value: '$liveOnline', icon: Icons.wifi_rounded, color: _kSky, isLive: true, onTap: () => widget.onNavigate?.call(5))),
         const SizedBox(width: 14),
-        Expanded(child: _buildKpiCard(label: 'Verified', value: '${u.verified}', icon: Icons.verified_rounded, color: _kViolet)),
+        Expanded(child: _buildKpiCard(label: 'Verified', value: '${u.verified}', icon: Icons.verified_rounded, color: _kViolet, onTap: () => widget.onNavigate?.call(1))),
       ],
     );
   }
@@ -193,13 +308,13 @@ class _DashboardHomeState extends State<DashboardHome> {
     if (p == null) return const SizedBox.shrink();
     return Row(
       children: [
-        Expanded(child: _buildKpiCard(label: 'Total Revenue', value: p.totalEarning, icon: Icons.account_balance_wallet_rounded, color: _kEmerald)),
+        Expanded(child: _buildKpiCard(label: 'Total Revenue', value: p.totalEarning, icon: Icons.account_balance_wallet_rounded, color: _kEmerald, onTap: () => widget.onNavigate?.call(4))),
         const SizedBox(width: 14),
-        Expanded(child: _buildKpiCard(label: "Today's Revenue", value: p.todayEarning, icon: Icons.today_rounded, color: _kAmber, subtitle: 'earned today')),
+        Expanded(child: _buildKpiCard(label: "Today's Revenue", value: p.todayEarning, icon: Icons.today_rounded, color: _kAmber, subtitle: 'earned today', onTap: () => widget.onNavigate?.call(4))),
         const SizedBox(width: 14),
-        Expanded(child: _buildKpiCard(label: 'Monthly Revenue', value: p.thisMonthEarning, icon: Icons.calendar_month_rounded, color: _kSky, subtitle: 'this month')),
+        Expanded(child: _buildKpiCard(label: 'Monthly Revenue', value: p.thisMonthEarning, icon: Icons.calendar_month_rounded, color: _kSky, subtitle: 'this month', onTap: () => widget.onNavigate?.call(4))),
         const SizedBox(width: 14),
-        Expanded(child: _buildKpiCard(label: 'Total Sales', value: '${p.totalSold}', icon: Icons.shopping_bag_rounded, color: _kRose)),
+        Expanded(child: _buildKpiCard(label: 'Total Sales', value: '${p.totalSold}', icon: Icons.shopping_bag_rounded, color: _kRose, onTap: () => widget.onNavigate?.call(4))),
       ],
     );
   }
@@ -208,7 +323,7 @@ class _DashboardHomeState extends State<DashboardHome> {
   Widget _buildBestPackageCard() {
     final pkg = _dashboardData?.payments.bestSellingPackage;
     if (pkg == null) return const SizedBox.shrink();
-    return Container(
+    final card = Container(
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
@@ -279,6 +394,15 @@ class _DashboardHomeState extends State<DashboardHome> {
         ],
       ),
     );
+    if (widget.onNavigate == null) return card;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: InkWell(
+        onTap: () => widget.onNavigate?.call(3),
+        borderRadius: BorderRadius.circular(12),
+        child: card,
+      ),
+    );
   }
 
   // ─── Payment methods card ────────────────────────────────────────────────────
@@ -288,6 +412,7 @@ class _DashboardHomeState extends State<DashboardHome> {
 
     final palette = [_kPrimary, _kEmerald, _kAmber, _kSky, _kViolet, _kRose];
     return _buildCard(
+      onTap: () => widget.onNavigate?.call(4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -353,6 +478,7 @@ class _DashboardHomeState extends State<DashboardHome> {
       children: [
         Expanded(
           child: _buildCard(
+            onTap: () => widget.onNavigate?.call(1),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -373,6 +499,7 @@ class _DashboardHomeState extends State<DashboardHome> {
         const SizedBox(width: 14),
         Expanded(
           child: _buildCard(
+            onTap: () => widget.onNavigate?.call(1),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -431,6 +558,7 @@ class _DashboardHomeState extends State<DashboardHome> {
     final addr = _dashboardData?.permanentAddress;
     if (addr == null) return const SizedBox.shrink();
     return _buildCard(
+      onTap: () => widget.onNavigate?.call(1),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -538,9 +666,9 @@ class _DashboardHomeState extends State<DashboardHome> {
   }
 
   // ─── Shared helpers ──────────────────────────────────────────────────────────
-  Widget _buildCard({required Widget child}) {
+  Widget _buildCard({required Widget child, VoidCallback? onTap}) {
     final cardBg = Theme.of(context).colorScheme.surface;
-    return Container(
+    final content = Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -555,6 +683,15 @@ class _DashboardHomeState extends State<DashboardHome> {
         ],
       ),
       child: child,
+    );
+    if (onTap == null) return content;
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: content,
+      ),
     );
   }
 
@@ -667,12 +804,19 @@ class _DashboardHomeState extends State<DashboardHome> {
           const SizedBox(height: 24),
 
           // User KPIs
-          _buildSectionHeader('User Statistics', onRefresh: _fetchDashboardData),
+          _buildSectionHeader(
+            'User Statistics',
+            onRefresh: _fetchDashboardData,
+            onViewAll: () => widget.onNavigate?.call(1),
+          ),
           _buildUserStatsRow(),
           const SizedBox(height: 22),
 
           // Revenue KPIs
-          _buildSectionHeader('Revenue Overview'),
+          _buildSectionHeader(
+            'Revenue Overview',
+            onViewAll: () => widget.onNavigate?.call(4),
+          ),
           _buildRevenueStatsRow(),
           const SizedBox(height: 22),
 
@@ -684,7 +828,10 @@ class _DashboardHomeState extends State<DashboardHome> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildSectionHeader('Package Performance'),
+                    _buildSectionHeader(
+                      'Package Performance',
+                      onViewAll: () => widget.onNavigate?.call(3),
+                    ),
                     _buildBestPackageCard(),
                   ],
                 ),
@@ -694,7 +841,10 @@ class _DashboardHomeState extends State<DashboardHome> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildSectionHeader('Payment Methods'),
+                    _buildSectionHeader(
+                      'Payment Methods',
+                      onViewAll: () => widget.onNavigate?.call(4),
+                    ),
                     _buildPaymentMethodsCard(),
                   ],
                 ),
@@ -704,12 +854,18 @@ class _DashboardHomeState extends State<DashboardHome> {
           const SizedBox(height: 22),
 
           // User analytics (types + gender)
-          _buildSectionHeader('User Analytics'),
+          _buildSectionHeader(
+            'User Analytics',
+            onViewAll: () => widget.onNavigate?.call(1),
+          ),
           _buildUserDistributionRow(),
           const SizedBox(height: 22),
 
           // Geographic
-          _buildSectionHeader('Geographic Data'),
+          _buildSectionHeader(
+            'Geographic Data',
+            onViewAll: () => widget.onNavigate?.call(1),
+          ),
           _buildGeographicCard(),
           const SizedBox(height: 32),
         ],
