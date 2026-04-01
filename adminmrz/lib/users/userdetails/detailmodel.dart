@@ -20,12 +20,14 @@ class UserDetailsData {
   final FamilyDetail familyDetail;
   final Lifestyle lifestyle;
   final PartnerPreference partner;
+  final ContactDetail contactDetail;
 
   UserDetailsData({
     required this.personalDetail,
     required this.familyDetail,
     required this.lifestyle,
     required this.partner,
+    required this.contactDetail,
   });
 
   factory UserDetailsData.fromJson(Map<String, dynamic> json) {
@@ -34,6 +36,12 @@ class UserDetailsData {
       familyDetail: FamilyDetail.fromJson(json['familyDetail'] ?? {}),
       lifestyle: Lifestyle.fromJson(json['lifestyle'] ?? {}),
       partner: PartnerPreference.fromJson(json['partner'] ?? {}),
+      contactDetail: ContactDetail.fromJson(
+        json['contactDetail'] ??
+            json['contact'] ??
+            json['personalDetail'] ??
+            {},
+      ),
     );
   }
 }
@@ -172,6 +180,58 @@ class PersonalDetail {
   }
 
   bool get hasProfilePicture => profilePicture.isNotEmpty;
+}
+
+class ContactDetail {
+  final String email;
+  final String phone;
+  final String whatsapp;
+  final String countryCode;
+
+  ContactDetail({
+    required this.email,
+    required this.phone,
+    required this.whatsapp,
+    required this.countryCode,
+  });
+
+  factory ContactDetail.fromJson(Map<String, dynamic> json) {
+    return ContactDetail(
+      email: json['email']?.toString() ?? '',
+      phone: json['phone']?.toString() ??
+          json['mobile']?.toString() ??
+          json['phone_number']?.toString() ??
+          '',
+      whatsapp: json['whatsapp']?.toString() ?? '',
+      countryCode: json['country_code']?.toString() ?? '',
+    );
+  }
+
+  ContactDetail withFallback({
+    String? email,
+    String? phone,
+    String? whatsapp,
+    String? countryCode,
+  }) {
+    return ContactDetail(
+      email: (email ?? this.email).isNotEmpty ? (email ?? this.email) : this.email,
+      phone: (phone ?? this.phone).isNotEmpty ? (phone ?? this.phone) : this.phone,
+      whatsapp:
+          (whatsapp ?? this.whatsapp).isNotEmpty ? (whatsapp ?? this.whatsapp) : this.whatsapp,
+      countryCode: (countryCode ?? this.countryCode).isNotEmpty
+          ? (countryCode ?? this.countryCode)
+          : this.countryCode,
+    );
+  }
+
+  bool get hasEmail => email.isNotEmpty && email != 'null';
+  bool get hasPhone => preferredPhone.isNotEmpty;
+
+  String get preferredPhone {
+    if (phone.isNotEmpty && phone != 'null') return phone;
+    if (whatsapp.isNotEmpty && whatsapp != 'null') return whatsapp;
+    return '';
+  }
 }
 
 class FamilyDetail {

@@ -58,13 +58,17 @@ class _DocumentsPageState extends State<DocumentsPage>
   }
 
   // ── navigate to profile ──────────────────────────────────────────────────────
-  void _openProfile(int userId) {
+  void _openProfile(Document doc) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => ChangeNotifierProvider(
           create: (_) => UserDetailsProvider(),
-          child: UserDetailsScreen(userId: userId, myId: userId),
+          child: UserDetailsScreen(
+            userId: doc.userId,
+            myId: doc.userId,
+            email: doc.email,
+          ),
         ),
       ),
     );
@@ -571,7 +575,7 @@ class _DocumentsPageState extends State<DocumentsPage>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   GestureDetector(
-                    onTap: () => _openProfile(doc.userId),
+                    onTap: () => _openProfile(doc),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -668,7 +672,7 @@ class _DocumentsPageState extends State<DocumentsPage>
                           icon: Icons.person_outlined,
                           tooltip: 'View Profile',
                           color: Colors.indigo,
-                          onTap: () => _openProfile(doc.userId),
+                          onTap: () => _openProfile(doc),
                         ),
                         if (isPending) ...[
                           const SizedBox(width: 4),
