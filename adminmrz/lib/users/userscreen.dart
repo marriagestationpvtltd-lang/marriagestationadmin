@@ -15,6 +15,10 @@ const _kEmerald = Color(0xFF10B981);
 const _kAmber = Color(0xFFF59E0B);
 const _kRose = Color(0xFFEF4444);
 const _kSky = Color(0xFF0EA5E9);
+const _kActionButtonTextBlendFactor = 0.25;
+const _kActionButtonMinWidth = 118.0;
+const _kActionButtonSpacing = 10.0;
+const _kActionButtonVerticalSpacing = 8.0;
 
 class UsersPage extends StatefulWidget {
   /// Called when admin taps "Direct Chat" on a member card.
@@ -467,54 +471,85 @@ class _UsersPageState extends State<UsersPage> {
                 const SizedBox(height: 10),
 
                 // Contact block
-                Row(
-                  children: [
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Icon(Icons.email_outlined,
-                              size: 14, color: Colors.grey.shade500),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              user.email.isNotEmpty ? user.email : 'No email',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade700,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          _miniVerifiedDot(isEmailVerified),
-                        ],
-                      ),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isDark ? const Color(0xFF0F172A) : const Color(0xFFF7F9FF),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDark
+                          ? Colors.white.withOpacity(0.08)
+                          : Colors.grey.shade200,
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Row(
-                        children: [
-                          Icon(Icons.phone_outlined,
-                              size: 14, color: Colors.grey.shade500),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              hasPhone ? cleanedPhone : 'No phone',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey.shade700,
-                                fontWeight: FontWeight.w500,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: _kPrimary.withOpacity(0.12),
+                                shape: BoxShape.circle,
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                              child: const Icon(Icons.email_outlined,
+                                  size: 14, color: _kPrimary),
                             ),
-                          ),
-                          if (hasPhone) _miniVerifiedDot(isPhoneVerified),
-                        ],
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                user.email.isNotEmpty ? user.email : 'No email',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark
+                                      ? Colors.grey.shade200
+                                      : const Color(0xFF1F2937),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            _miniVerifiedDot(isEmailVerified),
+                          ],
+                        ),
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: _kEmerald.withOpacity(0.12),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(Icons.phone_outlined,
+                                  size: 14, color: _kEmerald),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                hasPhone ? cleanedPhone : 'No phone',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: isDark
+                                      ? Colors.grey.shade200
+                                      : const Color(0xFF1F2937),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (hasPhone) _miniVerifiedDot(isPhoneVerified),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
 
                 const SizedBox(height: 12),
@@ -569,7 +604,9 @@ class _UsersPageState extends State<UsersPage> {
                 const SizedBox(height: 10),
 
                 // Action buttons
-                Row(
+                Wrap(
+                  spacing: _kActionButtonSpacing,
+                  runSpacing: _kActionButtonVerticalSpacing,
                   children: [
                     if (hasPhone) ...[
                       _actionIconBtn(
@@ -578,14 +615,12 @@ class _UsersPageState extends State<UsersPage> {
                         const Color(0xFF25D366),
                         () => _launchWhatsApp(cleanedPhone),
                       ),
-                      const SizedBox(width: 6),
                       _actionIconBtn(
                         Icons.videocam_rounded,
                         'Viber',
                         const Color(0xFF7360F2),
                         () => _launchViber(cleanedPhone),
                       ),
-                      const SizedBox(width: 6),
                     ],
                     if (user.email.isNotEmpty)
                       _actionIconBtn(
@@ -594,7 +629,6 @@ class _UsersPageState extends State<UsersPage> {
                         _kAmber,
                         () => _launchEmail(user.email),
                       ),
-                    const Spacer(),
                     _actionIconBtn(
                       Icons.chat_bubble_outline,
                       'Direct Chat',
@@ -612,7 +646,6 @@ class _UsersPageState extends State<UsersPage> {
                         }
                       },
                     ),
-                    const SizedBox(width: 6),
                     _actionIconBtn(
                       Icons.visibility_outlined,
                       'View Profile',
@@ -704,20 +737,47 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Widget _actionIconBtn(
-      IconData icon, String tooltip, Color color, VoidCallback onTap) {
+      IconData icon, String label, Color color, VoidCallback onTap) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color textColor = isDark
+        ? Color.lerp(color, Colors.white, _kActionButtonTextBlendFactor)!
+        : Color.lerp(color, Colors.black, _kActionButtonTextBlendFactor)!;
     return Tooltip(
-      message: tooltip,
+      message: label,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         child: Container(
-          padding: const EdgeInsets.all(6),
+          constraints: const BoxConstraints(minWidth: _kActionButtonMinWidth),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.08),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: color.withOpacity(0.18)),
+            color: color.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: color.withOpacity(0.22)),
+            boxShadow: [
+              BoxShadow(
+                color: color.withOpacity(0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          child: Icon(icon, size: 16, color: color),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: color),
+              const SizedBox(width: 7),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: textColor,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.2,
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
