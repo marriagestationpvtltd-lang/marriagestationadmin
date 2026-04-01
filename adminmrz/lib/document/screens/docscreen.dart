@@ -188,6 +188,8 @@ class _DocumentsPageState extends State<DocumentsPage>
 
   // ── image preview ────────────────────────────────────────────────────────────
   void _showImagePreview(String url) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final dialogBg = isDark ? const Color(0xFF1E293B) : Colors.white;
     showDialog(
       context: context,
       builder: (_) => Dialog(
@@ -202,7 +204,7 @@ class _DocumentsPageState extends State<DocumentsPage>
                 maxWidth: MediaQuery.of(context).size.width * 0.9,
               ),
               decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: dialogBg,
                   borderRadius: BorderRadius.circular(12)),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -230,7 +232,7 @@ class _DocumentsPageState extends State<DocumentsPage>
                             );
                           },
                           errorBuilder: (_, __, ___) => Container(
-                            color: Colors.grey[100],
+                            color: isDark ? const Color(0xFF263248) : Colors.grey[100],
                             child: const Center(
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
@@ -250,10 +252,10 @@ class _DocumentsPageState extends State<DocumentsPage>
                   ),
                   Container(
                     padding: const EdgeInsets.all(12),
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
+                    decoration: BoxDecoration(
+                      color: dialogBg,
                       borderRadius:
-                          BorderRadius.vertical(bottom: Radius.circular(12)),
+                          const BorderRadius.vertical(bottom: Radius.circular(12)),
                     ),
                     child: SizedBox(
                       width: double.infinity,
@@ -324,6 +326,7 @@ class _DocumentsPageState extends State<DocumentsPage>
   Widget _buildTopBar(DocumentsProvider provider) {
     final total = provider.documents.length;
     final cardBg = Theme.of(context).colorScheme.surface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       color: cardBg,
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
@@ -384,18 +387,18 @@ class _DocumentsPageState extends State<DocumentsPage>
                     : null,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey.shade200),
+                  borderSide: BorderSide(color: isDark ? Colors.white.withOpacity(0.10) : Colors.grey.shade200),
                 ),
                 enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide(color: Colors.grey.shade200),
+                  borderSide: BorderSide(color: isDark ? Colors.white.withOpacity(0.10) : Colors.grey.shade200),
                 ),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8),
                   borderSide:
                       const BorderSide(color: _kPrimary, width: 1.5),
                 ),
-                fillColor: Colors.grey.shade50,
+                fillColor: isDark ? const Color(0xFF263248) : Colors.grey.shade50,
                 filled: true,
                 contentPadding: EdgeInsets.zero,
                 isDense: true,
@@ -481,6 +484,7 @@ class _DocumentsPageState extends State<DocumentsPage>
             ? _kRejected
             : _kPending;
     final cardBg = Theme.of(context).colorScheme.surface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
@@ -513,8 +517,8 @@ class _DocumentsPageState extends State<DocumentsPage>
                     height: 64,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(8),
-                      color: Colors.grey.shade100,
-                      border: Border.all(color: Colors.grey.shade200),
+                      color: isDark ? const Color(0xFF263248) : Colors.grey.shade100,
+                      border: Border.all(color: isDark ? Colors.white.withOpacity(0.10) : Colors.grey.shade200),
                     ),
                     child: ClipRRect(
                       borderRadius: BorderRadius.circular(7),
@@ -532,7 +536,7 @@ class _DocumentsPageState extends State<DocumentsPage>
                           );
                         },
                         errorBuilder: (_, __, ___) => Container(
-                          color: Colors.grey.shade100,
+                          color: isDark ? const Color(0xFF263248) : Colors.grey.shade100,
                           child: Icon(Icons.insert_drive_file_outlined,
                               size: 28, color: Colors.grey.shade400),
                         ),
@@ -780,36 +784,39 @@ class _DocumentsPageState extends State<DocumentsPage>
       );
 
   // ── empty state ──────────────────────────────────────────────────────────────
-  Widget _buildEmpty(String message) => Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.grey.shade100,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.folder_open_outlined,
-                  size: 40, color: Colors.grey.shade400),
+  Widget _buildEmpty(String message) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: isDark ? const Color(0xFF263248) : Colors.grey.shade100,
+              shape: BoxShape.circle,
             ),
-            const SizedBox(height: 16),
-            Text(message,
-                style: TextStyle(
-                    fontSize: 15,
-                    color: Colors.grey.shade500,
-                    fontWeight: FontWeight.w500)),
-            const SizedBox(height: 6),
-            Text(
-              _query.isNotEmpty
-                  ? 'Try different search terms'
-                  : 'Pull down to refresh',
+            child: Icon(Icons.folder_open_outlined,
+                size: 40, color: Colors.grey.shade400),
+          ),
+          const SizedBox(height: 16),
+          Text(message,
               style: TextStyle(
-                  fontSize: 12, color: Colors.grey.shade400),
-            ),
-          ],
-        ),
-      );
+                  fontSize: 15,
+                  color: Colors.grey.shade500,
+                  fontWeight: FontWeight.w500)),
+          const SizedBox(height: 6),
+          Text(
+            _query.isNotEmpty
+                ? 'Try different search terms'
+                : 'Pull down to refresh',
+            style: TextStyle(
+                fontSize: 12, color: Colors.grey.shade400),
+          ),
+        ],
+      ),
+    );
+  }
 
   // ── list ─────────────────────────────────────────────────────────────────────
   Widget _buildList(List<Document> docs, bool isPending) {
@@ -833,6 +840,7 @@ class _DocumentsPageState extends State<DocumentsPage>
   Widget build(BuildContext context) {
     return Consumer<DocumentsProvider>(
       builder: (_, provider, __) {
+        final isDark = Theme.of(context).brightness == Brightness.dark;
         if (provider.isLoading) {
           return const Center(
             child: Column(
@@ -882,7 +890,7 @@ class _DocumentsPageState extends State<DocumentsPage>
         }
 
         return Container(
-          color: _kPageBg,
+          color: isDark ? const Color(0xFF0F172A) : _kPageBg,
           child: Column(
             children: [
               _buildTopBar(provider),
