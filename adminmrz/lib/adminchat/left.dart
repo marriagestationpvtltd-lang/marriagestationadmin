@@ -164,6 +164,10 @@ class _ChatSidebarState extends State<ChatSidebar> {
             _updateSelectedChat();
           }
           listenToConversationChanges();
+          // Restart the Firestore presence listener now that _users is populated.
+          // The initial snapshot will immediately apply any pending online/offline
+          // changes that occurred before this page was opened.
+          _startPresenceListener();
         }
 
         _applyFilters();
