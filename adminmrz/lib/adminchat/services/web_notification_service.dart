@@ -38,7 +38,7 @@ class WebNotificationService {
 
     _permissionListenerAttached = true;
 
-    Future<void> _handleGestureAndRequestPermission([dynamic event]) async {
+    Future<void> handleGesture([dynamic event]) async {
       if (_permissionRequestFuture != null) return;
       _disposePermissionListeners();
       try {
@@ -51,11 +51,11 @@ class WebNotificationService {
     }
 
     _permissionClickSubscription =
-        html.document.onClick.listen(_handleGestureAndRequestPermission);
+        html.document.onClick.listen(handleGesture);
     _permissionKeySubscription =
-        html.document.onKeyDown.listen(_handleGestureAndRequestPermission);
+        html.document.onKeyDown.listen(handleGesture);
     _permissionTouchSubscription =
-        html.document.onTouchStart.listen(_handleGestureAndRequestPermission);
+        html.document.onTouchStart.listen(handleGesture);
   }
 
   static void _disposePermissionListeners() {
@@ -66,6 +66,7 @@ class WebNotificationService {
     _permissionKeySubscription = null;
     _permissionTouchSubscription = null;
     _permissionListenerAttached = false;
+    _permissionRequestFuture = null;
   }
 
   // ------------------------------------------------------------------
