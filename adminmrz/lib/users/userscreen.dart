@@ -6,6 +6,15 @@ import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'model/usermodel.dart';
+import 'userdetails/detailmodel.dart';
+
+const _kPrimary = Color(0xFF6366F1);
+const _kPrimaryDark = Color(0xFF4F46E5);
+const _kViolet = Color(0xFF8B5CF6);
+const _kEmerald = Color(0xFF10B981);
+const _kAmber = Color(0xFFF59E0B);
+const _kRose = Color(0xFFEF4444);
+const _kSky = Color(0xFF0EA5E9);
 
 class UsersPage extends StatefulWidget {
   /// Called when admin taps "Direct Chat" on a member card.
@@ -164,7 +173,7 @@ class _UsersPageState extends State<UsersPage> {
         ScaffoldMessenger.of(ctx).showSnackBar(
           SnackBar(
             content: Text('Verification request sent for $type'),
-            backgroundColor: Colors.blue,
+            backgroundColor: _kPrimary,
             duration: const Duration(seconds: 2),
           ),
         );
@@ -172,20 +181,20 @@ class _UsersPageState extends State<UsersPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
-          color: Colors.blue.withOpacity(0.08),
+          color: _kPrimary.withOpacity(0.08),
           borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: Colors.blue.withOpacity(0.35)),
+          border: Border.all(color: _kPrimary.withOpacity(0.35)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.send_rounded, size: 10, color: Colors.blue.shade700),
+            Icon(Icons.send_rounded, size: 10, color: _kPrimaryDark),
             const SizedBox(width: 3),
             Text(
               'Send Verification Request',
               style: TextStyle(
                 fontSize: 10,
-                color: Colors.blue.shade700,
+                color: _kPrimaryDark,
                 fontWeight: FontWeight.w600,
               ),
             ),
@@ -224,6 +233,10 @@ class _UsersPageState extends State<UsersPage> {
   // ─── User Card ───────────────────────────────────────────────────────────
 
   Widget _buildUserCard(User user, UserProvider provider) {
+    provider.preloadActivity(user.id);
+    final activity = provider.activityFor(user.id);
+    final isActivityLoading = provider.isActivityLoading(user.id);
+
     final bool isSelected = provider.isUserSelected(user.id);
     final Color statusColor = user.statusColor;
     final bool isFemale = user.gender.toLowerCase() == 'female';
@@ -231,309 +244,383 @@ class _UsersPageState extends State<UsersPage> {
     final bool hasPhone = cleanedPhone.isNotEmpty;
     final bool isEmailVerified = user.emailVerified == 1;
     final bool isPhoneVerified = user.phoneVerified == 1;
-    final Color genderAccentColor = isFemale ? const Color(0xFFE91E8C) : const Color(0xFF1976D2);
+    final Color genderAccentColor = isFemale ? _kRose : _kSky;
     final String? profileImageUrl = _normaliseImageUrl(user.profilePicture);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardBg = Theme.of(context).colorScheme.surface;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-      elevation: isSelected ? 3 : 1,
-      shadowColor: Colors.black.withOpacity(0.08),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: isSelected
-            ? BorderSide(color: Colors.blue.shade400, width: 1.5)
-            : BorderSide(color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.shade100),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: () => _navigateToUser(user),
-        child: Container(
-          decoration: BoxDecoration(
-            color: cardBg,
-            border: Border(left: BorderSide(color: statusColor, width: 4)),
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [
+            cardBg,
+            isDark ? const Color(0xFF0B1222) : Colors.grey.shade50
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: isSelected
+              ? _kPrimary.withOpacity(0.7)
+              : (isDark
+                  ? Colors.white.withOpacity(0.06)
+                  : Colors.grey.shade200),
+          width: isSelected ? 1.4 : 1,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(isSelected ? 0.10 : 0.06),
+            blurRadius: isSelected ? 14 : 10,
+            offset: const Offset(0, 6),
           ),
-          padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // ── Row 1: checkbox + avatar + name/contact + badges ─────────
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Checkbox
-                  GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: () => provider.toggleUserSelection(user.id),
-                    child: SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: Checkbox(
-                        value: isSelected,
-                        onChanged: (_) => provider.toggleUserSelection(user.id),
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        activeColor: Colors.blue.shade600,
-                        shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(4)),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-
-                  // Profile photo
-                  GestureDetector(
-                    onTap: () => _navigateToUser(user),
-                    child: Stack(
-                      children: [
-                        Container(
-                          width: 52,
-                          height: 52,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            gradient: LinearGradient(
-                              colors: isFemale
-                                  ? [Colors.pink.shade100, Colors.pink.shade50]
-                                  : [Colors.blue.shade100, Colors.blue.shade50],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            border: Border.all(
-                              color: genderAccentColor.withOpacity(0.35),
-                              width: 2,
-                            ),
-                          ),
-                          child: ClipOval(
-                            child: profileImageUrl != null
-                                ? Image.network(
-                                    profileImageUrl,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) =>
-                                        _avatarIcon(isFemale),
-                                  )
-                                : _avatarIcon(isFemale),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () => _navigateToUser(user),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Header: selection + avatar + identity + badges
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => provider.toggleUserSelection(user.id),
+                      child: Container(
+                        height: 30,
+                        width: 30,
+                        decoration: BoxDecoration(
+                          color: isSelected
+                              ? _kPrimary.withOpacity(0.12)
+                              : (isDark
+                                  ? Colors.white.withOpacity(0.04)
+                                  : Colors.grey.shade100),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: isSelected
+                                ? _kPrimary
+                                : Colors.grey.shade400.withOpacity(0.6),
                           ),
                         ),
-                        // Online/Offline indicator dot (always visible, like chat section)
-                        Positioned(
-                          bottom: 1,
-                          right: 1,
-                          child: Container(
-                            width: 12,
-                            height: 12,
+                        child: Checkbox(
+                          value: isSelected,
+                          onChanged: (_) => provider.toggleUserSelection(user.id),
+                          activeColor: _kPrimary,
+                          checkColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    GestureDetector(
+                      onTap: () => _navigateToUser(user),
+                      child: Stack(
+                        clipBehavior: Clip.none,
+                        children: [
+                          Container(
+                            width: 62,
+                            height: 62,
                             decoration: BoxDecoration(
-                              color: user.isOnline == 1
-                                  ? Colors.green.shade500
-                                  : Colors.grey.shade400,
                               shape: BoxShape.circle,
+                              gradient: LinearGradient(
+                                colors: isFemale
+                                    ? [const Color(0xFFFCE7F3), const Color(0xFFFFF1F2)]
+                                    : [const Color(0xFFE0F2FE), const Color(0xFFEEF2FF)],
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                              ),
                               border: Border.all(
-                                  color: Colors.white, width: 1.5),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-
-                  // Name + contact info
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Full name
-                        Text(
-                          user.fullName,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: isDark ? Colors.white : const Color(0xFF0F172A),
-                            letterSpacing: 0.1,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 2),
-                        // ID + Gender
-                        Row(
-                          children: [
-                            Text(
-                              '#${user.id}',
-                              style: TextStyle(
-                                  fontSize: 11,
-                                  color: Colors.blue.shade400,
-                                  fontWeight: FontWeight.w600),
-                            ),
-                            Text(
-                              ' · ${user.gender}',
-                              style: TextStyle(
-                                  fontSize: 11, color: Colors.grey.shade500),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        // Email
-                        Row(
-                          children: [
-                            Icon(Icons.email_outlined,
-                                size: 11, color: Colors.grey.shade400),
-                            const SizedBox(width: 3),
-                            Expanded(
-                              child: Text(
-                                user.email.isNotEmpty ? user.email : '—',
-                                style: TextStyle(
-                                    fontSize: 11, color: Colors.grey.shade600),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                                color: genderAccentColor.withOpacity(0.45),
+                                width: 2,
                               ),
                             ),
-                            _miniVerifiedDot(isEmailVerified),
-                          ],
-                        ),
-                        const SizedBox(height: 2),
-                        // Phone
-                        Row(
-                          children: [
-                            Icon(Icons.phone_outlined,
-                                size: 11, color: Colors.grey.shade400),
-                            const SizedBox(width: 3),
-                            Expanded(
-                              child: Text(
-                                hasPhone ? cleanedPhone : '—',
-                                style: TextStyle(
-                                    fontSize: 11, color: Colors.grey.shade600),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                            child: ClipOval(
+                              child: profileImageUrl != null
+                                  ? Image.network(
+                                      profileImageUrl,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (_, __, ___) =>
+                                          _avatarIcon(isFemale),
+                                    )
+                                  : _avatarIcon(isFemale),
+                            ),
+                          ),
+                          Positioned(
+                            bottom: -2,
+                            right: -2,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: isDark ? const Color(0xFF0F172A) : Colors.white,
+                                shape: BoxShape.circle,
+                                boxShadow: [
+                                  BoxShadow(
+                                      color: Colors.black.withOpacity(0.08),
+                                      blurRadius: 4)
+                                ],
+                              ),
+                              child: Container(
+                                width: 12,
+                                height: 12,
+                                decoration: BoxDecoration(
+                                  color: user.isOnline == 1
+                                      ? _kEmerald
+                                      : Colors.grey.shade400,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white, width: 1.5),
+                                ),
                               ),
                             ),
-                            if (hasPhone) _miniVerifiedDot(isPhoneVerified),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-
-                  // Status + Plan badges
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      _badge(user.formattedStatus, statusColor),
-                      const SizedBox(height: 4),
-                      _badge(
-                        user.usertype.toUpperCase(),
-                        user.usertype.toLowerCase() == 'paid'
-                            ? const Color(0xFF6366F1)
-                            : Colors.grey.shade500,
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ],
-              ),
-
-              const SizedBox(height: 9),
-              Divider(height: 1, thickness: 0.8, color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.shade100),
-              const SizedBox(height: 7),
-
-              // ── Row 2: Info chips ────────────────────────────────────────
-              Wrap(
-                spacing: 5,
-                runSpacing: 5,
-                children: [
-                  _infoChip(Icons.calendar_today_outlined,
-                      'Reg: ${_formatDate(user.registrationDate)}', Colors.teal),
-                  _infoChip(
-                    user.isActive == 1
-                        ? Icons.check_circle_outline
-                        : Icons.cancel_outlined,
-                    user.isActive == 1 ? 'Active' : 'Inactive',
-                    user.isActive == 1 ? Colors.green : Colors.red,
-                  ),
-                  _infoChip(
-                    user.isOnline == 1 ? Icons.circle : Icons.circle_outlined,
-                    user.isOnline == 1 ? 'Online' : 'Offline',
-                    user.isOnline == 1 ? Colors.green : Colors.grey,
-                  ),
-                  if (user.expiryDate != null &&
-                      user.expiryDate!.isNotEmpty &&
-                      user.expiryDate != 'null')
-                    _infoChip(
-                      Icons.event_outlined,
-                      'Exp: ${_formatDate(user.expiryDate)}',
-                      Colors.deepOrange,
                     ),
-                  if (user.paymentStatus != null &&
-                      user.paymentStatus!.isNotEmpty &&
-                      user.paymentStatus != 'null')
-                    _infoChip(
-                      Icons.payment_outlined,
-                      user.paymentStatus!,
-                      Colors.purple,
-                    ),
-                ],
-              ),
-
-              const SizedBox(height: 7),
-              Divider(height: 1, thickness: 0.8, color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.shade100),
-              const SizedBox(height: 7),
-
-              // ── Row 3: Action buttons (contact LEFT · admin RIGHT) ────────
-              Row(
-                children: [
-                  // Contact buttons
-                  if (hasPhone) ...[
-                    _actionIconBtn(
-                      Icons.chat_rounded,
-                      'WhatsApp',
-                      const Color(0xFF25D366),
-                      () => _launchWhatsApp(cleanedPhone),
-                    ),
-                    const SizedBox(width: 5),
-                    _actionIconBtn(
-                      Icons.videocam_rounded,
-                      'Viber',
-                      const Color(0xFF7360F2),
-                      () => _launchViber(cleanedPhone),
-                    ),
-                    const SizedBox(width: 5),
-                  ],
-                  if (user.email.isNotEmpty)
-                    _actionIconBtn(
-                      Icons.email_outlined,
-                      'Send Email',
-                      Colors.orange,
-                      () => _launchEmail(user.email),
-                    ),
-                  const Spacer(),
-                  // Admin actions
-                  _actionIconBtn(
-                    Icons.chat_bubble_outline,
-                    'Direct Chat',
-                    Colors.teal,
-                    () {
-                      if (widget.onOpenChat != null) {
-                        widget.onOpenChat!(user.id);
-                      } else {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Opening chat…'),
-                            duration: Duration(seconds: 1),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  user.fullName,
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w800,
+                                    color: isDark
+                                        ? Colors.white
+                                        : const Color(0xFF0B1222),
+                                    letterSpacing: 0.2,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              _badge(
+                                user.formattedStatus,
+                                statusColor,
+                              ),
+                            ],
                           ),
-                        );
-                      }
-                    },
-                  ),
-                  const SizedBox(width: 5),
-                  _actionIconBtn(
-                    Icons.visibility_outlined,
-                    'View Profile',
-                    Colors.blue,
-                    () => _navigateToUser(user),
-                  ),
-                ],
-              ),
-            ],
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              _softChip(
+                                '#${user.id}',
+                                icon: Icons.badge_outlined,
+                                color: _kPrimary,
+                              ),
+                              const SizedBox(width: 6),
+                              _softChip(
+                                user.gender,
+                                icon: isFemale ? Icons.female : Icons.male,
+                                color: genderAccentColor,
+                              ),
+                              const SizedBox(width: 6),
+                              _softChip(
+                                'Last active ${_formatDate(user.lastLogin)}',
+                                icon: Icons.access_time,
+                                color: _kSky,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              _badge(
+                                user.usertype.toUpperCase(),
+                                user.usertype.toLowerCase() == 'paid'
+                                    ? _kPrimary
+                                    : Colors.grey.shade500,
+                              ),
+                              const SizedBox(width: 6),
+                              _badge(
+                                user.isActive == 1 ? 'ACTIVE' : 'INACTIVE',
+                                user.isActive == 1 ? _kEmerald : _kRose,
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+                _divider(isDark),
+                const SizedBox(height: 10),
+
+                // Contact block
+                Row(
+                  children: [
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(Icons.email_outlined,
+                              size: 14, color: Colors.grey.shade500),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              user.email.isNotEmpty ? user.email : 'No email',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade700,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          _miniVerifiedDot(isEmailVerified),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          Icon(Icons.phone_outlined,
+                              size: 14, color: Colors.grey.shade500),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              hasPhone ? cleanedPhone : 'No phone',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey.shade700,
+                                fontWeight: FontWeight.w500,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (hasPhone) _miniVerifiedDot(isPhoneVerified),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+                _divider(isDark),
+                const SizedBox(height: 10),
+
+                // Info chips
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _infoChip(Icons.calendar_today_outlined,
+                        'Reg: ${_formatDate(user.registrationDate)}', _kEmerald),
+                    _infoChip(
+                      user.isOnline == 1 ? Icons.wifi_tethering : Icons.wifi_off,
+                      user.isOnline == 1 ? 'Online' : 'Offline',
+                      user.isOnline == 1 ? _kEmerald : Colors.grey,
+                    ),
+                    if (user.expiryDate != null &&
+                        user.expiryDate!.isNotEmpty &&
+                        user.expiryDate != 'null')
+                      _infoChip(
+                        Icons.event_outlined,
+                        'Exp: ${_formatDate(user.expiryDate)}',
+                        _kAmber,
+                      ),
+                    if (user.paymentStatus != null &&
+                        user.paymentStatus!.isNotEmpty &&
+                        user.paymentStatus != 'null')
+                      _infoChip(
+                        Icons.payment_outlined,
+                        user.paymentStatus!,
+                        _kViolet,
+                      ),
+                    _infoChip(
+                      Icons.verified_outlined,
+                      user.isVerified == 1 ? 'Fully Verified' : 'Needs Review',
+                      user.isVerified == 1 ? _kEmerald : _kRose,
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+                _divider(isDark),
+                const SizedBox(height: 10),
+
+                // Activity board
+                _buildActivityBoard(activity, isActivityLoading, isDark),
+
+                const SizedBox(height: 12),
+                _divider(isDark),
+                const SizedBox(height: 10),
+
+                // Action buttons
+                Row(
+                  children: [
+                    if (hasPhone) ...[
+                      _actionIconBtn(
+                        Icons.chat_rounded,
+                        'WhatsApp',
+                        const Color(0xFF25D366),
+                        () => _launchWhatsApp(cleanedPhone),
+                      ),
+                      const SizedBox(width: 6),
+                      _actionIconBtn(
+                        Icons.videocam_rounded,
+                        'Viber',
+                        const Color(0xFF7360F2),
+                        () => _launchViber(cleanedPhone),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
+                    if (user.email.isNotEmpty)
+                      _actionIconBtn(
+                        Icons.email_outlined,
+                        'Send Email',
+                        _kAmber,
+                        () => _launchEmail(user.email),
+                      ),
+                    const Spacer(),
+                    _actionIconBtn(
+                      Icons.chat_bubble_outline,
+                      'Direct Chat',
+                      _kEmerald,
+                      () {
+                        if (widget.onOpenChat != null) {
+                          widget.onOpenChat!(user.id);
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text('Opening chat…'),
+                              duration: Duration(seconds: 1),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                    const SizedBox(width: 6),
+                    _actionIconBtn(
+                      Icons.visibility_outlined,
+                      'View Profile',
+                      _kPrimary,
+                      () => _navigateToUser(user),
+                    ),
+                  ],
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -545,7 +632,7 @@ class _UsersPageState extends State<UsersPage> {
       child: Icon(
         isFemale ? Icons.face_2 : Icons.person,
         size: 24,
-        color: isFemale ? Colors.pink.shade300 : Colors.blue.shade300,
+        color: isFemale ? Colors.pink.shade300 : _kPrimary.withOpacity(0.7),
       ),
     );
   }
@@ -626,9 +713,211 @@ class _UsersPageState extends State<UsersPage> {
           decoration: BoxDecoration(
             color: color.withOpacity(0.08),
             borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: color.withOpacity(0.18)),
           ),
           child: Icon(icon, size: 16, color: color),
         ),
+      ),
+    );
+  }
+
+  Widget _divider(bool isDark) {
+    return Divider(
+      height: 1,
+      thickness: 1,
+      color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.shade200,
+    );
+  }
+
+  Widget _softChip(String label, {required IconData icon, required Color color}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.20)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: color),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _activityPill({
+    required String label,
+    required IconData icon,
+    required Color color,
+    int? value,
+    bool loading = false,
+  }) {
+    return Container(
+      width: 140,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withOpacity(0.15)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.14),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 16, color: color),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Colors.grey.shade700,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                loading
+                    ? SizedBox(
+                        height: 14,
+                        width: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(color),
+                        ),
+                      )
+                    : Text(
+                        value != null ? value.toString() : '—',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                          color: color,
+                        ),
+                      ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityBoard(ActivityStats? stats, bool loading, bool isDark) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0F172A) : _kPrimary.withOpacity(0.04),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: _kPrimary.withOpacity(0.12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: _kPrimary.withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.timeline_outlined, color: _kPrimary, size: 18),
+              ),
+              const SizedBox(width: 8),
+              const Text(
+                'Activity Snapshot',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                  color: _kPrimary,
+                ),
+              ),
+              const Spacer(),
+              if (loading)
+                const SizedBox(
+                  height: 18,
+                  width: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation<Color>(_kPrimary),
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _activityPill(
+                  label: 'Requests Sent',
+                  icon: Icons.send_rounded,
+                  color: _kPrimary,
+                  value: stats?.requestsSent,
+                  loading: loading && stats == null,
+                ),
+                const SizedBox(width: 8),
+                _activityPill(
+                  label: 'Requests Received',
+                  icon: Icons.inbox_outlined,
+                  color: _kViolet,
+                  value: stats?.requestsReceived,
+                  loading: loading && stats == null,
+                ),
+                const SizedBox(width: 8),
+                _activityPill(
+                  label: 'Chat Requests',
+                  icon: Icons.chat_bubble_outline,
+                  color: _kSky,
+                  value: stats?.chatRequestsSent,
+                  loading: loading && stats == null,
+                ),
+                const SizedBox(width: 8),
+                _activityPill(
+                  label: 'Chats Accepted',
+                  icon: Icons.check_circle_outline,
+                  color: _kEmerald,
+                  value: stats?.chatRequestsAccepted,
+                  loading: loading && stats == null,
+                ),
+                const SizedBox(width: 8),
+                _activityPill(
+                  label: 'Profile Views',
+                  icon: Icons.visibility_outlined,
+                  color: _kAmber,
+                  value: stats?.profileViews,
+                  loading: loading && stats == null,
+                ),
+                const SizedBox(width: 8),
+                _activityPill(
+                  label: 'Matches',
+                  icon: Icons.favorite_outline,
+                  color: _kRose,
+                  value: stats?.matchesCount,
+                  loading: loading && stats == null,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -638,10 +927,25 @@ class _UsersPageState extends State<UsersPage> {
   Widget _buildFilterRow(UserProvider provider) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      color: Theme.of(context).colorScheme.surface,
+      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF0B1222) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade200,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 10),
+          )
+        ],
+      ),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12),
         child: Row(
           children: [
             _selectAllChip(provider),
@@ -686,7 +990,7 @@ class _UsersPageState extends State<UsersPage> {
                 }),
             if (provider.statusFilter != 'all' ||
                 provider.userTypeFilter != 'all')
-              _filterChip('✕ Clear', true, Colors.red, provider.clearFilters),
+              _filterChip('✕ Clear', true, _kRose, provider.clearFilters),
           ],
         ),
       ),
@@ -704,7 +1008,7 @@ class _UsersPageState extends State<UsersPage> {
       case 'not_uploaded':
         return Colors.grey;
       default:
-        return Colors.blueGrey;
+        return _kPrimaryDark;
     }
   }
 
@@ -715,7 +1019,7 @@ class _UsersPageState extends State<UsersPage> {
       case 'free':
         return Colors.grey;
       default:
-        return Colors.blueGrey;
+        return _kPrimaryDark;
     }
   }
 
@@ -730,26 +1034,26 @@ class _UsersPageState extends State<UsersPage> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: allSelected ? Colors.blue.shade50 : (isDark ? const Color(0xFF263248) : Colors.grey.shade100),
+          color: allSelected ? _kPrimary.withOpacity(0.12) : (isDark ? const Color(0xFF1C2339) : Colors.grey.shade100),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: allSelected ? Colors.blue.shade300 : (isDark ? Colors.white.withOpacity(0.15) : Colors.grey.shade300),
+            color: allSelected ? _kPrimary.withOpacity(0.8) : (isDark ? Colors.white.withOpacity(0.15) : Colors.grey.shade300),
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              allSelected ? Icons.check_box : Icons.check_box_outline_blank,
+              allSelected ? Icons.check_box_rounded : Icons.check_box_outline_blank,
               size: 14,
-              color: allSelected ? Colors.blue : Colors.grey,
+              color: allSelected ? _kPrimary : Colors.grey,
             ),
             const SizedBox(width: 5),
             Text(
               'All',
               style: TextStyle(
                 fontSize: 12,
-                color: allSelected ? Colors.blue : (isDark ? Colors.grey.shade300 : Colors.grey.shade700),
+                color: allSelected ? _kPrimary : (isDark ? Colors.grey.shade300 : Colors.grey.shade700),
                 fontWeight: allSelected ? FontWeight.w600 : FontWeight.w400,
               ),
             ),
@@ -799,9 +1103,9 @@ class _UsersPageState extends State<UsersPage> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: isDark ? const Color(0xFF1E293B) : Colors.blue.shade50,
+                color: isDark ? const Color(0xFF111827) : _kPrimary.withOpacity(0.08),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: isDark ? Colors.blue.withOpacity(0.3) : Colors.blue.shade200),
+                border: Border.all(color: _kPrimary.withOpacity(0.25)),
               ),
               child: Row(
                 children: [
@@ -810,7 +1114,7 @@ class _UsersPageState extends State<UsersPage> {
                     height: 8,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: Colors.blue.shade400,
+                      color: _kPrimary,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -818,7 +1122,7 @@ class _UsersPageState extends State<UsersPage> {
                     '${provider.selectedCount} selected',
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
-                      color: Colors.blue,
+                      color: _kPrimary,
                       fontSize: 13,
                     ),
                   ),
@@ -898,159 +1202,132 @@ class _UsersPageState extends State<UsersPage> {
 
   Widget _buildTopSection(UserProvider provider) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Container(
-      color: Theme.of(context).colorScheme.surface,
-      child: Column(
-        children: [
-          // Row 1: Search bar + Refresh (title shown in dashboard topbar)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 12, 8),
-            child: Row(
-              children: [
-                // Search bar (takes remaining space)
-                Expanded(
-                  child: TextField(
-                    controller: _searchController,
-                    decoration: InputDecoration(
-                      hintText: 'Search by name, email, phone or ID…',
-                      hintStyle: TextStyle(
-                          fontSize: 13, color: Colors.grey.shade400),
-                      prefixIcon: Icon(Icons.search_rounded,
-                          color: Colors.grey.shade400, size: 18),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide:
-                            BorderSide(color: isDark ? Colors.white.withOpacity(0.10) : Colors.grey.shade200),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide:
-                            BorderSide(color: isDark ? Colors.white.withOpacity(0.10) : Colors.grey.shade200),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(
-                            color: Colors.blue.shade300, width: 1.5),
-                      ),
-                      filled: true,
-                      fillColor: isDark ? const Color(0xFF263248) : Colors.grey.shade50,
-                      contentPadding: const EdgeInsets.symmetric(
-                          vertical: 9, horizontal: 12),
-                      isDense: true,
-                      suffixIcon: _searchController.text.isNotEmpty
-                          ? IconButton(
-                              icon: const Icon(Icons.clear_rounded,
-                                  size: 16),
-                              onPressed: () {
-                                _searchController.clear();
-                                provider.setSearchQuery('');
-                              },
-                            )
-                          : null,
-                    ),
-                    onChanged: (v) => provider.setSearchQuery(v),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                // Refresh button
-                Tooltip(
-                  message: 'Refresh',
-                  child: InkWell(
-                    onTap: () => provider.fetchUsers(),
-                    borderRadius: BorderRadius.circular(8),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: isDark ? const Color(0xFF263248) : Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(8),
-                        border:
-                            Border.all(color: isDark ? Colors.white.withOpacity(0.10) : Colors.grey.shade200),
-                      ),
-                      child: Icon(Icons.refresh_rounded,
-                          size: 18, color: Colors.grey.shade600),
-                    ),
-                  ),
-                ),
-              ],
+    return Column(
+      children: [
+        Container(
+          margin: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [_kPrimaryDark, _kViolet],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
+            borderRadius: BorderRadius.circular(18),
+            boxShadow: [
+              BoxShadow(
+                color: _kPrimary.withOpacity(0.25),
+                blurRadius: 22,
+                offset: const Offset(0, 10),
+              ),
+            ],
           ),
-
-          // Row 2: Stats + vertical divider + filter chips
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.fromLTRB(16, 0, 12, 10),
-            child: Row(
-              children: [
-                // Stat pills
-                if (provider.totalCount > 0) ...[
-                  _statPill('Total', provider.totalCount, Colors.blue),
-                  const SizedBox(width: 6),
-                  _statPill(
-                      'Shown', provider.filteredCount, Colors.teal),
-                  if (provider.selectedCount > 0) ...[
-                    const SizedBox(width: 6),
-                    _statPill('Selected', provider.selectedCount,
-                        Colors.purple),
-                  ],
-                  const SizedBox(width: 12),
-                  Container(
-                      width: 1, height: 22, color: isDark ? Colors.white.withOpacity(0.10) : Colors.grey.shade200),
-                  const SizedBox(width: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'Member Directory',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 0.2,
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Search, filter and action on members in one place.',
+                          style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Tooltip(
+                    message: 'Refresh',
+                    child: InkWell(
+                      onTap: () => provider.fetchUsers(),
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.12),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.18),
+                          ),
+                        ),
+                        child: const Icon(Icons.refresh_rounded,
+                            size: 18, color: Colors.white),
+                      ),
+                    ),
+                  ),
                 ],
-                // Select-all chip
-                _selectAllChip(provider),
-                const SizedBox(width: 8),
-                Container(
-                    width: 1, height: 22, color: isDark ? Colors.white.withOpacity(0.15) : Colors.grey.shade300),
-                const SizedBox(width: 8),
-                // Status filter chips
-                ...[
-                  ('all', 'All'),
-                  ('approved', 'Approved'),
-                  ('pending', 'Pending'),
-                  ('rejected', 'Rejected'),
-                  ('not_uploaded', 'Not Uploaded'),
-                ].expand((e) {
-                  final (key, label) = e;
-                  return [
-                    _filterChip(
-                      label,
-                      provider.statusFilter == key,
-                      _statusColor(key),
-                      () => provider.setStatusFilter(key),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: Colors.white.withOpacity(0.18)),
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: InputDecoration(
+                    hintText: 'Search by name, email, phone or ID…',
+                    hintStyle: TextStyle(
+                      fontSize: 13,
+                      color: Colors.white.withOpacity(0.7),
                     ),
+                    prefixIcon: Icon(Icons.search_rounded,
+                        color: Colors.white.withOpacity(0.8), size: 18),
+                    border: InputBorder.none,
+                    contentPadding:
+                        const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                    suffixIcon: _searchController.text.isNotEmpty
+                        ? IconButton(
+                            icon: const Icon(Icons.clear_rounded,
+                                size: 16, color: Colors.white),
+                            onPressed: () {
+                              _searchController.clear();
+                              provider.setSearchQuery('');
+                            },
+                          )
+                        : null,
+                  ),
+                  onChanged: (v) => provider.setSearchQuery(v),
+                ),
+              ),
+              const SizedBox(height: 12),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    _statPill('Total', provider.totalCount, Colors.white),
                     const SizedBox(width: 6),
-                  ];
-                }),
-                Container(
-                    width: 1, height: 22, color: isDark ? Colors.white.withOpacity(0.15) : Colors.grey.shade300),
-                const SizedBox(width: 6),
-                // Plan filter chips
-                ...[
-                  ('all', 'All Plans'),
-                  ('paid', 'Paid'),
-                  ('free', 'Free'),
-                ].expand((e) {
-                  final (key, label) = e;
-                  return [
-                    _filterChip(
-                      label,
-                      provider.userTypeFilter == key,
-                      _planColor(key),
-                      () => provider.setUserTypeFilter(key),
-                    ),
-                    const SizedBox(width: 6),
-                  ];
-                }),
-                if (provider.statusFilter != 'all' ||
-                    provider.userTypeFilter != 'all')
-                  _filterChip(
-                      '✕ Clear', true, Colors.red, provider.clearFilters),
-              ],
-            ),
+                    _statPill('Shown', provider.filteredCount, _kEmerald),
+                    if (provider.selectedCount > 0) ...[
+                      const SizedBox(width: 6),
+                      _statPill('Selected', provider.selectedCount, _kAmber),
+                    ],
+                  ],
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+        _buildFilterRow(provider),
+      ],
     );
   }
 

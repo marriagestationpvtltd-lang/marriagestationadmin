@@ -1,6 +1,8 @@
 import 'dart:async';
 
 import 'package:adminmrz/users/service/userservice.dart';
+import 'package:adminmrz/users/userdetails/detailmodel.dart';
+import 'package:adminmrz/users/userdetails/userdetailservice.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
@@ -9,6 +11,7 @@ import 'model/usermodel.dart';
 
 class UserProvider with ChangeNotifier {
   final UserService _userService = UserService();
+  final UserDetailsService _userDetailsService = UserDetailsService();
 
   List<User> _allUsers = [];
   List<User> _filteredUsers = [];
@@ -21,6 +24,8 @@ class UserProvider with ChangeNotifier {
   bool _isSelectAll = false;
 
   StreamSubscription<QuerySnapshot>? _presenceSub;
+  final Map<int, ActivityStats> _activityByUser = {};
+  final Set<int> _activityLoading = {};
 
   // Getters
   List<User> get filteredUsers => _filteredUsers;
@@ -35,6 +40,8 @@ class UserProvider with ChangeNotifier {
   Set<int> get selectedUserIds => _selectedUserIds;
   bool get isSelectAll => _isSelectAll;
   int get selectedCount => _selectedUserIds.length;
+  ActivityStats? activityFor(int userId) => _activityByUser[userId];
+  bool isActivityLoading(int userId) => _activityLoading.contains(userId);
 
   // Check if all filtered users are selected
   bool get areAllFilteredSelected {
@@ -55,6 +62,8 @@ class UserProvider with ChangeNotifier {
       // Start (or restart) the real-time presence listener now that _allUsers is
       // populated so the initial Firestore snapshot can immediately apply to it.
       _startPresenceListener();
+      _activityByUser.clear();
+      _activityLoading.clear();
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -133,6 +142,23 @@ class UserProvider with ChangeNotifier {
     _selectedUserIds.clear();
     _isSelectAll = false;
     notifyListeners();
+  }
+
+  Future<void> preloadActivity(int userId) async {
+    if (_activityByUser.containsKey(userId) || _activityLoading.contains(userId)) {
+      return;
+    }
+    _activityLoading.add(userId);
+    notifyListeners();
+    try {
+      final stats = await _userDetailsService.getUserActivity(userId);
+      _activityByUser[userId] = stats;
+    } catch (_) {
+      // Ignore quietly; UI will show fallback values.
+    } finally {
+      _activityLoading.remove(userId);
+      notifyListeners();
+    }
   }
 
   bool isUserSelected(int userId) {
