@@ -56,7 +56,7 @@ class WebNotificationService {
 
     // Clicking the notification focuses the tab.
     notification.onClick.listen((_) {
-      html.window.focus();
+      js.context.callMethod('eval', ['window.focus()']);
       notification.close();
     });
   }
