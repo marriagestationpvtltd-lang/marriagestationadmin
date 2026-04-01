@@ -2078,9 +2078,37 @@ class _ChatWindowState extends State<ChatWindow> {
               ),
               const SizedBox(width: 6),
               Expanded(
-                child: RawKeyboardListener(
-                  focusNode: _messageFocusNode,
-                  onKey: _handleMessageKeyEvent,
+                child: CallbackShortcuts(
+                  bindings: <ShortcutActivator, VoidCallback>{
+                    const SingleActivator(LogicalKeyboardKey.enter): () {
+                      final keys = HardwareKeyboard.instance.logicalKeysPressed;
+                      final bool hasModifier = keys.contains(LogicalKeyboardKey.shiftLeft) ||
+                          keys.contains(LogicalKeyboardKey.shiftRight) ||
+                          keys.contains(LogicalKeyboardKey.controlLeft) ||
+                          keys.contains(LogicalKeyboardKey.controlRight) ||
+                          keys.contains(LogicalKeyboardKey.altLeft) ||
+                          keys.contains(LogicalKeyboardKey.altRight) ||
+                          keys.contains(LogicalKeyboardKey.metaLeft) ||
+                          keys.contains(LogicalKeyboardKey.metaRight);
+
+                      final int lineCount = _estimateLineCount(_messageController.text);
+                      final String trimmed = _messageController.text.trim();
+
+                      if (!hasModifier && lineCount <= 2 && trimmed.isNotEmpty) {
+                        _sendMessage();
+                        return;
+                      }
+
+                      final selection = _messageController.selection;
+                      final start = selection.start >= 0 ? selection.start : _messageController.text.length;
+                      final end = selection.end >= 0 ? selection.end : _messageController.text.length;
+                      final String newText = _messageController.text.replaceRange(start, end, '\n');
+                      _messageController.value = TextEditingValue(
+                        text: newText,
+                        selection: TextSelection.collapsed(offset: start + 1),
+                      );
+                    },
+                  },
                   child: TextField(
                     controller: _messageController,
                     focusNode: _messageFocusNode,
@@ -2231,23 +2259,6 @@ class _ChatWindowState extends State<ChatWindow> {
             .showSnackBar(SnackBar(content: Text("Failed to send image: $e")));
       }
     }
-  }
-
-  KeyEventResult _handleMessageKeyEvent(RawKeyEvent event) {
-    if (event is RawKeyDownEvent &&
-        (event.logicalKey == LogicalKeyboardKey.enter ||
-            event.logicalKey == LogicalKeyboardKey.numpadEnter)) {
-      final bool hasModifier = event.isShiftPressed ||
-          event.isControlPressed ||
-          event.isAltPressed ||
-          event.isMetaPressed;
-      final int lineCount = _estimateLineCount(_messageController.text);
-      if (!hasModifier && lineCount <= 2 && _messageController.text.trim().isNotEmpty) {
-        _sendMessage();
-        return KeyEventResult.handled;
-      }
-    }
-    return KeyEventResult.ignored;
   }
 
   int _estimateLineCount(String text) {
