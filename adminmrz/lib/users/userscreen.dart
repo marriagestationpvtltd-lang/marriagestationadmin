@@ -341,7 +341,7 @@ class _UsersPageState extends State<UsersPage> {
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF1A1A2E),
+                            color: Color(0xFF0F172A),
                             letterSpacing: 0.1,
                           ),
                           maxLines: 1,
@@ -418,7 +418,7 @@ class _UsersPageState extends State<UsersPage> {
                       _badge(
                         user.usertype.toUpperCase(),
                         user.usertype.toLowerCase() == 'paid'
-                            ? const Color(0xFF6C63FF)
+                            ? const Color(0xFF6366F1)
                             : Colors.grey.shade500,
                       ),
                     ],
@@ -704,7 +704,7 @@ class _UsersPageState extends State<UsersPage> {
   Color _planColor(String plan) {
     switch (plan) {
       case 'paid':
-        return const Color(0xFF6C63FF);
+        return const Color(0xFF6366F1);
       case 'free':
         return Colors.grey;
       default:

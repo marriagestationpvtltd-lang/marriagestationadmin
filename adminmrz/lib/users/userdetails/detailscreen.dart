@@ -7,13 +7,13 @@ import 'package:provider/provider.dart';
 import 'detailmodel.dart';
 
 // ─────────────────────────── colour palette ───────────────────────────────────
-const _kPrimary   = Color(0xFF1E40AF);
-const _kPersonal  = Color(0xFF1E40AF);
-const _kEducation = Color(0xFF065F46);
-const _kFamily    = Color(0xFF6D28D9);
-const _kLifestyle = Color(0xFFD97706);
-const _kPartner   = Color(0xFFBE185D);
-const _kDocs      = Color(0xFF0369A1);
+const _kPrimary   = Color(0xFF6366F1);
+const _kPersonal  = Color(0xFF6366F1);
+const _kEducation = Color(0xFF059669);
+const _kFamily    = Color(0xFF7C3AED);
+const _kLifestyle = Color(0xFFF59E0B);
+const _kPartner   = Color(0xFFDB2777);
+const _kDocs      = Color(0xFF0EA5E9);
 const _kPageBg    = Color(0xFFF1F5F9);
 
 // ──────────────────────────── Screen ─────────────────────────────────────────

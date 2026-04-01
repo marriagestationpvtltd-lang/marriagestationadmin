@@ -63,19 +63,19 @@ class _PaymentsPageState extends State<PaymentsPage> {
       child: Row(
         children: [
           _statCard('Total Earnings', summary.totalEarning,
-              Icons.account_balance_wallet_outlined, const Color(0xFF2196F3)),
+              Icons.account_balance_wallet_outlined, const Color(0xFF6366F1)),
           const SizedBox(width: 10),
           _statCard('Packages Sold', summary.totalPackagesSold.toString(),
-              Icons.shopping_bag_outlined, const Color(0xFF9C27B0)),
+              Icons.shopping_bag_outlined, const Color(0xFF8B5CF6)),
           const SizedBox(width: 10),
           _statCard('Active', summary.activePackages.toString(),
-              Icons.check_circle_outline, const Color(0xFF4CAF50)),
+              Icons.check_circle_outline, const Color(0xFF10B981)),
           const SizedBox(width: 10),
           _statCard('Expired', summary.expiredPackages.toString(),
-              Icons.cancel_outlined, const Color(0xFFF44336)),
+              Icons.cancel_outlined, const Color(0xFFEF4444)),
           const SizedBox(width: 10),
           _statCard('Top Method', summary.topPaymentMethod,
-              Icons.payment_outlined, const Color(0xFFFF9800)),
+              Icons.payment_outlined, const Color(0xFFF59E0B)),
         ],
       ),
     );
@@ -83,13 +83,18 @@ class _PaymentsPageState extends State<PaymentsPage> {
 
   Widget _statCard(
       String label, String value, IconData icon, Color color) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = Theme.of(context).colorScheme.surface;
     return Container(
       width: 160,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(
+            color: isDark
+                ? Theme.of(context).colorScheme.outlineVariant
+                : Colors.grey.shade200),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withOpacity(0.04),
@@ -149,8 +154,9 @@ class _PaymentsPageState extends State<PaymentsPage> {
     final hasFilters = provider.paymentMethodFilter != 'all' ||
         provider.statusFilter != 'all' ||
         provider.startDate != null;
+    final cardBg = Theme.of(context).colorScheme.surface;
     return Container(
-      color: Colors.white,
+      color: cardBg,
       child: Column(
         children: [
           // Row 1: Search + action icon buttons
@@ -467,6 +473,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
   Widget _buildPaymentCard(Payment payment) {
     final Color statusColor = payment.statusColor;
     final String initials = payment.displayInitials;
+    final cardBg = Theme.of(context).colorScheme.surface;
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 5),
@@ -479,7 +486,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
       clipBehavior: Clip.antiAlias,
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: cardBg,
           border: Border(left: BorderSide(color: statusColor, width: 4)),
         ),
         padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
