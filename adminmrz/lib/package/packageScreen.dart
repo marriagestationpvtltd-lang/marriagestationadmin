@@ -30,7 +30,7 @@ _TierCfg _tierFor(String name) {
         Color(0xFF64748B), Color(0xFFF8FAFC), Color(0xFFCBD5E1), Icons.military_tech_rounded);
     default:
       return const _TierCfg(
-        Color(0xFF3B82F6), Color(0xFFEFF6FF), Color(0xFFBFDBFE), Icons.card_membership_rounded);
+        Color(0xFF3B82F6), Color(0xFFEEF2FF), Color(0xFFE0E7FF), Icons.card_membership_rounded);
   }
 }
 
@@ -288,7 +288,7 @@ class _PackagesPageState extends State<PackagesPage>
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          colors: [Color(0xFF1E3A5F), Color(0xFF2563EB)],
+          colors: [Color(0xFF4F46E5), Color(0xFF6366F1)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -364,8 +364,9 @@ class _PackagesPageState extends State<PackagesPage>
   // ── search bar ─────────────────────────────────────────────────────────────
 
   Widget _buildSearchBar(PackageProvider provider) {
+    final cardBg = Theme.of(context).colorScheme.surface;
     return Container(
-      color: Colors.white,
+      color: cardBg,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: ValueListenableBuilder<TextEditingValue>(
         valueListenable: _searchCtrl,
@@ -396,7 +397,7 @@ class _PackagesPageState extends State<PackagesPage>
                 borderSide: BorderSide(color: Colors.grey.shade200)),
             focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
+                borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5)),
           ),
         ),
       ),
@@ -406,8 +407,9 @@ class _PackagesPageState extends State<PackagesPage>
   // ── stats row ──────────────────────────────────────────────────────────────
 
   Widget _buildStatsRow(List<Package> pkgs) {
+    final cardBg = Theme.of(context).colorScheme.surface;
     return Container(
-      color: Colors.white,
+      color: cardBg,
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Row(
         children: _kStats.map((s) {
@@ -458,7 +460,7 @@ class _PackagesPageState extends State<PackagesPage>
 
   Widget _buildBody(PackageProvider provider) {
     if (provider.isLoading) {
-      return const Center(child: CircularProgressIndicator(color: Color(0xFF2563EB)));
+      return const Center(child: CircularProgressIndicator(color: Color(0xFF6366F1)));
     }
     if (provider.error.isNotEmpty) {
       return _buildErrorState(provider);
@@ -468,7 +470,7 @@ class _PackagesPageState extends State<PackagesPage>
     }
     return RefreshIndicator(
       onRefresh: provider.fetchPackages,
-      color: const Color(0xFF2563EB),
+      color: const Color(0xFF6366F1),
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 80),
         itemCount: provider.packages.length,
@@ -481,10 +483,11 @@ class _PackagesPageState extends State<PackagesPage>
 
   Widget _buildPackageCard(Package pkg) {
     final cfg = _tierFor(pkg.name);
+    final cardBg = Theme.of(context).colorScheme.surface;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: cfg.ring),
         boxShadow: [
@@ -630,7 +633,7 @@ class _PackagesPageState extends State<PackagesPage>
                     _actionBtn(
                         icon: Icons.edit_rounded,
                         tooltip: 'Edit',
-                        color: const Color(0xFF2563EB),
+                        color: const Color(0xFF6366F1),
                         onTap: () => _openEdit(pkg)),
                     const SizedBox(width: 6),
                     _actionBtn(
@@ -703,12 +706,12 @@ class _PackagesPageState extends State<PackagesPage>
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
+              color: const Color(0xFFEEF2FF),
               shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFBFDBFE)),
+              border: Border.all(color: const Color(0xFFE0E7FF)),
             ),
             child: const Icon(Icons.card_membership_rounded,
-                size: 52, color: Color(0xFF2563EB)),
+                size: 52, color: Color(0xFF6366F1)),
           ),
           const SizedBox(height: 20),
           const Text('No Packages Found',
@@ -721,7 +724,7 @@ class _PackagesPageState extends State<PackagesPage>
           ElevatedButton.icon(
             onPressed: _openCreate,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2563EB),
+              backgroundColor: const Color(0xFF6366F1),
               foregroundColor: Colors.white,
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -757,7 +760,7 @@ class _PackagesPageState extends State<PackagesPage>
                 provider.fetchPackages();
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF2563EB),
+                backgroundColor: const Color(0xFF6366F1),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               ),
@@ -774,14 +777,15 @@ class _PackagesPageState extends State<PackagesPage>
 
   Widget _buildSidePanel(PackageProvider provider) {
     final isEdit = _editingPkg != null;
+    final panelBg = Theme.of(context).colorScheme.surface;
     return Material(
       elevation: 24,
       shadowColor: Colors.black26,
       borderRadius: const BorderRadius.horizontal(left: Radius.circular(20)),
       child: Container(
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.horizontal(left: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: panelBg,
+          borderRadius: const BorderRadius.horizontal(left: Radius.circular(20)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -791,7 +795,7 @@ class _PackagesPageState extends State<PackagesPage>
               padding: const EdgeInsets.fromLTRB(20, 16, 12, 16),
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
-                  colors: [Color(0xFF1E3A5F), Color(0xFF2563EB)],
+                  colors: [Color(0xFF4F46E5), Color(0xFF6366F1)],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
@@ -835,19 +839,19 @@ class _PackagesPageState extends State<PackagesPage>
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEFF6FF),
+                            color: const Color(0xFFEEF2FF),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFBFDBFE)),
+                            border: Border.all(color: const Color(0xFFE0E7FF)),
                           ),
                           child: Row(
                             children: [
                               const Icon(Icons.info_outline_rounded,
-                                  size: 14, color: Color(0xFF2563EB)),
+                                  size: 14, color: Color(0xFF6366F1)),
                               const SizedBox(width: 8),
                               Text('Editing package ID: ${_editingPkg!.id}',
                                   style: const TextStyle(
                                       fontSize: 12,
-                                      color: Color(0xFF2563EB),
+                                      color: Color(0xFF6366F1),
                                       fontWeight: FontWeight.w500)),
                             ],
                           ),
@@ -934,7 +938,7 @@ class _PackagesPageState extends State<PackagesPage>
                             child: ElevatedButton(
                               onPressed: provider.isLoading ? null : _handleSave,
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF2563EB),
+                                backgroundColor: const Color(0xFF6366F1),
                                 foregroundColor: Colors.white,
                                 padding: const EdgeInsets.symmetric(vertical: 13),
                                 shape: RoundedRectangleBorder(
@@ -1012,7 +1016,7 @@ class _PackagesPageState extends State<PackagesPage>
                 borderSide: BorderSide(color: Colors.grey.shade200)),
             focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Color(0xFF2563EB), width: 1.5)),
+                borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5)),
             errorBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(color: Colors.red)),

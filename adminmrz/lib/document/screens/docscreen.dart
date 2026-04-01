@@ -7,7 +7,7 @@ import '../docprovider/docmodel.dart';
 import '../docprovider/docservice.dart';
 
 // ─────────────────────────── colour palette ──────────────────────────────────
-const _kPrimary   = Color(0xFF1E40AF);
+const _kPrimary   = Color(0xFF6366F1);
 const _kPageBg    = Color(0xFFF1F5F9);
 const _kPending   = Color(0xFFF59E0B);
 const _kApproved  = Color(0xFF10B981);
@@ -323,8 +323,9 @@ class _DocumentsPageState extends State<DocumentsPage>
   // ── top bar ──────────────────────────────────────────────────────────────────
   Widget _buildTopBar(DocumentsProvider provider) {
     final total = provider.documents.length;
+    final cardBg = Theme.of(context).colorScheme.surface;
     return Container(
-      color: Colors.white,
+      color: cardBg,
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -338,7 +339,7 @@ class _DocumentsPageState extends State<DocumentsPage>
                   style: TextStyle(
                       fontSize: 17,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF1E3A8A))),
+                      color: Color(0xFF4F46E5))),
               const Spacer(),
               IconButton(
                 icon: const Icon(Icons.refresh_rounded, size: 20),
@@ -410,7 +411,7 @@ class _DocumentsPageState extends State<DocumentsPage>
 
   // ── tab bar ──────────────────────────────────────────────────────────────────
   Widget _buildTabBar(DocumentsProvider provider) => Container(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         child: Column(
           children: [
             const Divider(height: 1, thickness: 1),
@@ -479,11 +480,12 @@ class _DocumentsPageState extends State<DocumentsPage>
         : doc.isRejected
             ? _kRejected
             : _kPending;
+    final cardBg = Theme.of(context).colorScheme.surface;
 
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(10),
         border: Border(
           left: BorderSide(color: statusColor, width: 3),

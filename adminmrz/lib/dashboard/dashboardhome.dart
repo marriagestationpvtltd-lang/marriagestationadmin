@@ -64,10 +64,11 @@ class _DashboardHomeState extends State<DashboardHome> {
     required Color color,
     String? subtitle,
   }) {
+    final cardBg = Theme.of(context).colorScheme.surface;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(12),
         border: Border(top: BorderSide(color: color, width: 3)),
         boxShadow: [
@@ -538,11 +539,12 @@ class _DashboardHomeState extends State<DashboardHome> {
 
   // ─── Shared helpers ──────────────────────────────────────────────────────────
   Widget _buildCard({required Widget child}) {
+    final cardBg = Theme.of(context).colorScheme.surface;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: cardBg,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(

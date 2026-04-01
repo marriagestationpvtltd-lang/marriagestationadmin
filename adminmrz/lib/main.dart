@@ -61,7 +61,7 @@ class MyApp extends StatelessWidget {
           themeMode: themeProvider.themeMode,
           theme: ThemeData(
             brightness: Brightness.light,
-            primarySwatch: Colors.blue,
+            primarySwatch: Colors.indigo,
             scaffoldBackgroundColor: const Color(0xFFF1F5F9),
             colorScheme: const ColorScheme.light(
               primary: Color(0xFF6366F1),
@@ -78,7 +78,7 @@ class MyApp extends StatelessWidget {
           ),
           darkTheme: ThemeData(
             brightness: Brightness.dark,
-            primarySwatch: Colors.blue,
+            primarySwatch: Colors.indigo,
             scaffoldBackgroundColor: const Color(0xFF0D1117),
             colorScheme: const ColorScheme.dark(
               primary: Color(0xFF6366F1),
