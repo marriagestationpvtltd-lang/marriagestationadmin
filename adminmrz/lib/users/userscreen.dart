@@ -739,10 +739,9 @@ class _UsersPageState extends State<UsersPage> {
     Widget _actionIconBtn(
         IconData icon, String title, Color color, VoidCallback onTap) {
       final isDark = Theme.of(context).brightness == Brightness.dark;
-      final Color textColor =
-          isDark
-              ? Colors.white
-              : Color.lerp(color, Colors.black, _kActionTextDarkenFactor)!;
+      final Color baseTextColor =
+          Color.lerp(color, Colors.black, _kActionTextDarkenFactor) ?? color;
+      final Color textColor = isDark ? Colors.white : baseTextColor;
     return Tooltip(
       message: title,
       child: InkWell(
