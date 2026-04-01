@@ -2067,8 +2067,9 @@ class _ChatWindowState extends State<ChatWindow> {
                 child: TextField(
                   controller: _messageController,
                   focusNode: _messageFocusNode,
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => _sendMessage(),
+                  textInputAction: TextInputAction.newline,
+                  minLines: 1,
+                  maxLines: 6,
                   onChanged: (text) {
                     if (chatProvider.id != null) {
                       _updateAdminTypingStatus(text, chatProvider.id.toString());
