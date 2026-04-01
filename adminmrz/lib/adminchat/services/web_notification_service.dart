@@ -10,11 +10,7 @@ import 'dart:js' as js;
 class WebNotificationService {
   WebNotificationService._();
 
-  static bool _permissionListenerAttached = false;
   static Future<void>? _permissionRequestFuture;
-  static StreamSubscription<html.Event>? _permissionClickSubscription;
-  static StreamSubscription<html.KeyboardEvent>? _permissionKeySubscription;
-  static StreamSubscription<html.Event>? _permissionTouchSubscription;
 
   // ------------------------------------------------------------------
   // Permission
@@ -26,7 +22,6 @@ class WebNotificationService {
     if (!html.Notification.supported) return;
     if (html.Notification.permission == 'granted') return;
     await html.Notification.requestPermission();
-    _disposePermissionListeners();
   }
 
   /// Ensures we request permission on the next user gesture (click/tap/key).
@@ -34,41 +29,17 @@ class WebNotificationService {
   static void ensurePermissionOnUserGesture() {
     if (!html.Notification.supported) return;
     if (html.Notification.permission != 'default') return;
-    if (_permissionListenerAttached) return;
+    if (_permissionRequestFuture != null) return;
 
-    _permissionListenerAttached = true;
+    final gestureFuture = Future.any([
+      html.document.onClick.first,
+      html.document.onKeyDown.first,
+      html.document.onTouchStart.first,
+    ]);
 
-    Future<void> handleGesture([dynamic _]) async {
-      if (_permissionRequestFuture != null) return;
-      final completer = Completer<void>();
-      _permissionRequestFuture = completer.future;
-      _disposePermissionListeners();
-      try {
-        await requestPermission();
-        completer.complete();
-      } catch (error, stackTrace) {
-        completer.completeError(error, stackTrace);
-      } finally {
-        _permissionRequestFuture = null;
-      }
-    }
-
-    _permissionClickSubscription =
-        html.document.onClick.listen(handleGesture);
-    _permissionKeySubscription =
-        html.document.onKeyDown.listen(handleGesture);
-    _permissionTouchSubscription =
-        html.document.onTouchStart.listen(handleGesture);
-  }
-
-  static void _disposePermissionListeners() {
-    _permissionClickSubscription?.cancel();
-    _permissionKeySubscription?.cancel();
-    _permissionTouchSubscription?.cancel();
-    _permissionClickSubscription = null;
-    _permissionKeySubscription = null;
-    _permissionTouchSubscription = null;
-    _permissionListenerAttached = false;
+    _permissionRequestFuture = gestureFuture
+        .then((_) => requestPermission())
+        .whenComplete(() => _permissionRequestFuture = null);
   }
 
   // ------------------------------------------------------------------
