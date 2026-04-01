@@ -12,9 +12,9 @@ class WebNotificationService {
 
   static bool _permissionListenerAttached = false;
   static bool _permissionRequestInFlight = false;
-  static StreamSubscription<html.Event>? _permissionClickSub;
-  static StreamSubscription<html.KeyboardEvent>? _permissionKeySub;
-  static StreamSubscription<html.Event>? _permissionTouchSub;
+  static StreamSubscription<html.Event>? _permissionClickSubscription;
+  static StreamSubscription<html.KeyboardEvent>? _permissionKeySubscription;
+  static StreamSubscription<html.Event>? _permissionTouchSubscription;
 
   // ------------------------------------------------------------------
   // Permission
@@ -42,22 +42,26 @@ class WebNotificationService {
       if (_permissionRequestInFlight) return;
       _permissionRequestInFlight = true;
       _disposePermissionListeners();
-      await requestPermission();
-      _permissionRequestInFlight = false;
+      try {
+        await requestPermission();
+      } finally {
+        _permissionRequestInFlight = false;
+      }
     }
 
-    _permissionClickSub = html.document.onClick.listen(handleUserGesture);
-    _permissionKeySub = html.document.onKeyDown.listen(handleUserGesture);
-    _permissionTouchSub = html.document.onTouchStart.listen(handleUserGesture);
+    _permissionClickSubscription = html.document.onClick.listen(handleUserGesture);
+    _permissionKeySubscription = html.document.onKeyDown.listen(handleUserGesture);
+    _permissionTouchSubscription =
+        html.document.onTouchStart.listen(handleUserGesture);
   }
 
   static void _disposePermissionListeners() {
-    _permissionClickSub?.cancel();
-    _permissionKeySub?.cancel();
-    _permissionTouchSub?.cancel();
-    _permissionClickSub = null;
-    _permissionKeySub = null;
-    _permissionTouchSub = null;
+    _permissionClickSubscription?.cancel();
+    _permissionKeySubscription?.cancel();
+    _permissionTouchSubscription?.cancel();
+    _permissionClickSubscription = null;
+    _permissionKeySubscription = null;
+    _permissionTouchSubscription = null;
     _permissionListenerAttached = false;
   }
 
