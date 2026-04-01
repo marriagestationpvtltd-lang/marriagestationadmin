@@ -81,6 +81,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   bool _videoEnabled = true;
   bool _cameraFront = true;
   bool _ending = false;
+  bool _controlsVisible = false;
 
   _VCallStatus _callStatus = _VCallStatus.calling;
 
@@ -453,16 +454,37 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
                 height: localHeight,
                 child: _buildLocalPreview(),
               ),
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _toggleControlsVisibility,
+                child: const SizedBox.expand(),
+              ),
+            ),
             Positioned(
               bottom: 16,
               left: 0,
               right: 0,
-              child: _buildControls(),
+              child: AnimatedOpacity(
+                opacity: _controlsVisible ? 1 : 0,
+                duration: const Duration(milliseconds: 180),
+                child: IgnorePointer(
+                  ignoring: !_controlsVisible,
+                  child: _buildControls(),
+                ),
+              ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  void _toggleControlsVisibility() {
+    if (!mounted) return;
+    setState(() {
+      _controlsVisible = !_controlsVisible;
+    });
   }
 
   Widget _buildTopBar() {
