@@ -737,7 +737,7 @@ class _UsersPageState extends State<UsersPage> {
   Widget _actionIconBtn(
       IconData icon, String title, Color color, VoidCallback onTap) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final Color textColor =
+    final Color actionButtonTextColor =
         isDark ? Colors.white : Color.lerp(color, Colors.black, _kActionTextDarkenFactor)!;
     return Tooltip(
       message: title,
@@ -768,7 +768,7 @@ class _UsersPageState extends State<UsersPage> {
                 title,
                 style: TextStyle(
                   fontSize: 12,
-                  color: textColor,
+                  color: actionButtonTextColor,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.2,
                 ),
