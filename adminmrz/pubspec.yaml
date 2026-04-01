@@ -45,12 +45,12 @@ dependencies:
   printing: ^5.11.1
   intl:
   file_saver: ^0.3.1
-  agora_rtc_engine: ^6.5.3
+  agora_rtc_engine: ^6.6.2
   cloud_firestore: ^6.1.2
   audioplayers: ^6.5.1
   file_picker: ^10.3.10
   just_audio: ^0.10.5
-  flutter_sound: ^9.30.0
+  flutter_sound: ^10.3.8
   emoji_picker_flutter: ^4.4.0
   firebase_storage: ^13.0.6
 
