@@ -32,7 +32,7 @@ const _kMinLocalPreviewWidth = 120.0;
 const _kMaxLocalPreviewWidth = 200.0;
 const _kMinLocalPreviewHeight = 170.0;
 const _kMaxLocalPreviewHeight = 280.0;
-const _kCompactLayoutBreakpoint = 520.0;
+const _kCompactLayoutMaxWidth = 520.0;
 
 class VideoCallScreen extends StatefulWidget {
   final String currentUserId;
@@ -480,7 +480,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
         _callStatus == _VCallStatus.connected ? _kEmerald : _kAmber;
     final String trimmedName = widget.otherUserName.trim();
     final String initial = trimmedName.isNotEmpty
-        ? trimmedName.characters.first.toString().toUpperCase()
+        ? trimmedName.characters.first.toUpperCase()
         : '?';
 
     return ClipRRect(
@@ -672,7 +672,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final bool compact = constraints.maxWidth < _kCompactLayoutBreakpoint;
+        final bool compact = constraints.maxWidth < _kCompactLayoutMaxWidth;
         final double buttonSize = compact ? 52 : 60;
         final double endSize = compact ? 66 : 74;
         final double spacing = compact ? 12 : 16;
