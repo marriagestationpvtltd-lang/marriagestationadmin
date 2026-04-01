@@ -73,21 +73,21 @@ class ChatColors {
 
   static final ChatColors _dark = ChatColors._(
     isDark: true,
-    bg:               const Color(0xFF0B141A),
-    sidebar:          const Color(0xFF111B21),
-    header:           const Color(0xFF1F2C34),
-    inputBg:          const Color(0xFF1F2C34),
-    cardBg:           const Color(0xFF1E2A32),
-    searchFill:       const Color(0xFF182229),
-    sentBubble:       const Color(0xFF005C4B),
+    bg:               const Color(0xFF1B2330),
+    sidebar:          const Color(0xFF1F2B38),
+    header:           const Color(0xFF253040),
+    inputBg:          const Color(0xFF253040),
+    cardBg:           const Color(0xFF243040),
+    searchFill:       const Color(0xFF1E2B38),
+    sentBubble:       const Color(0xFF1A7060),
     sentBubbleText:   const Color(0xFFE9EDEF),
-    receivedBubble:   const Color(0xFF1E2A32),
+    receivedBubble:   const Color(0xFF2E3A48),
     receivedBubbleText: const Color(0xFFE9EDEF),
     text:             const Color(0xFFE9EDEF),
     muted:            const Color(0xFF8696A0),
-    border:           const Color(0xFF222D34),
-    primaryLight:     const Color(0xFF4A1829),
-    selectedRow:      const Color(0xFF1A2A35),
+    border:           const Color(0xFF304050),
+    primaryLight:     const Color(0xFF5A1E30),
+    selectedRow:      const Color(0xFF253545),
   );
 
   /// Resolve the correct [ChatColors] set for the current [BuildContext].
