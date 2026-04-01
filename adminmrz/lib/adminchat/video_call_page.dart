@@ -3,6 +3,7 @@ import 'dart:math';
 import 'dart:ui';
 import 'package:adminmrz/adminchat/services/pushservice.dart';
 import 'package:adminmrz/settings/call_settings_provider.dart';
+import 'package:characters/characters.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
@@ -23,6 +24,14 @@ const _kAmber = Color(0xFFF59E0B);
 const _kRose = Color(0xFFEF4444);
 const _kSlate = Color(0xFF0F172A);
 const _kSlateDark = Color(0xFF1E293B);
+const _kHdVideoWidth = 1280;
+const _kHdVideoHeight = 720;
+const _kLocalPreviewWidthRatio = 0.28;
+const _kLocalPreviewAspectRatio = 1.35;
+const _kMinLocalPreviewWidth = 120.0;
+const _kMaxLocalPreviewWidth = 200.0;
+const _kMinLocalPreviewHeight = 170.0;
+const _kMaxLocalPreviewHeight = 280.0;
 
 class VideoCallScreen extends StatefulWidget {
   final String currentUserId;
@@ -224,7 +233,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       await _engine.enableVideo();
       await _engine.setVideoEncoderConfiguration(
         VideoEncoderConfiguration(
-          dimensions: VideoDimensions(width: 1280, height: 720),
+          dimensions: VideoDimensions(
+            width: _kHdVideoWidth,
+            height: _kHdVideoHeight,
+          ),
         ),
       );
 
@@ -407,10 +419,13 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    final double localWidth =
-        (size.width * 0.28).clamp(120.0, 200.0).toDouble();
+    final double localWidth = (size.width * _kLocalPreviewWidthRatio)
+        .clamp(_kMinLocalPreviewWidth, _kMaxLocalPreviewWidth)
+        .toDouble();
     final double localHeight =
-        (localWidth * 1.35).clamp(170.0, 280.0).toDouble();
+        (localWidth * _kLocalPreviewAspectRatio)
+            .clamp(_kMinLocalPreviewHeight, _kMaxLocalPreviewHeight)
+            .toDouble();
     final double topBarRightInset = _videoEnabled ? localWidth + 32 : 16;
 
     return Scaffold(
@@ -463,8 +478,9 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     final Color statusColor =
         _callStatus == _VCallStatus.connected ? _kEmerald : _kAmber;
     final String trimmedName = widget.otherUserName.trim();
-    final String initial =
-        trimmedName.isNotEmpty ? trimmedName.substring(0, 1).toUpperCase() : '?';
+    final String initial = trimmedName.isNotEmpty
+        ? trimmedName.characters.first.toUpperCase()
+        : '?';
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(26),
