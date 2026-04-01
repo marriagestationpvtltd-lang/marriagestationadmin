@@ -937,15 +937,17 @@ class _UsersPageState extends State<UsersPage> {
 
   Widget _buildFilterRow(UserProvider provider) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final borderColor =
+        isDark ? Colors.white.withOpacity(0.08) : Colors.grey.shade200;
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
       decoration: BoxDecoration(
-        color: isDark ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
+        color: isDark
+            ? Colors.white.withOpacity(0.04)
+            : const Color(0xFFF6F7FB),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.white.withOpacity(isDark ? 0.14 : 0.18),
-        ),
+        border: Border.all(color: borderColor),
       ),
       child: Wrap(
         spacing: 8,
@@ -998,13 +1000,13 @@ class _UsersPageState extends State<UsersPage> {
   Color _statusColor(String status) {
     switch (status) {
       case 'approved':
-        return Colors.green;
+        return _kEmerald;
       case 'pending':
-        return Colors.orange;
+        return _kAmber;
       case 'rejected':
-        return Colors.red;
+        return _kRose;
       case 'not_uploaded':
-        return Colors.grey;
+        return Colors.grey.shade600;
       default:
         return _kPrimaryDark;
     }
@@ -1013,9 +1015,9 @@ class _UsersPageState extends State<UsersPage> {
   Color _planColor(String plan) {
     switch (plan) {
       case 'paid':
-        return const Color(0xFF6366F1);
+        return _kPrimary;
       case 'free':
-        return Colors.grey;
+        return _kSky;
       default:
         return _kPrimaryDark;
     }
@@ -1026,7 +1028,9 @@ class _UsersPageState extends State<UsersPage> {
       width: 1,
       height: 18,
       margin: const EdgeInsets.symmetric(horizontal: 2),
-      color: isDark ? Colors.white.withOpacity(0.16) : Colors.white.withOpacity(0.26),
+      color: isDark
+          ? Colors.white.withOpacity(0.16)
+          : Colors.grey.shade300,
     );
   }
 
@@ -1208,49 +1212,70 @@ class _UsersPageState extends State<UsersPage> {
   // ─── Top section: title + search + stats + filters ───────────────────────
 
   Widget _buildTopSection(UserProvider provider) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final borderColor =
+        isDark ? Colors.white.withOpacity(0.08) : Colors.grey.shade200;
+    final subtleFill =
+        isDark ? Colors.white.withOpacity(0.04) : _kPrimary.withOpacity(0.04);
+
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-      padding: const EdgeInsets.all(14),
+      margin: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [_kPrimaryDark, _kViolet],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-        borderRadius: BorderRadius.circular(18),
-        boxShadow: [
-          BoxShadow(
-            color: _kPrimary.withOpacity(0.25),
-            blurRadius: 22,
-            offset: const Offset(0, 10),
-          ),
-        ],
+        color: isDark ? const Color(0xFF0F172A) : Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: borderColor),
+        boxShadow: isDark
+            ? []
+            : [
+                BoxShadow(
+                  color: _kPrimary.withOpacity(0.08),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
+                ),
+              ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              Container(
+                height: 40,
+                width: 40,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [_kPrimaryDark, _kViolet],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.people_alt_rounded,
+                    color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     Text(
                       'Member Directory',
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
+                        color: isDark ? Colors.white : _kPrimaryDark,
+                        fontSize: 15,
                         fontWeight: FontWeight.w800,
-                        letterSpacing: 0.2,
+                        letterSpacing: 0.1,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 2),
                     Text(
                       'Search, filter and action on members in one place.',
                       style: TextStyle(
-                        color: Colors.white70,
+                        color: isDark
+                            ? Colors.white70
+                            : Colors.grey.shade600,
                         fontSize: 12,
                       ),
                     ),
@@ -1265,68 +1290,95 @@ class _UsersPageState extends State<UsersPage> {
                   child: Container(
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.12),
+                      color: isDark
+                          ? Colors.white.withOpacity(0.06)
+                          : _kPrimary.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.18),
+                        color: isDark
+                            ? Colors.white.withOpacity(0.14)
+                            : _kPrimary.withOpacity(0.25),
                       ),
                     ),
-                    child: const Icon(Icons.refresh_rounded,
-                        size: 18, color: Colors.white),
+                    child: Icon(
+                      Icons.refresh_rounded,
+                      size: 18,
+                      color: isDark ? Colors.white : _kPrimaryDark,
+                    ),
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white.withOpacity(0.18)),
-            ),
-            child: TextField(
-              controller: _searchController,
-              style: const TextStyle(color: Colors.white),
-              decoration: InputDecoration(
-                hintText: 'Search by name, email, phone or ID…',
-                hintStyle: TextStyle(
-                  fontSize: 13,
-                  color: Colors.white.withOpacity(0.7),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: subtleFill,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: borderColor),
+                  ),
+                  child: TextField(
+                    controller: _searchController,
+                    style: TextStyle(
+                      color: isDark ? Colors.white : Colors.grey.shade900,
+                      fontSize: 13,
+                    ),
+                    decoration: InputDecoration(
+                      hintText: 'Search by name, email, phone or ID…',
+                      hintStyle: TextStyle(
+                        fontSize: 13,
+                        color: isDark
+                            ? Colors.white.withOpacity(0.7)
+                            : Colors.grey.shade600,
+                      ),
+                      prefixIcon: Icon(Icons.search_rounded,
+                          color: isDark ? Colors.white70 : _kPrimaryDark,
+                          size: 18),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(
+                          vertical: 12, horizontal: 12),
+                      suffixIcon: _searchController.text.isNotEmpty
+                          ? IconButton(
+                              icon: Icon(
+                                Icons.clear_rounded,
+                                size: 16,
+                                color: isDark
+                                    ? Colors.white70
+                                    : Colors.grey.shade600,
+                              ),
+                              onPressed: () {
+                                setState(() {});
+                                _searchController.clear();
+                                provider.setSearchQuery('');
+                              },
+                            )
+                          : null,
+                    ),
+                    onChanged: (v) {
+                      setState(() {});
+                      provider.setSearchQuery(v);
+                    },
+                  ),
                 ),
-                prefixIcon: Icon(Icons.search_rounded,
-                    color: Colors.white.withOpacity(0.8), size: 18),
-                border: InputBorder.none,
-                contentPadding:
-                    const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-                suffixIcon: _searchController.text.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear_rounded,
-                            size: 16, color: Colors.white),
-                        onPressed: () {
-                          _searchController.clear();
-                          provider.setSearchQuery('');
-                        },
-                      )
-                    : null,
               ),
-              onChanged: (v) => provider.setSearchQuery(v),
-            ),
-          ),
-          const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _statPill('Total', provider.totalCount, Colors.white),
-                const SizedBox(width: 6),
-                _statPill('Shown', provider.filteredCount, _kEmerald),
-                if (provider.selectedCount > 0) ...[
-                  const SizedBox(width: 6),
-                  _statPill('Selected', provider.selectedCount, _kAmber),
+              const SizedBox(width: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  _statPill('Total', provider.totalCount,
+                      isDark ? Colors.white70 : _kPrimaryDark),
+                  _statPill('Shown', provider.filteredCount, _kEmerald),
+                  if (provider.selectedCount > 0)
+                    _statPill('Selected', provider.selectedCount, _kAmber),
                 ],
-              ],
-            ),
+              ),
+            ],
           ),
           const SizedBox(height: 10),
           _buildFilterRow(provider),
