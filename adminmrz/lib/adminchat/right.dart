@@ -3,20 +3,15 @@ import 'package:adminmrz/adminchat/services/MatchedProfileService.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'chat_theme.dart';
 import 'chatprovider.dart';
 import 'dart:html' as html;
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Design tokens
+//  Static design tokens (same in both modes)
 // ─────────────────────────────────────────────────────────────────────────────
-const _kPrimary      = Color(0xFFD81B60);
-const _kPrimaryLight = Color(0xFFFCE4EC);
-const _kText         = Color(0xFF1E293B);
-const _kMuted        = Color(0xFF94A3B8);
-const _kBorder       = Color(0xFFE2E8F0);
-const _kOnline       = Color(0xFF22C55E);
-const _kBg           = Color(0xFFF8FAFC);
-const _kCardBg       = Colors.white;
+const _kPrimary = Color(0xFFD81B60);
+const _kOnline  = Color(0xFF22C55E);
 
 const _kPaginationScrollThreshold = 200.0;
 
@@ -338,10 +333,11 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
   @override
   Widget build(BuildContext context) {
     final chatProvider = Provider.of<ChatProvider>(context);
+    final c = ChatColors.of(context);
 
     return Container(
       width: 300,
-      color: _kCardBg,
+      color: c.cardBg,
       child: Column(
         children: [
           _buildHeader(chatProvider),
@@ -350,7 +346,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
           _buildFilterRow(),
           if (_showFilters) _buildFilterPanel(),
           _buildStatsRow(chatProvider),
-          const Divider(height: 1, color: _kBorder),
+          Divider(height: 1, color: c.border),
           Expanded(child: _buildProfileList()),
         ],
       ),
@@ -359,19 +355,20 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
 
   // ── Header ──────────────────────────────────────────────────────────────
   Widget _buildHeader(ChatProvider chat) {
+    final c = ChatColors.of(context);
     return Container(
       height: 56,
       padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: const BoxDecoration(
-        color: _kCardBg,
-        border: Border(bottom: BorderSide(color: _kBorder)),
+      decoration: BoxDecoration(
+        color: c.cardBg,
+        border: Border(bottom: BorderSide(color: c.border)),
       ),
       child: Row(
         children: [
           Container(
             width: 32, height: 32,
             decoration: BoxDecoration(
-              color: _kPrimaryLight,
+              color: c.primaryLight,
               borderRadius: BorderRadius.circular(8),
             ),
             child: const Icon(Icons.favorite, color: _kPrimary, size: 16),
@@ -382,14 +379,14 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Match Profiles',
+                Text('Match Profiles',
                     style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: _kText)),
+                        color: c.text)),
                 if (chat.namee != null)
                   Text('for ${chat.namee}',
-                      style: const TextStyle(fontSize: 10, color: _kMuted),
+                      style: TextStyle(fontSize: 10, color: c.muted),
                       overflow: TextOverflow.ellipsis),
               ],
             ),
@@ -403,7 +400,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                        color: _kPrimaryLight,
+                        color: c.primaryLight,
                         borderRadius: BorderRadius.circular(10),
                       ),
                       child: Text(
@@ -417,9 +414,9 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
                     const SizedBox(width: 4),
                     GestureDetector(
                       onTap: _loadMatches,
-                      child: const Tooltip(
+                      child: Tooltip(
                         message: 'Refresh matches',
-                        child: Icon(Icons.refresh, size: 16, color: _kMuted),
+                        child: Icon(Icons.refresh, size: 16, color: c.muted),
                       ),
                     ),
                   ],
@@ -428,7 +425,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
               return Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: _kPrimaryLight,
+                  color: c.primaryLight,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -458,6 +455,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
 
   Widget _tabBtn(String label, int index) {
     final active = widget.selectedTab == index;
+    final c = ChatColors.of(context);
     return Expanded(
       child: GestureDetector(
         onTap: () => widget.onTabChange(index),
@@ -465,10 +463,10 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
           height: 40,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: _kCardBg,
+            color: c.cardBg,
             border: Border(
               bottom: BorderSide(
-                color: active ? _kPrimary : _kBorder,
+                color: active ? _kPrimary : c.border,
                 width: active ? 2 : 1,
               ),
             ),
@@ -478,7 +476,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
             style: TextStyle(
               fontSize: 11,
               fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-              color: active ? _kPrimary : _kMuted,
+              color: active ? _kPrimary : c.muted,
             ),
           ),
         ),
@@ -488,38 +486,40 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
 
   // ── Search ──────────────────────────────────────────────────────────────
   Widget _buildSearchBar() {
+    final c = ChatColors.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
       child: SizedBox(
         height: 36,
         child: TextField(
           controller: _searchController,
-          style: const TextStyle(fontSize: 12),
+          style: TextStyle(fontSize: 12, color: c.text),
+          cursorColor: _kPrimary,
           decoration: InputDecoration(
             hintText: 'Search name, occupation, ID…',
-            hintStyle: const TextStyle(fontSize: 11, color: _kMuted),
-            prefixIcon: const Icon(Icons.search, size: 16, color: _kMuted),
+            hintStyle: TextStyle(fontSize: 11, color: c.muted),
+            prefixIcon: Icon(Icons.search, size: 16, color: c.muted),
             suffixIcon: _searchQuery.isNotEmpty
                 ? IconButton(
-                    icon: const Icon(Icons.clear, size: 14, color: _kMuted),
+                    icon: Icon(Icons.clear, size: 14, color: c.muted),
                     padding: EdgeInsets.zero,
                     onPressed: () => _searchController.clear(),
                   )
                 : null,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(20),
-              borderSide: const BorderSide(color: _kBorder),
+              borderSide: BorderSide(color: c.border),
             ),
             enabledBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(20),
-              borderSide: const BorderSide(color: _kBorder),
+              borderSide: BorderSide(color: c.border),
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(20),
               borderSide: const BorderSide(color: _kPrimary, width: 1.5),
             ),
             filled: true,
-            fillColor: _kBg,
+            fillColor: c.searchFill,
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
             isDense: true,
@@ -531,6 +531,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
 
   // ── Filter row (chips) ───────────────────────────────────────────────────
   Widget _buildFilterRow() {
+    final c = ChatColors.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(10, 2, 10, 4),
       child: Row(
@@ -544,21 +545,21 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: _showFilters ? _kPrimaryLight : _kBg,
+                color: _showFilters ? c.primaryLight : c.searchFill,
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(
-                    color: _showFilters ? _kPrimary : _kBorder),
+                    color: _showFilters ? _kPrimary : c.border),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.tune, size: 12,
-                      color: _showFilters ? _kPrimary : _kMuted),
+                      color: _showFilters ? _kPrimary : c.muted),
                   const SizedBox(width: 3),
                   Text('Sort',
                       style: TextStyle(
                           fontSize: 10,
-                          color: _showFilters ? _kPrimary : _kMuted)),
+                          color: _showFilters ? _kPrimary : c.muted)),
                 ],
               ),
             ),
@@ -569,21 +570,22 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
   }
 
   Widget _filterChip(String label, bool active, VoidCallback onTap) {
+    final c = ChatColors.of(context);
     return GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
         decoration: BoxDecoration(
-          color: active ? _kPrimaryLight : _kBg,
+          color: active ? c.primaryLight : c.searchFill,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: active ? _kPrimary : _kBorder),
+          border: Border.all(color: active ? _kPrimary : c.border),
         ),
         child: Text(
           label,
           style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.w600,
-              color: active ? _kPrimary : _kMuted),
+              color: active ? _kPrimary : c.muted),
         ),
       ),
     );
@@ -591,22 +593,23 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
 
   // ── Collapsible sort/filter panel ────────────────────────────────────────
   Widget _buildFilterPanel() {
+    final c = ChatColors.of(context);
     return Container(
       margin: const EdgeInsets.fromLTRB(10, 0, 10, 4),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: _kBg,
+        color: c.searchFill,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _kBorder),
+        border: Border.all(color: c.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Sort By',
+          Text('Sort By',
               style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w600,
-                  color: _kMuted)),
+                  color: c.muted)),
           const SizedBox(height: 6),
           Wrap(
             spacing: 6, runSpacing: 6,
@@ -617,10 +620,10 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 8, vertical: 4),
                         decoration: BoxDecoration(
-                          color: _sortBy == s ? _kPrimary : _kCardBg,
+                          color: _sortBy == s ? _kPrimary : c.cardBg,
                           borderRadius: BorderRadius.circular(12),
                           border: Border.all(
-                              color: _sortBy == s ? _kPrimary : _kBorder),
+                              color: _sortBy == s ? _kPrimary : c.border),
                         ),
                         child: Text(
                           s,
@@ -629,7 +632,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
                               fontWeight: FontWeight.w600,
                               color: _sortBy == s
                                   ? Colors.white
-                                  : _kMuted),
+                                  : c.muted),
                         ),
                       ),
                     ))
@@ -642,6 +645,9 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
 
   // ── Stats row ────────────────────────────────────────────────────────────
   Widget _buildStatsRow(ChatProvider chat) {
+    final c = ChatColors.of(context);
+    final statsBg     = c.isDark ? const Color(0xFF052E16) : const Color(0xFFF0FDF4);
+    final statsBorder = c.isDark ? const Color(0xFF14532D) : const Color(0xFFBBF7D0);
     return StreamBuilder<QuerySnapshot>(
       stream: chat.id == null
           ? Stream.empty()
@@ -657,9 +663,9 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
           margin: const EdgeInsets.fromLTRB(10, 4, 10, 4),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: const Color(0xFFF0FDF4),
+            color: statsBg,
             borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFBBF7D0)),
+            border: Border.all(color: statsBorder),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -667,7 +673,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
               _statItem(Icons.share_outlined, '$total', 'Total Shares',
                   const Color(0xFF16A34A)),
               Container(width: 1, height: 24,
-                  color: const Color(0xFFBBF7D0)),
+                  color: statsBorder),
               _statItem(Icons.people_outline, '$unique', 'Unique Profiles',
                   const Color(0xFF0284C7)),
             ],
@@ -679,6 +685,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
 
   Widget _statItem(
       IconData icon, String value, String label, Color color) {
+    final c = ChatColors.of(context);
     return Column(
       children: [
         Icon(icon, size: 14, color: color),
@@ -689,7 +696,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
                 fontWeight: FontWeight.w700,
                 color: color)),
         Text(label,
-            style: const TextStyle(fontSize: 8, color: _kMuted)),
+            style: TextStyle(fontSize: 8, color: c.muted)),
       ],
     );
   }
@@ -809,6 +816,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
 
   // ── Show Match button ────────────────────────────────────────────────────
   Widget _buildShowMatchButton(ChatProvider chat) {
+    final c = ChatColors.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -817,8 +825,8 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
           children: [
             Container(
               width: 64, height: 64,
-              decoration: const BoxDecoration(
-                color: _kPrimaryLight,
+              decoration: BoxDecoration(
+                color: c.primaryLight,
                 shape: BoxShape.circle,
               ),
               child: const Icon(Icons.manage_search_rounded,
@@ -830,16 +838,16 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
                   ? '${chat.namee} को म्याच हेर्नुहोस्'
                   : 'Match profiles',
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: _kText),
+                  color: c.text),
             ),
             const SizedBox(height: 6),
-            const Text(
+            Text(
               'यस युजरसँग मिल्दो प्रोफाइलहरू लोड गर्न तलको बटन थिच्नुहोस्',
               textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11, color: _kMuted, height: 1.5),
+              style: TextStyle(fontSize: 11, color: c.muted, height: 1.5),
             ),
             const SizedBox(height: 18),
             GestureDetector(
@@ -886,6 +894,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
 
   // ── Pagination footer ────────────────────────────────────────────────────
   Widget _buildPaginationFooter(MatchedProfileProvider provider) {
+    final c = ChatColors.of(context);
     if (provider.isLoadingMore) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 16),
@@ -922,7 +931,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
       child: Center(
         child: Text(
           'सबै ${provider.ids.length} म्याच देखाइयो',
-          style: const TextStyle(fontSize: 10, color: _kMuted),
+          style: TextStyle(fontSize: 10, color: c.muted),
         ),
       ),
     );
@@ -946,6 +955,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
     bool showClear = false,
     bool showRefetch = false,
   }) {
+    final c = ChatColors.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -955,7 +965,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
             Container(
               width: 64, height: 64,
               decoration: BoxDecoration(
-                color: _kPrimaryLight,
+                color: c.primaryLight,
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, size: 30, color: _kPrimary),
@@ -963,15 +973,15 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
             const SizedBox(height: 14),
             Text(title,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
-                    color: _kText)),
+                    color: c.text)),
             const SizedBox(height: 6),
             Text(subtitle,
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                    fontSize: 11, color: _kMuted, height: 1.5)),
+                style: TextStyle(
+                    fontSize: 11, color: c.muted, height: 1.5)),
             if (showClear) ...[
               const SizedBox(height: 12),
               TextButton(
@@ -1048,6 +1058,7 @@ class _ProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = ChatColors.of(context);
     final hasPic = profilePicture != null && profilePicture!.isNotEmpty;
     final matchColor = matchPct >= 70
         ? const Color(0xFF16A34A)
@@ -1055,19 +1066,26 @@ class _ProfileCard extends StatelessWidget {
             ? _kPrimary
             : const Color(0xFF64748B);
 
+    // Dark-mode aware contextual colors
+    final sharedBadgeBg     = c.isDark ? const Color(0xFF052E16) : const Color(0xFFF0FDF4);
+    final sharedBadgeBorder = c.isDark ? const Color(0xFF14532D) : const Color(0xFFBBF7D0);
+    final freeBadgeBg       = c.isDark ? const Color(0xFF0C1A2E) : const Color(0xFFEFF6FF);
+    final freeBadgeText     = c.isDark ? const Color(0xFF93C5FD) : const Color(0xFF2563EB);
+    final offlineDot        = c.isDark ? const Color(0xFF4A5568) : const Color(0xFFCBD5E1);
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: _kCardBg,
+        color: c.cardBg,
         borderRadius: BorderRadius.circular(10),
         border: Border(
           left: BorderSide(
             color: isShared ? _kOnline : Colors.transparent,
             width: 3,
           ),
-          right: const BorderSide(color: _kBorder),
-          top:   const BorderSide(color: _kBorder),
-          bottom: const BorderSide(color: _kBorder),
+          right: BorderSide(color: c.border),
+          top:   BorderSide(color: c.border),
+          bottom: BorderSide(color: c.border),
         ),
         boxShadow: [
           BoxShadow(
@@ -1086,7 +1104,7 @@ class _ProfileCard extends StatelessWidget {
               children: [
                 CircleAvatar(
                   radius: 22,
-                  backgroundColor: _kBg,
+                  backgroundColor: c.searchFill,
                   backgroundImage:
                       hasPic ? NetworkImage(profilePicture!) : null,
                   child: !hasPic
@@ -1100,9 +1118,9 @@ class _ProfileCard extends StatelessWidget {
                   child: Container(
                     width: 10, height: 10,
                     decoration: BoxDecoration(
-                      color: isOnline ? _kOnline : const Color(0xFFCBD5E1),
+                      color: isOnline ? _kOnline : offlineDot,
                       shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white, width: 1.5),
+                      border: Border.all(color: c.cardBg, width: 1.5),
                     ),
                   ),
                 ),
@@ -1115,7 +1133,7 @@ class _ProfileCard extends StatelessWidget {
                       decoration: BoxDecoration(
                         color: Colors.amber,
                         shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 1.5),
+                        border: Border.all(color: c.cardBg, width: 1.5),
                       ),
                       child: const Icon(Icons.star, size: 8,
                           color: Colors.white),
@@ -1139,7 +1157,7 @@ class _ProfileCard extends StatelessWidget {
                           style: TextStyle(
                             fontWeight: FontWeight.w700,
                             fontSize: 12,
-                            color: isPaid ? _kPrimary : _kText,
+                            color: isPaid ? _kPrimary : c.text,
                           ),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -1181,8 +1199,7 @@ class _ProfileCard extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 5, vertical: 1),
                         decoration: BoxDecoration(
-                          color: isPaid ? _kPrimaryLight
-                              : const Color(0xFFEFF6FF),
+                          color: isPaid ? c.primaryLight : freeBadgeBg,
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
@@ -1190,8 +1207,7 @@ class _ProfileCard extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 8,
                             fontWeight: FontWeight.w700,
-                            color: isPaid ? _kPrimary
-                                : const Color(0xFF2563EB),
+                            color: isPaid ? _kPrimary : freeBadgeText,
                           ),
                         ),
                       ),
@@ -1201,10 +1217,9 @@ class _ProfileCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 5, vertical: 1),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF0FDF4),
+                            color: sharedBadgeBg,
                             borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                                color: const Color(0xFFBBF7D0)),
+                            border: Border.all(color: sharedBadgeBorder),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -1225,8 +1240,8 @@ class _ProfileCard extends StatelessWidget {
                               if (lastShareTs != null) ...[
                                 const SizedBox(width: 3),
                                 Text(timeAgo(lastShareTs!),
-                                    style: const TextStyle(
-                                        fontSize: 7, color: _kMuted)),
+                                    style: TextStyle(
+                                        fontSize: 7, color: c.muted)),
                               ],
                             ],
                           ),
@@ -1240,22 +1255,22 @@ class _ProfileCard extends StatelessWidget {
                   // Occupation + age/gender row
                   Row(
                     children: [
-                      const Icon(Icons.work_outline, size: 10,
-                          color: _kMuted),
+                      Icon(Icons.work_outline, size: 10,
+                          color: c.muted),
                       const SizedBox(width: 3),
                       Expanded(
                         child: Text(
                           occupation.isNotEmpty ? occupation : '—',
-                          style: const TextStyle(
-                              fontSize: 10, color: _kMuted),
+                          style: TextStyle(
+                              fontSize: 10, color: c.muted),
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
                       const SizedBox(width: 6),
                       Text(
                         '${age}y · $gender',
-                        style: const TextStyle(
-                            fontSize: 10, color: _kMuted),
+                        style: TextStyle(
+                            fontSize: 10, color: c.muted),
                       ),
                     ],
                   ),
@@ -1265,26 +1280,26 @@ class _ProfileCard extends StatelessWidget {
                   // User ID + Member ID row
                   Row(
                     children: [
-                      const Icon(Icons.tag, size: 10,
-                          color: _kMuted),
+                      Icon(Icons.tag, size: 10,
+                          color: c.muted),
                       const SizedBox(width: 3),
                       Text(
                         '$profileId',
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 9,
-                            color: _kMuted,
+                            color: c.muted,
                             fontWeight: FontWeight.w600),
                       ),
                       const SizedBox(width: 6),
-                      const Icon(Icons.badge_outlined, size: 10,
-                          color: _kMuted),
+                      Icon(Icons.badge_outlined, size: 10,
+                          color: c.muted),
                       const SizedBox(width: 3),
                       Expanded(
                         child: Text(
                           memberid,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 9,
-                              color: _kMuted,
+                              color: c.muted,
                               fontWeight: FontWeight.w500),
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -1339,9 +1354,7 @@ class _ProfileCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 8, vertical: 4),
                           decoration: BoxDecoration(
-                            color: isShared
-                                ? const Color(0xFFF0FDF4)
-                                : _kPrimary,
+                            color: isShared ? sharedBadgeBg : _kPrimary,
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(
@@ -1352,9 +1365,7 @@ class _ProfileCard extends StatelessWidget {
                                     ? Icons.check
                                     : Icons.send_outlined,
                                 size: 10,
-                                color: isShared
-                                    ? _kOnline
-                                    : Colors.white,
+                                color: isShared ? _kOnline : Colors.white,
                               ),
                               const SizedBox(width: 3),
                               Text(
@@ -1362,9 +1373,7 @@ class _ProfileCard extends StatelessWidget {
                                 style: TextStyle(
                                   fontSize: 9,
                                   fontWeight: FontWeight.w700,
-                                  color: isShared
-                                      ? _kOnline
-                                      : Colors.white,
+                                  color: isShared ? _kOnline : Colors.white,
                                 ),
                               ),
                             ],
@@ -1391,13 +1400,15 @@ class _SkeletonCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final c = ChatColors.of(context);
+    final shimmerColor = c.isDark ? const Color(0xFF2A3540) : const Color(0xFFEEF2F7);
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: _kCardBg,
+        color: c.cardBg,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _kBorder),
+        border: Border.all(color: c.border),
       ),
       child: Row(
         children: [
@@ -1405,7 +1416,7 @@ class _SkeletonCard extends StatelessWidget {
           Container(
             width: 44, height: 44,
             decoration: BoxDecoration(
-              color: _kBg,
+              color: c.searchFill,
               shape: BoxShape.circle,
             ),
           ),
@@ -1414,11 +1425,11 @@ class _SkeletonCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _shimmerBox(120, 10),
+                _shimmerBox(120, 10, shimmerColor),
                 const SizedBox(height: 6),
-                _shimmerBox(80, 8),
+                _shimmerBox(80, 8, shimmerColor),
                 const SizedBox(height: 6),
-                _shimmerBox(160, 8),
+                _shimmerBox(160, 8, shimmerColor),
               ],
             ),
           ),
@@ -1427,10 +1438,10 @@ class _SkeletonCard extends StatelessWidget {
     );
   }
 
-  Widget _shimmerBox(double w, double h) => Container(
+  Widget _shimmerBox(double w, double h, Color color) => Container(
         width: w, height: h,
         decoration: BoxDecoration(
-          color: const Color(0xFFEEF2F7),
+          color: color,
           borderRadius: BorderRadius.circular(4),
         ),
       );
