@@ -467,7 +467,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
               right: 0,
               child: AnimatedOpacity(
                 opacity: _controlsVisible ? 1 : 0,
-                duration: const Duration(milliseconds: 180),
+                duration: const Duration(milliseconds: 200),
                 child: IgnorePointer(
                   ignoring: !_controlsVisible,
                   child: _buildControls(),
