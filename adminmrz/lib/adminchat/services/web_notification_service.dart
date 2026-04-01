@@ -40,11 +40,18 @@ class WebNotificationService {
 
     Future<void> handleGesture([dynamic event]) async {
       if (_permissionRequestFuture != null) return;
+      final completer = Completer<void>();
+      _permissionRequestFuture = completer.future;
       _disposePermissionListeners();
       try {
-        final permissionRequest = requestPermission();
-        _permissionRequestFuture = permissionRequest;
-        await permissionRequest;
+        await requestPermission();
+        if (!completer.isCompleted) {
+          completer.complete();
+        }
+      } catch (error, stackTrace) {
+        if (!completer.isCompleted) {
+          completer.completeError(error, stackTrace);
+        }
       } finally {
         _permissionRequestFuture = null;
       }
@@ -66,7 +73,6 @@ class WebNotificationService {
     _permissionKeySubscription = null;
     _permissionTouchSubscription = null;
     _permissionListenerAttached = false;
-    _permissionRequestFuture = null;
   }
 
   // ------------------------------------------------------------------
