@@ -18,7 +18,7 @@ const _kSky = Color(0xFF0EA5E9);
 const _kActionTextDarkenFactor = 0.25;
 const _kActionButtonMinWidth = 118.0;
 const _kActionButtonSpacing = 10.0;
-const _kActionButtonRunSpacing = 8.0;
+const _kActionButtonVerticalSpacing = 8.0;
 
 class UsersPage extends StatefulWidget {
   /// Called when admin taps "Direct Chat" on a member card.
@@ -606,7 +606,7 @@ class _UsersPageState extends State<UsersPage> {
                 // Action buttons
                 Wrap(
                   spacing: _kActionButtonSpacing,
-                  runSpacing: _kActionButtonRunSpacing,
+                  runSpacing: _kActionButtonVerticalSpacing,
                   children: [
                     if (hasPhone) ...[
                       _actionIconBtn(
@@ -736,11 +736,14 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  Widget _actionIconBtn(
-      IconData icon, String title, Color color, VoidCallback onTap) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final Color textColor =
-        isDark ? Colors.white : Color.lerp(color, Colors.black, _kActionTextDarkenFactor)!;
+    Widget _actionIconBtn(
+        IconData icon, String title, Color color, VoidCallback onTap) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      final Color textColor =
+          isDark
+              ? Colors.white
+              : (Color.lerp(color, Colors.black, _kActionTextDarkenFactor) ??
+                  color);
     return Tooltip(
       message: title,
       child: InkWell(
