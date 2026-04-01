@@ -193,6 +193,7 @@ class MatchedProfileProvider with ChangeNotifier {
     _currentPage = 1;
     _totalCount = 0;
     _currentUserId = null;
+    _isloading = false;
     notifyListeners();
   }
 }
