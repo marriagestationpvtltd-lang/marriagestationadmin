@@ -49,7 +49,7 @@ class _DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     _pages = [
-      const DashboardHome(),
+      DashboardHome(onNavigate: _onItemTapped),
       UsersPage(onOpenChat: _openChatForUser),
       const DocumentsPage(),
       const PackagesPage(),
