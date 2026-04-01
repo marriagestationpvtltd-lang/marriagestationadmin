@@ -667,6 +667,10 @@ class _ChatWindowState extends State<ChatWindow> {
       if (chatProvider.id != null) Future.microtask(() => _setupTypingListener(chatProvider.id!));
       // Clear admin typing status for the previous user.
       Future.microtask(_clearAdminTypingStatus);
+      // Auto-focus the message input so the admin can type immediately.
+      Future.microtask(() {
+        if (mounted) FocusScope.of(context).requestFocus(_messageFocusNode);
+      });
     }
     if (userChanged || limitChanged) {
       _cachedLimit = _currentLimit;
