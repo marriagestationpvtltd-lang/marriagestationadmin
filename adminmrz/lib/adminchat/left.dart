@@ -587,9 +587,18 @@ class _ChatSidebarState extends State<ChatSidebar> {
   void _updateSelectedChat() {
     if (_selectedChat != null) {
       final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      // Update id FIRST so that _handleExternalSelection() (which fires on
+      // every notifyListeners call) sees chatProvider.id == _selectedChat['id']
+      // and short-circuits instead of overriding the selection.
+      final rawId = _selectedChat!["id"];
+      final parsedId = int.tryParse(rawId.toString());
+      if (parsedId == null) {
+        debugPrint('_updateSelectedChat: invalid user id "$rawId", skipping');
+        return;
+      }
+      chatProvider.updateidd(parsedId);
       chatProvider.updateName(_selectedChat!["name"]);
       chatProvider.updateonline(_selectedChat!["is_online"] == true);
-      chatProvider.updateidd(int.tryParse(_selectedChat!["id"]) ?? 0);
       chatProvider.updatePaidStatus(_selectedChat!["is_paid"] == true);
     }
   }
