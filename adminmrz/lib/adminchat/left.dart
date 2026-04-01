@@ -14,6 +14,12 @@ import 'chatscreen.dart';
 import 'constant.dart';
 
 class ChatSidebar extends StatefulWidget {
+  /// Called on mobile when the user taps a conversation so the parent can
+  /// switch from the list panel to the chat panel.
+  final VoidCallback? onUserTap;
+
+  const ChatSidebar({super.key, this.onUserTap});
+
   @override
   _ChatSidebarState createState() => _ChatSidebarState();
 }
@@ -411,9 +417,12 @@ class _ChatSidebarState extends State<ChatSidebar> {
   Widget build(BuildContext context) {
     final chatProvider = Provider.of<ChatProvider>(context);
     final c = ChatColors.of(context);
+    // On mobile (when onUserTap is provided), take full available width;
+    // on desktop keep the fixed sidebar width.
+    final double? sidebarWidth = widget.onUserTap != null ? null : 280;
 
     return Container(
-      width: 280,
+      width: sidebarWidth,
       color: c.sidebar,
       child: Column(
         children: [
@@ -725,6 +734,8 @@ class _ChatSidebarState extends State<ChatSidebar> {
                               });
                               // Persist the selected user so the chat reopens to the same conversation.
                               _saveLastSelectedUserId(user["id"].toString());
+                              // Notify parent so mobile view can switch to chat panel.
+                              widget.onUserTap?.call();
                             },
                           );
                         },
