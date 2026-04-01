@@ -971,7 +971,7 @@ class _ChatWindowState extends State<ChatWindow> {
                       children: [
                         Icon(Icons.chat_bubble_outline, size: 40, color: Colors.grey[300]),
                         const SizedBox(height: 12),
-                        const Text(
+                        Text(
                           "No messages yet",
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: c.muted),
                         ),
