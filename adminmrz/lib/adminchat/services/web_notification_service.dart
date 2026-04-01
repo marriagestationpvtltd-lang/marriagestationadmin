@@ -1,0 +1,110 @@
+import 'dart:html' as html;
+import 'dart:js' as js;
+
+/// Service for browser notifications and message sounds on the web platform.
+///
+/// - Background messages  → browser notification + sound
+/// - Foreground messages  → sound only (no notification popup)
+class WebNotificationService {
+  WebNotificationService._();
+
+  // ------------------------------------------------------------------
+  // Permission
+  // ------------------------------------------------------------------
+
+  /// Requests the browser notification permission.
+  /// Should be called once after the user first interacts with the app.
+  static Future<void> requestPermission() async {
+    if (!html.Notification.supported) return;
+    if (html.Notification.permission == 'granted') return;
+    await html.Notification.requestPermission();
+  }
+
+  // ------------------------------------------------------------------
+  // Background detection
+  // ------------------------------------------------------------------
+
+  /// Returns `true` when the browser tab / window is not visible
+  /// (i.e. the app is in the background).
+  static bool isAppInBackground() {
+    return html.document.hidden ?? false;
+  }
+
+  // ------------------------------------------------------------------
+  // Browser notification
+  // ------------------------------------------------------------------
+
+  /// Shows a native browser notification with [senderName] as the title
+  /// and [message] as the body.  Only shown when the app is in the
+  /// background and permission has been granted.
+  static void showMessageNotification({
+    required String senderName,
+    required String message,
+  }) {
+    if (!html.Notification.supported) return;
+    if (html.Notification.permission != 'granted') return;
+    if (!isAppInBackground()) return;
+
+    final notification = html.Notification(
+      senderName,
+      body: message,
+      icon: '/adminp/icons/Icon-192.png',
+    );
+
+    // Auto-close after 6 seconds.
+    Future.delayed(const Duration(seconds: 6), notification.close);
+
+    // Clicking the notification focuses the tab.
+    notification.onClick.listen((_) {
+      html.window.focus();
+      notification.close();
+    });
+  }
+
+  // ------------------------------------------------------------------
+  // Notification sound  (WhatsApp-like double-tone via Web Audio API)
+  // ------------------------------------------------------------------
+
+  /// Plays a short WhatsApp-style notification sound using the Web Audio API.
+  /// Works regardless of foreground/background state.
+  static void playMessageSound() {
+    try {
+      js.context.callMethod('eval', [
+        '''
+        (function() {
+          try {
+            var AudioCtx = window.AudioContext || window.webkitAudioContext;
+            if (!AudioCtx) return;
+            var ctx = new AudioCtx();
+
+            // Two quick descending tones, identical to WhatsApp's ping.
+            var tones = [
+              { start: 0.00, freq: 880, end: 660 },
+              { start: 0.12, freq: 880, end: 660 }
+            ];
+
+            tones.forEach(function(t) {
+              var osc  = ctx.createOscillator();
+              var gain = ctx.createGain();
+              osc.connect(gain);
+              gain.connect(ctx.destination);
+
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(t.freq, ctx.currentTime + t.start);
+              osc.frequency.exponentialRampToValueAtTime(
+                t.end, ctx.currentTime + t.start + 0.10);
+
+              gain.gain.setValueAtTime(0.45, ctx.currentTime + t.start);
+              gain.gain.exponentialRampToValueAtTime(
+                0.001, ctx.currentTime + t.start + 0.18);
+
+              osc.start(ctx.currentTime + t.start);
+              osc.stop(ctx.currentTime  + t.start + 0.18);
+            });
+          } catch(e) { /* silently ignore – e.g. user hasn't interacted yet */ }
+        })();
+        '''
+      ]);
+    } catch (_) {}
+  }
+}

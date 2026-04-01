@@ -12,6 +12,7 @@ import 'chat_theme.dart';
 import 'chatprovider.dart';
 import 'chatscreen.dart';
 import 'constant.dart';
+import 'services/web_notification_service.dart';
 
 class ChatSidebar extends StatefulWidget {
   /// Called on mobile when the user taps a conversation so the parent can
@@ -41,6 +42,11 @@ class _ChatSidebarState extends State<ChatSidebar> {
   final int senderId = 1;
   StreamSubscription? _conversationSub;
   StreamSubscription<QuerySnapshot>? _presenceSub;
+
+  // Tracks the last known message timestamp per conversation so we can
+  // detect truly NEW incoming messages (from users, not the admin).
+  final Map<String, Timestamp?> _prevLastTimestamps = {};
+  bool _isFirstConversationSnapshot = true;
 
   // Pagination
   int _page = 1;
@@ -316,6 +322,8 @@ class _ChatSidebarState extends State<ChatSidebar> {
   }
 
   void listenToConversationChanges() {
+    _isFirstConversationSnapshot = true;
+
     _conversationSub = FirebaseFirestore.instance
         .collection('conversations')
         .where('participants', arrayContains: senderId.toString())
@@ -323,6 +331,61 @@ class _ChatSidebarState extends State<ChatSidebar> {
         .snapshots()
         .listen((snapshot) {
 
+      // ── Detect new incoming messages ────────────────────────────────────
+      if (!_isFirstConversationSnapshot) {
+        for (final change in snapshot.docChanges) {
+          if (change.type == DocumentChangeType.added ||
+              change.type == DocumentChangeType.modified) {
+            final data = change.doc.data() as Map<String, dynamic>;
+
+            // Only react to messages sent by the other person (not the admin).
+            final lastSenderId = data['lastSenderId']?.toString() ?? '';
+            if (lastSenderId == senderId.toString()) continue;
+
+            final List participants =
+                List<String>.from(data['participants'] ?? []);
+            final String otherUserId = participants.firstWhere(
+              (id) => id != senderId.toString(),
+              orElse: () => '',
+            );
+            if (otherUserId.isEmpty) continue;
+
+            final Timestamp? newTs = data['lastTimestamp'] as Timestamp?;
+            final Timestamp? prevTs = _prevLastTimestamps[otherUserId];
+
+            // Only trigger if the timestamp is genuinely newer.
+            final bool isNewMessage = newTs != null &&
+                (prevTs == null ||
+                    newTs.compareTo(prevTs) > 0);
+            if (!isNewMessage) continue;
+
+            // Play sound and optionally show a browser notification.
+            final String lastMessage = data['lastMessage']?.toString() ?? '';
+            _handleIncomingMessage(
+              senderIdStr: otherUserId,
+              message: lastMessage,
+            );
+            break; // one notification per snapshot batch is enough
+          }
+        }
+      }
+      _isFirstConversationSnapshot = false;
+
+      // ── Update previous timestamps ──────────────────────────────────────
+      for (final doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final List participants = List<String>.from(data['participants'] ?? []);
+        final String otherUserId = participants.firstWhere(
+          (id) => id != senderId.toString(),
+          orElse: () => '',
+        );
+        if (otherUserId.isNotEmpty) {
+          _prevLastTimestamps[otherUserId] =
+              data['lastTimestamp'] as Timestamp?;
+        }
+      }
+
+      // ── Update sidebar UI ───────────────────────────────────────────────
       Map<String, Map<String, dynamic>> tempMap = {};
       List<dynamic> sortedUsers = [];
 
@@ -375,6 +438,34 @@ class _ChatSidebarState extends State<ChatSidebar> {
         }).toList();
       });
     });
+  }
+
+  /// Called whenever a new message arrives from a user.
+  /// Plays a notification sound and, when the tab is in the background,
+  /// also shows a native browser notification.
+  void _handleIncomingMessage({
+    required String senderIdStr,
+    required String message,
+  }) {
+    // Look up the sender's display name from the loaded user list.
+    final user = _users.firstWhere(
+      (u) => u['id'].toString() == senderIdStr,
+      orElse: () => <String, dynamic>{},
+    );
+    final String senderName =
+        (user.isNotEmpty ? user['name']?.toString() : null) ?? 'Someone';
+
+    final String displayMessage =
+        message.isEmpty ? '📷 Photo' : message;
+
+    // Always play sound (foreground + background).
+    WebNotificationService.playMessageSound();
+
+    // Only show the popup notification when the tab is not visible.
+    WebNotificationService.showMessageNotification(
+      senderName: senderName,
+      message: displayMessage,
+    );
   }
   void _applyFilters() {
     setState(() {
