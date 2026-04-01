@@ -58,6 +58,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
   final ScrollController _scrollController = ScrollController();
   Timer? _searchDebounce;
   Timer? _onlineStatusTimer;
+  ChatProvider? _chatProvider;
 
   @override
   void initState() {
@@ -71,6 +72,13 @@ class _ChatSidebarState extends State<ChatSidebar> {
     );
     // Real-time Firestore listener for immediate offline/online status updates
     _startPresenceListener();
+
+    // Sync selection when navigating from other modules (e.g., Members -> Chat)
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _chatProvider = context.read<ChatProvider>();
+      _chatProvider?.addListener(_handleExternalSelection);
+      _handleExternalSelection();
+    });
   }
 
   @override
@@ -80,6 +88,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
     _scrollController.dispose();
     _searchDebounce?.cancel();
     _onlineStatusTimer?.cancel();
+    _chatProvider?.removeListener(_handleExternalSelection);
     super.dispose();
   }
 
@@ -162,8 +171,8 @@ class _ChatSidebarState extends State<ChatSidebar> {
               Provider.of<ChatProvider>(context, listen: false);
 
           if (_users.isNotEmpty) {
-            // Priority: saved prefs ID > chatProvider.id already set > first user
-            final targetId = savedId ?? chatProvider.id?.toString();
+            // Priority: external selection (chatProvider.id) > saved prefs ID > first user
+            final targetId = chatProvider.id?.toString() ?? savedId;
             if (targetId != null) {
               _selectedChat = _users.firstWhere(
                 (user) => user['id']?.toString() == targetId,
@@ -319,6 +328,25 @@ class _ChatSidebarState extends State<ChatSidebar> {
     } catch (e) {
       debugPrint('Error refreshing online status: $e');
     }
+  }
+
+  // Handle external chat selection (e.g., from Members page)
+  void _handleExternalSelection() {
+    final targetId = _chatProvider?.id?.toString();
+    if (targetId == null || _users.isEmpty) return;
+
+    final currentId = _selectedChat?['id']?.toString();
+    if (currentId == targetId) return;
+
+    final matchIndex =
+        _users.indexWhere((u) => u['id']?.toString() == targetId);
+    if (matchIndex == -1) return;
+
+    setState(() {
+      _selectedChat = _users[matchIndex];
+    });
+    _updateSelectedChat();
+    _saveLastSelectedUserId(targetId);
   }
 
   void listenToConversationChanges() {
