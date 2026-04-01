@@ -763,9 +763,10 @@ class _UsersPageState extends State<UsersPage> {
     required Color color,
     int? value,
     bool loading = false,
+    double? width,
   }) {
     return Container(
-      width: 140,
+      width: width ?? 160,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: color.withOpacity(0.06),
@@ -822,105 +823,113 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Widget _buildActivityBoard(ActivityStats? stats, bool loading, bool isDark) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0F172A) : _kPrimary.withOpacity(0.04),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _kPrimary.withOpacity(0.12)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final double tileWidth = constraints.maxWidth < 680
+            ? (constraints.maxWidth - 12) / 2
+            : (constraints.maxWidth - 24) / 3;
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isDark ? const Color(0xFF0F172A) : _kPrimary.withOpacity(0.04),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: _kPrimary.withOpacity(0.12)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(8),
-                decoration: BoxDecoration(
-                  color: _kPrimary.withOpacity(0.14),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: const Icon(Icons.timeline_outlined, color: _kPrimary, size: 18),
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Activity Snapshot',
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  fontSize: 13,
-                  color: _kPrimary,
-                ),
-              ),
-              const Spacer(),
-              if (loading)
-                const SizedBox(
-                  height: 18,
-                  width: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    valueColor: AlwaysStoppedAnimation<Color>(_kPrimary),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: _kPrimary.withOpacity(0.14),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child:
+                        const Icon(Icons.timeline_outlined, color: _kPrimary, size: 18),
                   ),
-                ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Activity Snapshot',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      color: _kPrimary,
+                    ),
+                  ),
+                  const Spacer(),
+                  if (loading)
+                    const SizedBox(
+                      height: 18,
+                      width: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(_kPrimary),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _activityPill(
+                    label: 'Requests Sent',
+                    icon: Icons.send_rounded,
+                    color: _kPrimary,
+                    value: stats?.requestsSent,
+                    loading: loading && stats == null,
+                    width: tileWidth,
+                  ),
+                  _activityPill(
+                    label: 'Requests Received',
+                    icon: Icons.inbox_outlined,
+                    color: _kViolet,
+                    value: stats?.requestsReceived,
+                    loading: loading && stats == null,
+                    width: tileWidth,
+                  ),
+                  _activityPill(
+                    label: 'Chat Requests',
+                    icon: Icons.chat_bubble_outline,
+                    color: _kSky,
+                    value: stats?.chatRequestsSent,
+                    loading: loading && stats == null,
+                    width: tileWidth,
+                  ),
+                  _activityPill(
+                    label: 'Chats Accepted',
+                    icon: Icons.check_circle_outline,
+                    color: _kEmerald,
+                    value: stats?.chatRequestsAccepted,
+                    loading: loading && stats == null,
+                    width: tileWidth,
+                  ),
+                  _activityPill(
+                    label: 'Profile Views',
+                    icon: Icons.visibility_outlined,
+                    color: _kAmber,
+                    value: stats?.profileViews,
+                    loading: loading && stats == null,
+                    width: tileWidth,
+                  ),
+                  _activityPill(
+                    label: 'Matches',
+                    icon: Icons.favorite_outline,
+                    color: _kRose,
+                    value: stats?.matchesCount,
+                    loading: loading && stats == null,
+                    width: tileWidth,
+                  ),
+                ],
+              ),
             ],
           ),
-          const SizedBox(height: 10),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                _activityPill(
-                  label: 'Requests Sent',
-                  icon: Icons.send_rounded,
-                  color: _kPrimary,
-                  value: stats?.requestsSent,
-                  loading: loading && stats == null,
-                ),
-                const SizedBox(width: 8),
-                _activityPill(
-                  label: 'Requests Received',
-                  icon: Icons.inbox_outlined,
-                  color: _kViolet,
-                  value: stats?.requestsReceived,
-                  loading: loading && stats == null,
-                ),
-                const SizedBox(width: 8),
-                _activityPill(
-                  label: 'Chat Requests',
-                  icon: Icons.chat_bubble_outline,
-                  color: _kSky,
-                  value: stats?.chatRequestsSent,
-                  loading: loading && stats == null,
-                ),
-                const SizedBox(width: 8),
-                _activityPill(
-                  label: 'Chats Accepted',
-                  icon: Icons.check_circle_outline,
-                  color: _kEmerald,
-                  value: stats?.chatRequestsAccepted,
-                  loading: loading && stats == null,
-                ),
-                const SizedBox(width: 8),
-                _activityPill(
-                  label: 'Profile Views',
-                  icon: Icons.visibility_outlined,
-                  color: _kAmber,
-                  value: stats?.profileViews,
-                  loading: loading && stats == null,
-                ),
-                const SizedBox(width: 8),
-                _activityPill(
-                  label: 'Matches',
-                  icon: Icons.favorite_outline,
-                  color: _kRose,
-                  value: stats?.matchesCount,
-                  loading: loading && stats == null,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
