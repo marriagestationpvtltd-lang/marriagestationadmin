@@ -38,27 +38,24 @@ class WebNotificationService {
 
     _permissionListenerAttached = true;
 
-    Future<void> handleUserGestureForPermission([dynamic event]) async {
+    Future<void> _handleGestureAndRequestPermission([dynamic event]) async {
       if (_permissionRequestFuture != null) return;
-      final completer = Completer<void>();
-      _permissionRequestFuture = completer.future;
       _disposePermissionListeners();
       try {
-        await requestPermission();
+        final permissionRequest = requestPermission();
+        _permissionRequestFuture = permissionRequest;
+        await permissionRequest;
       } finally {
-        if (!completer.isCompleted) {
-          completer.complete();
-        }
         _permissionRequestFuture = null;
       }
     }
 
     _permissionClickSubscription =
-        html.document.onClick.listen(handleUserGestureForPermission);
+        html.document.onClick.listen(_handleGestureAndRequestPermission);
     _permissionKeySubscription =
-        html.document.onKeyDown.listen(handleUserGestureForPermission);
+        html.document.onKeyDown.listen(_handleGestureAndRequestPermission);
     _permissionTouchSubscription =
-        html.document.onTouchStart.listen(handleUserGestureForPermission);
+        html.document.onTouchStart.listen(_handleGestureAndRequestPermission);
   }
 
   static void _disposePermissionListeners() {
@@ -104,6 +101,7 @@ class WebNotificationService {
   }) {
     if (!html.Notification.supported) return;
     if (html.Notification.permission == 'default') {
+      // Ensure we prompt for permission on the next user gesture.
       ensurePermissionOnUserGesture();
       return;
     }
