@@ -95,7 +95,10 @@ class _ChatWindowState extends State<ChatWindow> {
     super.initState();
     _initializeWebSpeech();
     _initializeRecorder();
-    _fetchMatchDetails();
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    if (chatProvider.id != null) {
+      _fetchMatchDetails();
+    }
     _scrollController.addListener(_onScrollForPagination);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       FocusScope.of(context).requestFocus(_messageFocusNode);
@@ -108,8 +111,19 @@ class _ChatWindowState extends State<ChatWindow> {
   Future<void> _fetchMatchDetails() async {
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
+    if (chatProvider.id == null) {
+      setState(() {
+        _isLoadingMatchDetails = false;
+        _matchDetails = null;
+        _mutualMatches = [];
+      });
+      return;
+    }
+
     setState(() {
       _isLoadingMatchDetails = true;
+      _matchDetails = null;
+      _mutualMatches = [];
     });
 
     try {
