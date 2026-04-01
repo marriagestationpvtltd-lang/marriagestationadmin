@@ -50,7 +50,6 @@ class _ChatWindowState extends State<ChatWindow> {
   bool _isListening = false;
   bool _userStoppedListening = false;
   bool _isSearching = false;
-  bool _isSendingImage = false;
   bool _showMatchInfo = false;
   File? _selectedImage;
   Uint8List? _selectedImageBytes;
@@ -1983,20 +1982,14 @@ class _ChatWindowState extends State<ChatWindow> {
                   ),
                   const SizedBox(width: 8),
                   ElevatedButton(
-                    onPressed: _isSendingImage ? null : () async => await _sendImageMessage(),
+                    onPressed: _sendImageMessage,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: kPrimary,
                       foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                     ),
-                    child: _isSendingImage
-                        ? const SizedBox(
-                            height: 18,
-                            width: 18,
-                            child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
-                          )
-                        : const Text("Send", style: TextStyle(fontSize: 13)),
+                    child: const Text("Send", style: TextStyle(fontSize: 13)),
                   ),
                   const SizedBox(width: 8),
                   IconButton(
@@ -2178,22 +2171,39 @@ class _ChatWindowState extends State<ChatWindow> {
     }
   }
 
-  Future<void> _sendImageMessage() async {
+  void _sendImageMessage() {
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
     if (_selectedImage == null && _selectedImageBytes == null) return;
 
-    setState(() => _isSendingImage = true);
+    // Capture data and clear UI immediately (background processing)
+    final File? imageToSend = _selectedImage;
+    final Uint8List? imageBytesToSend = _selectedImageBytes;
+    final String receiverId = chatProvider.id.toString();
 
+    setState(() {
+      _selectedImage = null;
+      _selectedImageBytes = null;
+    });
+
+    // Upload and send in background without blocking the UI
+    _uploadImageInBackground(imageToSend, imageBytesToSend, receiverId);
+  }
+
+  Future<void> _uploadImageInBackground(
+    File? image,
+    Uint8List? imageBytes,
+    String receiverId,
+  ) async {
     try {
       String fileName = DateTime.now().millisecondsSinceEpoch.toString();
       Reference storageRef = _storage.ref().child('chat_images/$fileName');
       UploadTask uploadTask;
 
       if (kIsWeb) {
-        uploadTask = storageRef.putData(_selectedImageBytes!);
+        uploadTask = storageRef.putData(imageBytes!);
       } else {
-        uploadTask = storageRef.putFile(_selectedImage!);
+        uploadTask = storageRef.putFile(image!);
       }
 
       TaskSnapshot snapshot = await uploadTask;
@@ -2204,22 +2214,17 @@ class _ChatWindowState extends State<ChatWindow> {
         'liked': false,
         'replyto': '',
         'senderid': senderId.toString(),
-        'receiverid': chatProvider.id.toString(),
+        'receiverid': receiverId,
         'timestamp': FieldValue.serverTimestamp(),
         'type': 'image',
         'imageUrl': imageUrl,
         'seen': false,
       });
-
-      setState(() {
-        _selectedImage = null;
-        _selectedImageBytes = null;
-        _isSendingImage = false;
-      });
     } catch (e) {
-      setState(() => _isSendingImage = false);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text("Failed to send image: $e")));
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text("Failed to send image: $e")));
+      }
     }
   }
 
