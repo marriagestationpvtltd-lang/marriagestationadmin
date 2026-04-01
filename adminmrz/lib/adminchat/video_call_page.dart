@@ -32,7 +32,7 @@ const _kMinLocalPreviewWidth = 120.0;
 const _kMaxLocalPreviewWidth = 200.0;
 const _kMinLocalPreviewHeight = 170.0;
 const _kMaxLocalPreviewHeight = 280.0;
-const _kCompactLayoutMaxWidth = 520.0;
+const _kCompactLayoutBreakpoint = 520.0;
 
 class VideoCallScreen extends StatefulWidget {
   final String currentUserId;
@@ -672,11 +672,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final bool isCompactLayout =
-            constraints.maxWidth < _kCompactLayoutMaxWidth;
-        final double buttonSize = isCompactLayout ? 52 : 60;
-        final double endSize = isCompactLayout ? 66 : 74;
-        final double spacing = isCompactLayout ? 12 : 16;
+        final bool useCompactLayout =
+            constraints.maxWidth < _kCompactLayoutBreakpoint;
+        final double buttonSize = useCompactLayout ? 52 : 60;
+        final double endSize = useCompactLayout ? 66 : 74;
+        final double spacing = useCompactLayout ? 12 : 16;
 
         final List<Widget> buttons = [
           if (widget.onMinimize != null)
@@ -728,8 +728,8 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
               filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
               child: Container(
                 padding: EdgeInsets.symmetric(
-                  vertical: isCompactLayout ? 12 : 16,
-                  horizontal: isCompactLayout ? 12 : 18,
+                  vertical: useCompactLayout ? 12 : 16,
+                  horizontal: useCompactLayout ? 12 : 18,
                 ),
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.35),
