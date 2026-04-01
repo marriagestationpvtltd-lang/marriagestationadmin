@@ -398,8 +398,6 @@ class _CallScreenState extends State<CallScreen>
               child: Column(
                 children: [
                   const SizedBox(height: 48),
-                  _buildStatusLabel(),
-                  const SizedBox(height: 32),
                   _buildAvatar(),
                   const SizedBox(height: 24),
                   Text(
@@ -697,11 +695,11 @@ class _ControlButton extends StatelessWidget {
               shape: BoxShape.circle,
               color: isActive
                   ? const Color(0xFF6366F1).withOpacity(0.85)
-                  : Colors.white.withOpacity(0.12),
+                  : Colors.white.withOpacity(0.22),
               border: Border.all(
                 color: isActive
                     ? const Color(0xFF6366F1)
-                    : Colors.white.withOpacity(0.18),
+                    : Colors.white.withOpacity(0.35),
               ),
             ),
             child: Icon(icon, color: Colors.white, size: 26),

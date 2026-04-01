@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
-import 'package:adminmrz/adminchat/services/MatchedProfileService.dart';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -725,14 +725,6 @@ class _ChatSidebarState extends State<ChatSidebar> {
                               });
                               // Persist the selected user so the chat reopens to the same conversation.
                               _saveLastSelectedUserId(user["id"].toString());
-                              // Fetch matched profiles for the newly selected user
-                              final newId =
-                                  int.tryParse(user["id"].toString()) ?? 0;
-                              if (newId > 0) {
-                                Provider.of<MatchedProfileProvider>(context,
-                                        listen: false)
-                                    .fetchMatchedProfiles(newId);
-                              }
                             },
                           );
                         },
