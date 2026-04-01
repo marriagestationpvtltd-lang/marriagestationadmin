@@ -734,12 +734,16 @@ class _UsersPageState extends State<UsersPage> {
 
   Widget _actionIconBtn(
       IconData icon, String title, Color color, VoidCallback onTap) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color textColor =
+        isDark ? Colors.white : Color.lerp(color, Colors.black, 0.25)!;
     return Tooltip(
       message: title,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         child: Container(
+          constraints: const BoxConstraints(minWidth: 118),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: color.withOpacity(0.10),
@@ -762,7 +766,7 @@ class _UsersPageState extends State<UsersPage> {
                 title,
                 style: TextStyle(
                   fontSize: 12,
-                  color: color,
+                  color: textColor,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.2,
                 ),
