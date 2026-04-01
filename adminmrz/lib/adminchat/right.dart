@@ -96,6 +96,8 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
       // Fetch Firestore share history and matched profiles automatically
       _loadSharedProfilesForUser(userId.toString());
       matchProvider.fetchMatchedProfiles(userId);
+      // Start real-time offline detection for this user's matched profiles
+      matchProvider.startPresenceListener();
     }
   }
 

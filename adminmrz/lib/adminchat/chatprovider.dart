@@ -292,6 +292,25 @@ class ChatProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // Update a single user's online status in chatList (called by Firestore listener)
+  void updateUserOnlineStatus(String userId, bool isOnline, String lastSeenText) {
+    final idx = _chatList.indexWhere((u) => u['id'] == userId);
+    if (idx == -1) {
+      debugPrint('updateUserOnlineStatus: user $userId not found in chatList');
+      return;
+    }
+    _chatList[idx] = {
+      ..._chatList[idx],
+      'online': isOnline.toString(),
+      'last_seen_text': isOnline ? 'Online' : lastSeenText,
+    };
+    // Keep provider's own online field in sync if this is the selected user
+    if (id?.toString() == userId) {
+      online = isOnline;
+    }
+    notifyListeners();
+  }
+
   // Update paid status
   void updatePaidStatus(bool newStatus) {
     ispaid = newStatus;

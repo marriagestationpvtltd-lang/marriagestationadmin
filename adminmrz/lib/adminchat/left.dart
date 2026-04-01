@@ -34,6 +34,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
   Map<String, dynamic>? _selectedChat;
   final int senderId = 1;
   StreamSubscription? _conversationSub;
+  StreamSubscription<QuerySnapshot>? _presenceSub;
 
   // Pagination
   int _page = 1;
@@ -56,11 +57,14 @@ class _ChatSidebarState extends State<ChatSidebar> {
       const Duration(seconds: 10),
       (_) => _refreshOnlineStatus(),
     );
+    // Real-time Firestore listener for immediate offline/online status updates
+    _startPresenceListener();
   }
 
   @override
   void dispose() {
     _conversationSub?.cancel();
+    _presenceSub?.cancel();
     _scrollController.dispose();
     _searchDebounce?.cancel();
     _onlineStatusTimer?.cancel();
@@ -184,6 +188,59 @@ class _ChatSidebarState extends State<ChatSidebar> {
         _hasMore) {
       fetchUsers();
     }
+  }
+
+  // Firestore real-time presence listener — fires the instant a user's isOnline
+  // field changes in the 'users' collection (written by the user-side app).
+  // This gives immediate offline detection without waiting for the REST poll.
+  // The listener covers the full 'users' collection; only changes for users
+  // already in _users are applied, so extra documents are a no-op.
+  void _startPresenceListener() {
+    _presenceSub = FirebaseFirestore.instance
+        .collection('users')
+        .snapshots()
+        .listen((snapshot) {
+      if (!mounted) return;
+      bool changed = false;
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      for (final change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.removed) continue;
+        final data = change.doc.data();
+        if (data == null) continue;
+
+        final userId = change.doc.id;
+        final isOnline = data['isOnline'] as bool? ?? false;
+        final lastSeenText = data['lastSeen']?.toString() ?? '';
+
+        // Update sidebar user list
+        final idx = _users.indexWhere(
+            (u) => u['id']?.toString() == userId);
+        if (idx != -1) {
+          final prev = _users[idx]['is_online'];
+          if (prev != isOnline) {
+            _users[idx] = {
+              ..._users[idx] as Map<String, dynamic>,
+              'is_online': isOnline,
+              'last_seen_text': isOnline ? 'Online' : lastSeenText,
+            };
+            changed = true;
+            if (_selectedChat?['id']?.toString() == userId) {
+              _selectedChat = _users[idx];
+              _updateSelectedChat();
+            }
+          }
+        }
+
+        // Keep ChatProvider in sync so the dashboard live count stays accurate
+        chatProvider.updateUserOnlineStatus(userId, isOnline, lastSeenText);
+      }
+
+      if (changed && mounted) {
+        _applyFilters();
+      }
+    }, onError: (e) {
+      debugPrint('Presence listener error: $e');
+    });
   }
 
   // Lightweight poll: fetch a large page and update only is_online / last_seen_text

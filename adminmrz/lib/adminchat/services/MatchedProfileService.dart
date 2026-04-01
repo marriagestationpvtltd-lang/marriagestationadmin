@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'dart:convert';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../model/MatchedProfile.dart';
@@ -13,6 +15,9 @@ class MatchedProfileProvider with ChangeNotifier {
   static const int _perPage = 20;
   int? _currentUserId;
   String _memberid = '';
+
+  // Firestore presence listener for matched profiles
+  StreamSubscription<QuerySnapshot>? _presenceSub;
 
   String get memberid => _memberid;
   String get name => _name;
@@ -194,6 +199,44 @@ class MatchedProfileProvider with ChangeNotifier {
     _totalCount = 0;
     _currentUserId = null;
     _isloading = false;
+    stopPresenceListener();
     notifyListeners();
+  }
+
+  // Start a Firestore real-time listener that immediately reflects online/offline
+  // changes for matched profiles as soon as the user-side app writes to 'users'.
+  // The full collection is listened to for simplicity; changes not matching any
+  // loaded matched profile are ignored (no-op).
+  void startPresenceListener() {
+    _presenceSub?.cancel();
+    _presenceSub = FirebaseFirestore.instance
+        .collection('users')
+        .snapshots()
+        .listen((snapshot) {
+      bool changed = false;
+      for (final change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.removed) continue;
+        final data = change.doc.data();
+        if (data == null) continue;
+
+        final int userId = int.tryParse(change.doc.id) ?? -1;
+        if (userId == -1) continue;
+        final isOnline = data['isOnline'] as bool? ?? false;
+
+        final idx = _matchedProfiles.indexWhere((p) => p.id == userId);
+        if (idx != -1 && _matchedProfiles[idx].isOnline != isOnline) {
+          _matchedProfiles[idx] = _matchedProfiles[idx].copyWith(isOnline: isOnline);
+          changed = true;
+        }
+      }
+      if (changed) notifyListeners();
+    }, onError: (e) {
+      debugPrint('MatchedProfile presence listener error: $e');
+    });
+  }
+
+  void stopPresenceListener() {
+    _presenceSub?.cancel();
+    _presenceSub = null;
   }
 }
