@@ -15,7 +15,7 @@ const _kEmerald = Color(0xFF10B981);
 const _kAmber = Color(0xFFF59E0B);
 const _kRose = Color(0xFFEF4444);
 const _kSky = Color(0xFF0EA5E9);
-const _kActionTextLightModeDarkenFactor = 0.25;
+const _kTextDarkenFactor = 0.25;
 const _kActionButtonMinWidth = 118.0;
 const _kActionButtonSpacing = 10.0;
 const _kActionButtonVerticalSpacing = 8.0;
@@ -736,12 +736,11 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-  Widget _actionIconBtn(
-      IconData icon, String label, Color color, VoidCallback onTap) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final Color baseTextColor =
-        Color.lerp(color, Colors.black, _kActionTextLightModeDarkenFactor) ??
-            color;
+    Widget _actionIconBtn(
+        IconData icon, String label, Color color, VoidCallback onTap) {
+      final isDark = Theme.of(context).brightness == Brightness.dark;
+      final Color baseTextColor =
+          Color.lerp(color, Colors.black, _kTextDarkenFactor)!;
     final Color textColor = isDark ? Colors.white : baseTextColor;
     return Tooltip(
       message: label,
