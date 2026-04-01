@@ -11,7 +11,7 @@ class WebNotificationService {
   WebNotificationService._();
 
   static bool _permissionListenerAttached = false;
-  static bool _permissionRequestInFlight = false;
+  static Future<void>? _permissionRequestFuture;
   static StreamSubscription<html.Event>? _permissionClickSubscription;
   static StreamSubscription<html.KeyboardEvent>? _permissionKeySubscription;
   static StreamSubscription<html.Event>? _permissionTouchSubscription;
@@ -38,14 +38,15 @@ class WebNotificationService {
 
     _permissionListenerAttached = true;
 
-    Future<void> handleUserGesture([dynamic _]) async {
-      if (_permissionRequestInFlight) return;
-      _permissionRequestInFlight = true;
+    Future<void> handleUserGesture([dynamic event]) async {
+      if (_permissionRequestFuture != null) return;
       _disposePermissionListeners();
+      final request = requestPermission();
+      _permissionRequestFuture = request;
       try {
-        await requestPermission();
+        await request;
       } finally {
-        _permissionRequestInFlight = false;
+        _permissionRequestFuture = null;
       }
     }
 
@@ -97,11 +98,10 @@ class WebNotificationService {
     bool showInForeground = false,
   }) {
     if (!html.Notification.supported) return;
-    if (html.Notification.permission == 'default') {
+    if (html.Notification.permission != 'granted') {
       ensurePermissionOnUserGesture();
       return;
     }
-    if (html.Notification.permission != 'granted') return;
     if (!showInForeground && !isAppInBackground()) return;
 
     final notification = html.Notification(
