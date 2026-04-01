@@ -11,7 +11,12 @@ import 'package:flutter/foundation.dart';
 class WebNotificationService {
   WebNotificationService._();
 
+  /// Tracks in-flight permission requests to avoid duplicate prompts.
+  /// Cleared once the request finishes (success, denial, or error).
   static Future<void>? _permissionRequestFuture;
+
+  /// Temporary gesture listeners used to trigger the permission prompt.
+  /// These are removed once the first gesture is detected.
   static StreamSubscription<html.Event>? _permissionClickSubscription;
   static StreamSubscription<html.KeyboardEvent>? _permissionKeySubscription;
   static StreamSubscription<html.Event>? _permissionTouchSubscription;
@@ -25,10 +30,14 @@ class WebNotificationService {
   static Future<void> requestPermission() async {
     if (!html.Notification.supported) return;
     if (html.Notification.permission == 'granted') return;
-    await html.Notification.requestPermission();
+    final result = await html.Notification.requestPermission();
+    if (result == 'denied') {
+      debugPrint('Notification permission denied by the user.');
+    }
   }
 
   /// Ensures we request permission on the next user gesture (click/tap/key).
+  /// This attaches temporary listeners and is safe to call multiple times.
   /// Required because some browsers block permission prompts without a gesture.
   static void ensurePermissionOnUserGesture() {
     if (!html.Notification.supported) return;
@@ -53,7 +62,10 @@ class WebNotificationService {
     _permissionRequestFuture = gestureCompleter.future
         .then((_) => requestPermission())
         .catchError((error, _) {
-          debugPrint('Notification permission request failed: $error');
+          debugPrint(
+            'Notification permission request failed: $error '
+            '(state: ${html.Notification.permission})',
+          );
         })
         .whenComplete(() => _permissionRequestFuture = null);
   }
