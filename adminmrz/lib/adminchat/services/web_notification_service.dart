@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:js' as js;
+import 'package:flutter/foundation.dart';
 
 /// Service for browser notifications and message sounds on the web platform.
 ///
@@ -11,6 +12,9 @@ class WebNotificationService {
   WebNotificationService._();
 
   static Future<void>? _permissionRequestFuture;
+  static StreamSubscription<html.Event>? _permissionClickSubscription;
+  static StreamSubscription<html.KeyboardEvent>? _permissionKeySubscription;
+  static StreamSubscription<html.Event>? _permissionTouchSubscription;
 
   // ------------------------------------------------------------------
   // Permission
@@ -31,15 +35,36 @@ class WebNotificationService {
     if (html.Notification.permission != 'default') return;
     if (_permissionRequestFuture != null) return;
 
-    final gestureFuture = Future.any([
-      html.document.onClick.first,
-      html.document.onKeyDown.first,
-      html.document.onTouchStart.first,
-    ]);
+    final gestureCompleter = Completer<void>();
 
-    _permissionRequestFuture = gestureFuture
+    void handleGesture([dynamic _]) {
+      if (gestureCompleter.isCompleted) return;
+      gestureCompleter.complete();
+      _disposePermissionListeners();
+    }
+
+    _permissionClickSubscription =
+        html.document.onClick.listen(handleGesture);
+    _permissionKeySubscription =
+        html.document.onKeyDown.listen(handleGesture);
+    _permissionTouchSubscription =
+        html.document.onTouchStart.listen(handleGesture);
+
+    _permissionRequestFuture = gestureCompleter.future
         .then((_) => requestPermission())
+        .catchError((error, _) {
+          debugPrint('Notification permission request failed: $error');
+        })
         .whenComplete(() => _permissionRequestFuture = null);
+  }
+
+  static void _disposePermissionListeners() {
+    _permissionClickSubscription?.cancel();
+    _permissionKeySubscription?.cancel();
+    _permissionTouchSubscription?.cancel();
+    _permissionClickSubscription = null;
+    _permissionKeySubscription = null;
+    _permissionTouchSubscription = null;
   }
 
   // ------------------------------------------------------------------
