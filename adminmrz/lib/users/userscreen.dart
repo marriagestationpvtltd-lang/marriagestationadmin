@@ -15,7 +15,7 @@ const _kEmerald = Color(0xFF10B981);
 const _kAmber = Color(0xFFF59E0B);
 const _kRose = Color(0xFFEF4444);
 const _kSky = Color(0xFF0EA5E9);
-const _kTextColorBlendFactor = 0.25;
+const _kActionButtonTextBlendFactor = 0.25;
 const _kActionButtonMinWidth = 118.0;
 const _kActionButtonSpacing = 10.0;
 const _kActionButtonVerticalSpacing = 8.0;
@@ -740,8 +740,8 @@ class _UsersPageState extends State<UsersPage> {
       IconData icon, String label, Color color, VoidCallback onTap) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final Color textColor = isDark
-        ? Colors.white
-        : Color.lerp(color, Colors.black, _kTextColorBlendFactor)!;
+        ? Color.lerp(color, Colors.white, _kActionButtonTextBlendFactor)!
+        : Color.lerp(color, Colors.black, _kActionButtonTextBlendFactor)!;
     return Tooltip(
       message: label,
       child: InkWell(
