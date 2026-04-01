@@ -192,6 +192,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
         }
 
         _applyFilters();
+        _handleExternalSelection();
       }
     } catch (error) {
       debugPrint('Error fetching users: $error');
