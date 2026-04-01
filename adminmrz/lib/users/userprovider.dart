@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:adminmrz/users/service/userservice.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import 'model/usermodel.dart';
@@ -16,6 +19,8 @@ class UserProvider with ChangeNotifier {
   String _statusFilter = 'all';
   String _userTypeFilter = 'all';
   bool _isSelectAll = false;
+
+  StreamSubscription<QuerySnapshot>? _presenceSub;
 
   // Getters
   List<User> get filteredUsers => _filteredUsers;
@@ -47,12 +52,54 @@ class UserProvider with ChangeNotifier {
       final response = await _userService.getUsers();
       _allUsers = response.data;
       _applyFilters();
+      // Start (or restart) the real-time presence listener now that _allUsers is
+      // populated so the initial Firestore snapshot can immediately apply to it.
+      _startPresenceListener();
     } catch (e) {
       _error = e.toString();
     } finally {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  // Real-time Firestore listener: fires the instant any user's isOnline field
+  // changes in the 'users' collection (written by the user-side app).
+  void _startPresenceListener() {
+    _presenceSub?.cancel();
+    _presenceSub = FirebaseFirestore.instance
+        .collection('users')
+        .snapshots()
+        .listen((snapshot) {
+      bool changed = false;
+      for (final change in snapshot.docChanges) {
+        if (change.type == DocumentChangeType.removed) continue;
+        final data = change.doc.data();
+        if (data == null) continue;
+
+        final docId = change.doc.id;
+        final isOnline = (data['isOnline'] as bool? ?? false) ? 1 : 0;
+
+        for (final user in _allUsers) {
+          if (user.id.toString() == docId) {
+            if (user.isOnline != isOnline) {
+              user.isOnline = isOnline;
+              changed = true;
+            }
+            break; // IDs are unique; no need to scan further
+          }
+        }
+      }
+      if (changed) _applyFilters();
+    }, onError: (e) {
+      debugPrint('UserProvider presence error: $e');
+    });
+  }
+
+  @override
+  void dispose() {
+    _presenceSub?.cancel();
+    super.dispose();
   }
 
   // Selection methods
