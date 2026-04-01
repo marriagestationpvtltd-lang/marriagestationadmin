@@ -733,15 +733,14 @@ class _UsersPageState extends State<UsersPage> {
   }
 
   Widget _actionIconBtn(
-      IconData icon, String label, Color color, VoidCallback onTap) {
+      IconData icon, String title, Color color, VoidCallback onTap) {
     return Tooltip(
-      message: label,
+      message: title,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         child: Container(
-          height: 40,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: color.withOpacity(0.10),
             borderRadius: BorderRadius.circular(10),
@@ -760,7 +759,7 @@ class _UsersPageState extends State<UsersPage> {
               Icon(icon, size: 16, color: color),
               const SizedBox(width: 7),
               Text(
-                label,
+                title,
                 style: TextStyle(
                   fontSize: 12,
                   color: color,
