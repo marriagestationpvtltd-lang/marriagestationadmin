@@ -89,7 +89,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
     final userId = chatProvider.id;
     if (userId != null && userId != _lastFetchedUserId) {
       _lastFetchedUserId = userId;
-      _matchesLoaded = true;
+      setState(() => _matchesLoaded = true);
       final matchProvider =
           Provider.of<MatchedProfileProvider>(context, listen: false);
       matchProvider.clearData();
@@ -721,94 +721,94 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
           );
         }
 
-        // ── Show Match button (not yet loaded) ─────────────────────────
+        // ── If profiles are already available, show them immediately ────
+        // (do NOT gate on _matchesLoaded – the flag may lag behind the data
+        //  when the Consumer rebuilds before a setState propagates)
+        if (provider.ids.isNotEmpty) {
+          final indices = _sortProfiles(_filterProfiles(provider), provider);
+
+          if (indices.isEmpty) {
+            return _buildEmptyState(
+              icon: Icons.search_off,
+              title: 'No results',
+              subtitle: 'Try adjusting your search or filters',
+              showClear: true,
+            );
+          }
+
+          // ── Profile cards ──────────────────────────────────────────
+          return ListView.builder(
+            controller: _scrollController,
+            padding: const EdgeInsets.only(top: 6, bottom: 16),
+            itemCount: indices.length + (provider.hasMore || provider.isLoadingMore ? 1 : 0),
+            cacheExtent: 300,
+            physics: const BouncingScrollPhysics(),
+            itemBuilder: (context, i) {
+              if (i == indices.length) {
+                return _buildPaginationFooter(provider);
+              }
+              final idx        = indices[i];
+              final profileId  = provider.ids[idx];
+              final isPaid     = provider.isPaidList[idx];
+              final isOnline   = provider.isOnlineList[idx];
+              final isShared   = _sharedProfileIds.contains(profileId);
+              final shareCount = _sharedProfilesData[profileId]?['share_count'] ?? 0;
+              final lastShareTs = _lastShareTimestamp[profileId];
+              final pic        = provider.profilePictures.isNotEmpty
+                  ? provider.profilePictures[idx]
+                  : null;
+              final matchPct   = provider.matchingPercentages[idx];
+              final fullName   =
+                  '${provider.firstNames[idx]} ${provider.lastNames[idx]}';
+
+              return _ProfileCard(
+                key: ValueKey(profileId),
+                profileId:      profileId,
+                fullName:       fullName,
+                firstName:      provider.firstNames[idx],
+                lastName:       provider.lastNames[idx],
+                memberid:       provider.memberiddd[idx],
+                occupation:     provider.occupation[idx],
+                age:            provider.age[idx],
+                gender:         provider.gender[idx],
+                matchPct:       matchPct,
+                isPaid:         isPaid,
+                isOnline:       isOnline,
+                isShared:       isShared,
+                shareCount:     shareCount,
+                lastShareTs:    lastShareTs,
+                profilePicture: pic,
+                onShare: () => _sendMessage(
+                  matchPct.toString(),
+                  provider.memberiddd[idx],
+                  provider.gender[idx],
+                  provider.occupation[idx],
+                  provider.education[idx],
+                  provider.marit[idx],
+                  provider.age[idx].toString(),
+                  profileId,
+                  provider.firstNames[idx],
+                  provider.lastNames[idx],
+                  pic,
+                  provider.country[idx],
+                ),
+                timeAgo: _timeAgo,
+              );
+            },
+          );
+        }
+
+        // ── Show Match button (not yet triggered) ──────────────────────
         if (!_matchesLoaded) {
           return _buildShowMatchButton(chatProvider);
         }
 
-        final indices = _sortProfiles(
-            _filterProfiles(provider), provider);
-
-        // ── No results after filter ────────────────────────────────────
-        if (provider.ids.isEmpty) {
-          return _buildEmptyState(
-            icon: Icons.favorite_border,
-            title: 'No matches yet',
-            subtitle: 'No matching profiles found for this user',
-            showRefetch: true,
-          );
-        }
-
-        if (indices.isEmpty) {
-          return _buildEmptyState(
-            icon: Icons.search_off,
-            title: 'No results',
-            subtitle: 'Try adjusting your search or filters',
-            showClear: true,
-          );
-        }
-
-        // ── Profile cards with scroll pagination ──────────────────────
-        return ListView.builder(
-          controller: _scrollController,
-          padding: const EdgeInsets.only(top: 6, bottom: 16),
-          itemCount: indices.length + (provider.hasMore || provider.isLoadingMore ? 1 : 0),
-          cacheExtent: 300,
-          physics: const BouncingScrollPhysics(),
-          itemBuilder: (context, i) {
-            // Pagination footer
-            if (i == indices.length) {
-              return _buildPaginationFooter(provider);
-            }
-
-            final idx       = indices[i];
-            final profileId = provider.ids[idx];
-            final isPaid    = provider.isPaidList[idx];
-            final isOnline  = provider.isOnlineList[idx];
-            final isShared  = _sharedProfileIds.contains(profileId);
-            final shareCount = _sharedProfilesData[profileId]?['share_count'] ?? 0;
-            final lastShareTs = _lastShareTimestamp[profileId];
-            final pic       = provider.profilePictures.isNotEmpty
-                ? provider.profilePictures[idx]
-                : null;
-            final matchPct  = provider.matchingPercentages[idx];
-            final fullName  =
-                '${provider.firstNames[idx]} ${provider.lastNames[idx]}';
-
-            return _ProfileCard(
-              key: ValueKey(profileId),
-              profileId:   profileId,
-              fullName:    fullName,
-              firstName:   provider.firstNames[idx],
-              lastName:    provider.lastNames[idx],
-              memberid:    provider.memberiddd[idx],
-              occupation:  provider.occupation[idx],
-              age:         provider.age[idx],
-              gender:      provider.gender[idx],
-              matchPct:    matchPct,
-              isPaid:      isPaid,
-              isOnline:    isOnline,
-              isShared:    isShared,
-              shareCount:  shareCount,
-              lastShareTs: lastShareTs,
-              profilePicture: pic,
-              onShare: () => _sendMessage(
-                matchPct.toString(),
-                provider.memberiddd[idx],
-                provider.gender[idx],
-                provider.occupation[idx],
-                provider.education[idx],
-                provider.marit[idx],
-                provider.age[idx].toString(),
-                profileId,
-                provider.firstNames[idx],
-                provider.lastNames[idx],
-                pic,
-                provider.country[idx],
-              ),
-              timeAgo: _timeAgo,
-            );
-          },
+        // ── No matches found for this user ────────────────────────────
+        return _buildEmptyState(
+          icon: Icons.favorite_border,
+          title: 'No matches yet',
+          subtitle: 'No matching profiles found for this user',
+          showRefetch: true,
         );
       },
     );
