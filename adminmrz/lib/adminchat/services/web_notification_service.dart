@@ -38,22 +38,24 @@ class WebNotificationService {
 
     _permissionListenerAttached = true;
 
-    Future<void> handleUserGesture([dynamic event]) async {
+    Future<void> _handleUserGestureForPermission([dynamic event]) async {
       if (_permissionRequestFuture != null) return;
       _disposePermissionListeners();
-      final request = requestPermission();
-      _permissionRequestFuture = request;
+      final permissionRequest = requestPermission();
+      _permissionRequestFuture = permissionRequest;
       try {
-        await request;
+        await permissionRequest;
       } finally {
         _permissionRequestFuture = null;
       }
     }
 
-    _permissionClickSubscription = html.document.onClick.listen(handleUserGesture);
-    _permissionKeySubscription = html.document.onKeyDown.listen(handleUserGesture);
+    _permissionClickSubscription =
+        html.document.onClick.listen(_handleUserGestureForPermission);
+    _permissionKeySubscription =
+        html.document.onKeyDown.listen(_handleUserGestureForPermission);
     _permissionTouchSubscription =
-        html.document.onTouchStart.listen(handleUserGesture);
+        html.document.onTouchStart.listen(_handleUserGestureForPermission);
   }
 
   static void _disposePermissionListeners() {
