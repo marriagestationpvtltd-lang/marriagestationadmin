@@ -14,12 +14,26 @@ class UserDetailsProvider with ChangeNotifier {
   bool _isUpdating = false;
   String _updateError = '';
 
+  // Activity stats
+  ActivityStats? _activityStats;
+  bool _isLoadingActivity = false;
+
+  // Photo action
+  bool _isPhotoActioning = false;
+
+  // Notification
+  bool _isSendingNotification = false;
+
   UserDetailsData? get userDetails => _userDetails;
   bool get isLoading => _isLoading;
   String get error => _error;
   int? get userId => _userId;
   bool get isUpdating => _isUpdating;
   String get updateError => _updateError;
+  ActivityStats? get activityStats => _activityStats;
+  bool get isLoadingActivity => _isLoadingActivity;
+  bool get isPhotoActioning => _isPhotoActioning;
+  bool get isSendingNotification => _isSendingNotification;
 
   Future<void> fetchUserDetails(int userId, int myId) async {
     _isLoading = true;
@@ -38,6 +52,23 @@ class UserDetailsProvider with ChangeNotifier {
       _error = e.toString();
     } finally {
       _isLoading = false;
+      notifyListeners();
+    }
+
+    // Also fetch activity stats in parallel
+    fetchActivityStats(userId);
+  }
+
+  /// Fetch user activity stats (requests, chats, views, matches).
+  Future<void> fetchActivityStats(int userId) async {
+    _isLoadingActivity = true;
+    notifyListeners();
+    try {
+      _activityStats = await _userDetailsService.getUserActivity(userId);
+    } catch (_) {
+      _activityStats = ActivityStats.empty();
+    } finally {
+      _isLoadingActivity = false;
       notifyListeners();
     }
   }
@@ -74,11 +105,67 @@ class UserDetailsProvider with ChangeNotifier {
     }
   }
 
+  /// Approve or reject the user's pending profile photo.
+  Future<bool> handleProfilePhotoRequest({
+    required String action,
+    String? reason,
+  }) async {
+    if (_userId == null) return false;
+    _isPhotoActioning = true;
+    notifyListeners();
+    try {
+      final ok = await _userDetailsService.handleProfilePhotoRequest(
+        userId: _userId!,
+        action: action,
+        reason: reason,
+      );
+      if (ok && _userDetails != null) {
+        // Refresh details to reflect new photo status
+        final response = await _userDetailsService.getUserDetails(_userId!, _userId!);
+        if (response.status == 'success') {
+          _userDetails = response.data;
+        }
+      }
+      _isPhotoActioning = false;
+      notifyListeners();
+      return ok;
+    } catch (e) {
+      _isPhotoActioning = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// Send an admin notification directly to the user.
+  Future<bool> sendAdminNotification({
+    required String title,
+    required String message,
+  }) async {
+    if (_userId == null) return false;
+    _isSendingNotification = true;
+    notifyListeners();
+    try {
+      final ok = await _userDetailsService.sendAdminNotification(
+        userId: _userId!,
+        title: title,
+        message: message,
+      );
+      _isSendingNotification = false;
+      notifyListeners();
+      return ok;
+    } catch (e) {
+      _isSendingNotification = false;
+      notifyListeners();
+      return false;
+    }
+  }
+
   void clearData() {
     _userDetails = null;
     _error = '';
     _userId = null;
     _updateError = '';
+    _activityStats = null;
     notifyListeners();
   }
 }
