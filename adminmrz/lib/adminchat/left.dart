@@ -487,13 +487,16 @@ class _ChatSidebarState extends State<ChatSidebar> {
     final String displayMessage =
         message.isEmpty ? '📷 Photo' : message;
 
-    // Always play sound (foreground + background).
-    WebNotificationService.playMessageSound();
+    // Play sound only when the browser tab is in the background.
+    if (WebNotificationService.isAppInBackground()) {
+      WebNotificationService.playMessageSound();
+    }
 
-    // Only show the popup notification when the tab is not visible.
+    // Show the popup notification only when the tab is not visible.
     WebNotificationService.showMessageNotification(
       senderName: senderName,
       message: displayMessage,
+      userId: senderIdStr,
     );
   }
   void _applyFilters() {
