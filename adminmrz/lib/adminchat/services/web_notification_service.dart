@@ -49,11 +49,11 @@ class WebNotificationService {
 
     _disposePermissionListeners();
 
-    final gestureCompleter = Completer<void>();
+    final permissionGestureCompleter = Completer<void>();
 
     void handleGesture([dynamic _]) {
-      if (gestureCompleter.isCompleted) return;
-      gestureCompleter.complete();
+      if (permissionGestureCompleter.isCompleted) return;
+      permissionGestureCompleter.complete();
       _disposePermissionListeners();
     }
 
@@ -64,9 +64,19 @@ class WebNotificationService {
     _permissionTouchSubscription =
         html.document.onTouchStart.listen(handleGesture);
 
-    _permissionRequestFuture = gestureCompleter.future
+    _permissionRequestFuture = permissionGestureCompleter.future
         .then((_) => requestPermission())
         .catchError((error, stackTrace) {
+          FlutterError.reportError(
+            FlutterErrorDetails(
+              exception: error,
+              stack: stackTrace,
+              library: 'WebNotificationService',
+              context: ErrorDescription(
+                'requesting browser notification permission',
+              ),
+            ),
+          );
           debugPrint(
             'Notification permission request failed: $error '
             '(state: ${html.Notification.permission})\n$stackTrace',
