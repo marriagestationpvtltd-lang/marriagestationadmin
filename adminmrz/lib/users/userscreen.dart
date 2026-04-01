@@ -15,6 +15,8 @@ const _kEmerald = Color(0xFF10B981);
 const _kAmber = Color(0xFFF59E0B);
 const _kRose = Color(0xFFEF4444);
 const _kSky = Color(0xFF0EA5E9);
+const _kActionTextDarkenFactor = 0.25;
+const _kActionButtonMinWidth = 118.0;
 
 class UsersPage extends StatefulWidget {
   /// Called when admin taps "Direct Chat" on a member card.
@@ -734,17 +736,16 @@ class _UsersPageState extends State<UsersPage> {
 
   Widget _actionIconBtn(
       IconData icon, String title, Color color, VoidCallback onTap) {
-    const double textDarkenFactor = 0.25;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final Color textColor =
-        isDark ? Colors.white : Color.lerp(color, Colors.black, textDarkenFactor)!;
+        isDark ? Colors.white : Color.lerp(color, Colors.black, _kActionTextDarkenFactor)!;
     return Tooltip(
       message: title,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(10),
         child: Container(
-          constraints: const BoxConstraints(minWidth: 118),
+          constraints: const BoxConstraints(minWidth: _kActionButtonMinWidth),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: color.withOpacity(0.10),
