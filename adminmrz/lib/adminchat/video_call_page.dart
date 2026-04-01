@@ -222,6 +222,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       // Enable audio and video
       await _engine.enableAudio();
       await _engine.enableVideo();
+      await _engine.setVideoEncoderConfiguration(
+        VideoEncoderConfiguration(
+          dimensions: VideoDimensions(width: 1280, height: 720),
+        ),
+      );
 
       // Start preview – triggers camera permission prompt
       await _engine.startPreview();
@@ -615,10 +620,10 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
               alignment: Alignment.center,
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: const [
-                  Icon(Icons.videocam, color: Colors.white54, size: 36),
-                  SizedBox(height: 8),
-                  Text(
+                children: [
+                  const Icon(Icons.videocam, color: Colors.white54, size: 36),
+                  const SizedBox(height: 8),
+                  const Text(
                     'Camera starting…',
                     style: TextStyle(color: Colors.white70, fontSize: 12),
                   ),
