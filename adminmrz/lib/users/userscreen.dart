@@ -927,72 +927,59 @@ class _UsersPageState extends State<UsersPage> {
   Widget _buildFilterRow(UserProvider provider) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF0B1222) : Colors.white,
-        borderRadius: BorderRadius.circular(14),
+        color: isDark ? Colors.white.withOpacity(0.06) : Colors.white.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: isDark ? Colors.white.withOpacity(0.05) : Colors.grey.shade200,
+          color: Colors.white.withOpacity(isDark ? 0.14 : 0.18),
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 10),
-          )
-        ],
       ),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        child: Row(
-          children: [
-            _selectAllChip(provider),
-            const SizedBox(width: 10),
-            Container(width: 1, height: 22, color: isDark ? Colors.white.withOpacity(0.15) : Colors.grey.shade300),
-            const SizedBox(width: 10),
-            ...[
-              ('all', 'All'),
-              ('approved', 'Approved'),
-              ('pending', 'Pending'),
-              ('rejected', 'Rejected'),
-              ('not_uploaded', 'Not Uploaded'),
-            ].expand((e) {
-                  final (key, label) = e;
-                  return [
-                    _filterChip(
-                      label,
-                      provider.statusFilter == key,
-                      _statusColor(key),
-                      () => provider.setStatusFilter(key),
-                    ),
-                    const SizedBox(width: 6),
-                  ];
-                }),
-            Container(width: 1, height: 22, color: isDark ? Colors.white.withOpacity(0.15) : Colors.grey.shade300),
-            const SizedBox(width: 6),
-            ...[
-              ('all', 'All Plans'),
-              ('paid', 'Paid'),
-              ('free', 'Free'),
-            ].expand((e) {
-                  final (key, label) = e;
-                  return [
-                    _filterChip(
-                      label,
-                      provider.userTypeFilter == key,
-                      _planColor(key),
-                      () => provider.setUserTypeFilter(key),
-                    ),
-                    const SizedBox(width: 6),
-                  ];
-                }),
-            if (provider.statusFilter != 'all' ||
-                provider.userTypeFilter != 'all')
-              _filterChip('✕ Clear', true, _kRose, provider.clearFilters),
-          ],
-        ),
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 8,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          _selectAllChip(provider),
+          _filterDivider(isDark),
+          ...[
+            ('all', 'All'),
+            ('approved', 'Approved'),
+            ('pending', 'Pending'),
+            ('rejected', 'Rejected'),
+            ('not_uploaded', 'Not Uploaded'),
+          ].expand((e) {
+            final (key, label) = e;
+            return [
+              _filterChip(
+                label,
+                provider.statusFilter == key,
+                _statusColor(key),
+                () => provider.setStatusFilter(key),
+              ),
+            ];
+          }),
+          _filterDivider(isDark),
+          ...[
+            ('all', 'All Plans'),
+            ('paid', 'Paid'),
+            ('free', 'Free'),
+          ].expand((e) {
+            final (key, label) = e;
+            return [
+              _filterChip(
+                label,
+                provider.userTypeFilter == key,
+                _planColor(key),
+                () => provider.setUserTypeFilter(key),
+              ),
+            ];
+          }),
+          if (provider.statusFilter != 'all' ||
+              provider.userTypeFilter != 'all')
+            _filterChip('✕ Clear', true, _kRose, provider.clearFilters),
+        ],
       ),
     );
   }
@@ -1021,6 +1008,15 @@ class _UsersPageState extends State<UsersPage> {
       default:
         return _kPrimaryDark;
     }
+  }
+
+  Widget _filterDivider(bool isDark) {
+    return Container(
+      width: 1,
+      height: 18,
+      margin: const EdgeInsets.symmetric(horizontal: 2),
+      color: isDark ? Colors.white.withOpacity(0.16) : Colors.white.withOpacity(0.26),
+    );
   }
 
   Widget _selectAllChip(UserProvider provider) {
@@ -1070,7 +1066,7 @@ class _UsersPageState extends State<UsersPage> {
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           color: selected ? color.withOpacity(0.14) : (isDark ? const Color(0xFF263248) : Colors.grey.shade100),
           borderRadius: BorderRadius.circular(20),
@@ -1202,132 +1198,129 @@ class _UsersPageState extends State<UsersPage> {
 
   Widget _buildTopSection(UserProvider provider) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    return Column(
-      children: [
-        Container(
-          margin: const EdgeInsets.fromLTRB(12, 12, 12, 8),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [_kPrimaryDark, _kViolet],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(18),
-            boxShadow: [
-              BoxShadow(
-                color: _kPrimary.withOpacity(0.25),
-                blurRadius: 22,
-                offset: const Offset(0, 10),
-              ),
-            ],
+    return Container(
+      margin: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [_kPrimaryDark, _kViolet],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(18),
+        boxShadow: [
+          BoxShadow(
+            color: _kPrimary.withOpacity(0.25),
+            blurRadius: 22,
+            offset: const Offset(0, 10),
           ),
-          child: Column(
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text(
-                          'Member Directory',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                        SizedBox(height: 4),
-                        Text(
-                          'Search, filter and action on members in one place.',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Tooltip(
-                    message: 'Refresh',
-                    child: InkWell(
-                      onTap: () => provider.fetchUsers(),
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        padding: const EdgeInsets.all(10),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.12),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.18),
-                          ),
-                        ),
-                        child: const Icon(Icons.refresh_rounded,
-                            size: 18, color: Colors.white),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: const [
+                    Text(
+                      'Member Directory',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.2,
                       ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: Colors.white.withOpacity(0.18)),
-                ),
-                child: TextField(
-                  controller: _searchController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: InputDecoration(
-                    hintText: 'Search by name, email, phone or ID…',
-                    hintStyle: TextStyle(
-                      fontSize: 13,
-                      color: Colors.white.withOpacity(0.7),
+                    SizedBox(height: 4),
+                    Text(
+                      'Search, filter and action on members in one place.',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                      ),
                     ),
-                    prefixIcon: Icon(Icons.search_rounded,
-                        color: Colors.white.withOpacity(0.8), size: 18),
-                    border: InputBorder.none,
-                    contentPadding:
-                        const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
-                    suffixIcon: _searchController.text.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(Icons.clear_rounded,
-                                size: 16, color: Colors.white),
-                            onPressed: () {
-                              _searchController.clear();
-                              provider.setSearchQuery('');
-                            },
-                          )
-                        : null,
-                  ),
-                  onChanged: (v) => provider.setSearchQuery(v),
-                ),
-              ),
-              const SizedBox(height: 12),
-              SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                child: Row(
-                  children: [
-                    _statPill('Total', provider.totalCount, Colors.white),
-                    const SizedBox(width: 6),
-                    _statPill('Shown', provider.filteredCount, _kEmerald),
-                    if (provider.selectedCount > 0) ...[
-                      const SizedBox(width: 6),
-                      _statPill('Selected', provider.selectedCount, _kAmber),
-                    ],
                   ],
                 ),
               ),
+              Tooltip(
+                message: 'Refresh',
+                child: InkWell(
+                  onTap: () => provider.fetchUsers(),
+                  borderRadius: BorderRadius.circular(12),
+                  child: Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.white.withOpacity(0.18),
+                      ),
+                    ),
+                    child: const Icon(Icons.refresh_rounded,
+                        size: 18, color: Colors.white),
+                  ),
+                ),
+              ),
             ],
           ),
-        ),
-        _buildFilterRow(provider),
-      ],
+          const SizedBox(height: 12),
+          Container(
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white.withOpacity(0.18)),
+            ),
+            child: TextField(
+              controller: _searchController,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Search by name, email, phone or ID…',
+                hintStyle: TextStyle(
+                  fontSize: 13,
+                  color: Colors.white.withOpacity(0.7),
+                ),
+                prefixIcon: Icon(Icons.search_rounded,
+                    color: Colors.white.withOpacity(0.8), size: 18),
+                border: InputBorder.none,
+                contentPadding:
+                    const EdgeInsets.symmetric(vertical: 12, horizontal: 14),
+                suffixIcon: _searchController.text.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear_rounded,
+                            size: 16, color: Colors.white),
+                        onPressed: () {
+                          _searchController.clear();
+                          provider.setSearchQuery('');
+                        },
+                      )
+                    : null,
+              ),
+              onChanged: (v) => provider.setSearchQuery(v),
+            ),
+          ),
+          const SizedBox(height: 12),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _statPill('Total', provider.totalCount, Colors.white),
+                const SizedBox(width: 6),
+                _statPill('Shown', provider.filteredCount, _kEmerald),
+                if (provider.selectedCount > 0) ...[
+                  const SizedBox(width: 6),
+                  _statPill('Selected', provider.selectedCount, _kAmber),
+                ],
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          _buildFilterRow(provider),
+        ],
+      ),
     );
   }
 
