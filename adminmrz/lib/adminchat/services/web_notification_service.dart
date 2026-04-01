@@ -38,24 +38,27 @@ class WebNotificationService {
 
     _permissionListenerAttached = true;
 
-    Future<void> _handleUserGestureForPermission([dynamic event]) async {
+    Future<void> handleUserGestureForPermission([dynamic event]) async {
       if (_permissionRequestFuture != null) return;
+      final completer = Completer<void>();
+      _permissionRequestFuture = completer.future;
       _disposePermissionListeners();
-      final permissionRequest = requestPermission();
-      _permissionRequestFuture = permissionRequest;
       try {
-        await permissionRequest;
+        await requestPermission();
       } finally {
+        if (!completer.isCompleted) {
+          completer.complete();
+        }
         _permissionRequestFuture = null;
       }
     }
 
     _permissionClickSubscription =
-        html.document.onClick.listen(_handleUserGestureForPermission);
+        html.document.onClick.listen(handleUserGestureForPermission);
     _permissionKeySubscription =
-        html.document.onKeyDown.listen(_handleUserGestureForPermission);
+        html.document.onKeyDown.listen(handleUserGestureForPermission);
     _permissionTouchSubscription =
-        html.document.onTouchStart.listen(_handleUserGestureForPermission);
+        html.document.onTouchStart.listen(handleUserGestureForPermission);
   }
 
   static void _disposePermissionListeners() {
@@ -100,10 +103,11 @@ class WebNotificationService {
     bool showInForeground = false,
   }) {
     if (!html.Notification.supported) return;
-    if (html.Notification.permission != 'granted') {
+    if (html.Notification.permission == 'default') {
       ensurePermissionOnUserGesture();
       return;
     }
+    if (html.Notification.permission != 'granted') return;
     if (!showInForeground && !isAppInBackground()) return;
 
     final notification = html.Notification(
