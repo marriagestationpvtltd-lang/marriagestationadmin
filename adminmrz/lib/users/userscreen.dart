@@ -734,9 +734,10 @@ class _UsersPageState extends State<UsersPage> {
 
   Widget _actionIconBtn(
       IconData icon, String title, Color color, VoidCallback onTap) {
+    const double _textDarkenFactor = 0.25;
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final Color textColor =
-        isDark ? Colors.white : Color.lerp(color, Colors.black, 0.25)!;
+        isDark ? Colors.white : Color.lerp(color, Colors.black, _textDarkenFactor)!;
     return Tooltip(
       message: title,
       child: InkWell(
