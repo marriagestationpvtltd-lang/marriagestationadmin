@@ -20,11 +20,13 @@ const _kPageBg    = Color(0xFFF1F5F9);
 class UserDetailsScreen extends StatefulWidget {
   final int userId;
   final int myId;
+  final void Function(int userId)? onOpenChat;
 
   const UserDetailsScreen({
     super.key,
     required this.userId,
     required this.myId,
+    this.onOpenChat,
   });
 
   @override
@@ -35,6 +37,8 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
   String? _editingKey;
   final TextEditingController _editCtrl = TextEditingController();
   final TextEditingController _rejectDocCtrl = TextEditingController();
+  final TextEditingController _notifTitleCtrl = TextEditingController();
+  final TextEditingController _notifBodyCtrl = TextEditingController();
   bool _isSaving = false;
 
   @override
@@ -57,6 +61,8 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
     context.read<UserDetailsProvider>().clearData();
     _editCtrl.dispose();
     _rejectDocCtrl.dispose();
+    _notifTitleCtrl.dispose();
+    _notifBodyCtrl.dispose();
     super.dispose();
   }
 
@@ -105,6 +111,106 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           margin: const EdgeInsets.all(16),
           duration: const Duration(seconds: 3),
+        ),
+      );
+    }
+  }
+
+  Future<void> _handlePhotoAction(String action) async {
+    final prov = context.read<UserDetailsProvider>();
+    String? reason;
+    if (action == 'reject') {
+      _rejectDocCtrl.clear();
+      final res = await showDialog<String>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: const Text('Reject Profile Photo'),
+          content: TextField(
+            controller: _rejectDocCtrl,
+            maxLines: 3,
+            decoration: const InputDecoration(
+              hintText: 'Reason (optional)',
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, _rejectDocCtrl.text.trim()),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFEF4444)),
+              child: const Text('Reject'),
+            ),
+          ],
+        ),
+      );
+      if (res == null) return;
+      reason = res;
+    }
+
+    final ok = await prov.handleProfilePhotoRequest(action: action, reason: reason);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ok ? 'Photo ${action == 'approve' ? 'approved' : 'rejected'}' : 'Action failed'),
+          backgroundColor: ok
+              ? (action == 'approve' ? const Color(0xFF10B981) : const Color(0xFFEF4444))
+              : Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        ),
+      );
+    }
+  }
+
+  Future<void> _showSendNotificationDialog() async {
+    _notifTitleCtrl.clear();
+    _notifBodyCtrl.clear();
+    final prov = context.read<UserDetailsProvider>();
+    final res = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Send Notification'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _notifTitleCtrl,
+              decoration: const InputDecoration(labelText: 'Title'),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _notifBodyCtrl,
+              maxLines: 3,
+              decoration: const InputDecoration(labelText: 'Message'),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: _kPrimary),
+            child: const Text('Send'),
+          ),
+        ],
+      ),
+    );
+    if (res != true) return;
+    final ok = await prov.sendAdminNotification(
+      title: _notifTitleCtrl.text.trim().isEmpty ? 'Admin Message' : _notifTitleCtrl.text.trim(),
+      message: _notifBodyCtrl.text.trim(),
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ok ? 'Notification sent' : 'Failed to send notification'),
+          backgroundColor: ok ? _kPrimary : Colors.red.shade700,
+          behavior: SnackBarBehavior.floating,
+          margin: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
         ),
       );
     }
@@ -317,6 +423,173 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
             child: Column(children: rows),
           ),
           const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
+  Widget _activityStatCard(String label, String value, Color color, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withOpacity(0.25)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.18),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, size: 16, color: color),
+          ),
+          const SizedBox(width: 10),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label,
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 2),
+              Text(value,
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityStats(UserDetailsProvider prov) {
+    final stats = prov.activityStats;
+    if (prov.isLoadingActivity && stats == null) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    final s = stats ?? ActivityStats.empty();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: [
+              const Text('User Activity',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: _kPrimary)),
+              if (prov.isLoadingActivity) ...[
+                const SizedBox(width: 8),
+                const SizedBox(
+                  height: 14,
+                  width: 14,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ]
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _activityStatCard('Requests Sent', '${s.requestsSent}', _kPrimary, Icons.send_rounded),
+              _activityStatCard('Requests Received', '${s.requestsReceived}', const Color(0xFF8B5CF6), Icons.inbox_outlined),
+              _activityStatCard('Chat Sent', '${s.chatRequestsSent}', const Color(0xFF0EA5E9), Icons.chat_bubble_outline),
+              _activityStatCard('Chat Accepted', '${s.chatRequestsAccepted}', const Color(0xFF10B981), Icons.check_circle_outline),
+              _activityStatCard('Profile Views', '${s.profileViews}', const Color(0xFFF59E0B), Icons.visibility_outlined),
+              _activityStatCard('Matches', '${s.matchesCount}', const Color(0xFFDB2777), Icons.favorite_outline),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+
+  Widget _buildAdminActions(PersonalDetail p, UserDetailsProvider prov) {
+    final hasPendingPhoto =
+        p.photoRequest.isNotEmpty && p.photoRequest.toLowerCase() != 'approved';
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text('Admin Actions',
+                  style: TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w700, color: Colors.grey.shade800)),
+              const SizedBox(width: 8),
+              if (prov.isSendingNotification || prov.isPhotoActioning)
+                const SizedBox(
+                  height: 16,
+                  width: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              ElevatedButton.icon(
+                icon: const Icon(Icons.notifications_active_outlined, size: 16),
+                label: const Text('Send Notification'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _kPrimary,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                ),
+                onPressed: prov.isSendingNotification ? null : _showSendNotificationDialog,
+              ),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.chat_bubble_outline, size: 16),
+                label: const Text('Open Chat'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: _kPrimary,
+                  side: const BorderSide(color: _kPrimary),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                ),
+                onPressed: widget.onOpenChat != null
+                    ? () => widget.onOpenChat!(widget.userId)
+                    : null,
+              ),
+              if (hasPendingPhoto)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    ElevatedButton.icon(
+                      icon: const Icon(Icons.verified_outlined, size: 16),
+                      label: const Text('Approve Photo'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF10B981),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      ),
+                      onPressed: prov.isPhotoActioning ? null : () => _handlePhotoAction('approve'),
+                    ),
+                    const SizedBox(width: 8),
+                    OutlinedButton.icon(
+                      icon: const Icon(Icons.cancel_outlined, size: 16),
+                      label: const Text('Reject'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFEF4444),
+                        side: const BorderSide(color: Color(0xFFEF4444)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      ),
+                      onPressed: prov.isPhotoActioning ? null : () => _handlePhotoAction('reject'),
+                    ),
+                  ],
+                ),
+            ],
+          ),
         ],
       ),
     );
@@ -1174,7 +1447,7 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
 
   // ── build ────────────────────────────────────────────────────────────────────
 
-  Widget _buildBody(UserDetailsData data) {
+  Widget _buildBody(UserDetailsProvider provider, UserDetailsData data) {
     final p = data.personalDetail;
     return SingleChildScrollView(
       child: Center(
@@ -1196,6 +1469,8 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
             child: Column(
               children: [
                 _buildHeader(p),
+                _buildAdminActions(p, provider),
+                _buildActivityStats(provider),
                 const Divider(height: 1, thickness: 1),
                 _buildPersonal(p),
                 const Divider(height: 1, thickness: 1),
@@ -1248,7 +1523,7 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
           : provider.error.isNotEmpty
               ? _buildError(provider)
               : provider.userDetails != null
-                  ? _buildBody(provider.userDetails!)
+                  ? _buildBody(provider, provider.userDetails!)
                   : Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,

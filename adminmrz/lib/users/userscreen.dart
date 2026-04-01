@@ -42,7 +42,11 @@ class _UsersPageState extends State<UsersPage> {
       MaterialPageRoute(
         builder: (context) => ChangeNotifierProvider(
           create: (context) => UserDetailsProvider(),
-          child: UserDetailsScreen(userId: user.id, myId: user.id),
+          child: UserDetailsScreen(
+            userId: user.id,
+            myId: user.id,
+            onOpenChat: widget.onOpenChat,
+          ),
         ),
       ),
     );
