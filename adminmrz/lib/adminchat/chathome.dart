@@ -26,6 +26,7 @@ import 'left.dart';
 import 'dart:html' as html;
 import 'dart:js' as js;
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/services.dart';
 
 class ChatWindow extends StatefulWidget {
   final String name;
@@ -2077,37 +2078,41 @@ class _ChatWindowState extends State<ChatWindow> {
               ),
               const SizedBox(width: 6),
               Expanded(
-                child: TextField(
-                  controller: _messageController,
+                child: RawKeyboardListener(
                   focusNode: _messageFocusNode,
-                  textInputAction: TextInputAction.newline,
-                  minLines: 1,
-                  maxLines: 6,
-                  onChanged: (text) {
-                    if (chatProvider.id != null) {
-                      _updateAdminTypingStatus(text, chatProvider.id.toString());
-                    }
-                  },
-                  style: TextStyle(color: colors.text, fontSize: 14),
-                  decoration: InputDecoration(
-                    hintText: _selectedLanguage == 'ne-NP'
-                        ? "सन्देश टाइप गर्नुहोस्"
-                        : "Type a message",
-                    hintStyle: TextStyle(color: colors.muted, fontSize: 14),
-                    filled: true,
-                    fillColor: colors.searchFill,
-                    contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: colors.border, width: 1),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: kPrimary, width: 1.5),
-                    ),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: BorderSide(color: colors.border, width: 1),
+                  onKey: _handleMessageKeyEvent,
+                  child: TextField(
+                    controller: _messageController,
+                    focusNode: _messageFocusNode,
+                    textInputAction: TextInputAction.newline,
+                    minLines: 1,
+                    maxLines: 6,
+                    onChanged: (text) {
+                      if (chatProvider.id != null) {
+                        _updateAdminTypingStatus(text, chatProvider.id.toString());
+                      }
+                    },
+                    style: TextStyle(color: colors.text, fontSize: 14),
+                    decoration: InputDecoration(
+                      hintText: _selectedLanguage == 'ne-NP'
+                          ? "सन्देश टाइप गर्नुहोस्"
+                          : "Type a message",
+                      hintStyle: TextStyle(color: colors.muted, fontSize: 14),
+                      filled: true,
+                      fillColor: colors.searchFill,
+                      contentPadding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: colors.border, width: 1),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: kPrimary, width: 1.5),
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: colors.border, width: 1),
+                      ),
                     ),
                   ),
                 ),
@@ -2226,6 +2231,28 @@ class _ChatWindowState extends State<ChatWindow> {
             .showSnackBar(SnackBar(content: Text("Failed to send image: $e")));
       }
     }
+  }
+
+  KeyEventResult _handleMessageKeyEvent(RawKeyEvent event) {
+    if (event is RawKeyDownEvent &&
+        (event.logicalKey == LogicalKeyboardKey.enter ||
+            event.logicalKey == LogicalKeyboardKey.numpadEnter)) {
+      final bool hasModifier = event.isShiftPressed ||
+          event.isControlPressed ||
+          event.isAltPressed ||
+          event.isMetaPressed;
+      final int lineCount = _estimateLineCount(_messageController.text);
+      if (!hasModifier && lineCount <= 2 && _messageController.text.trim().isNotEmpty) {
+        _sendMessage();
+        return KeyEventResult.handled;
+      }
+    }
+    return KeyEventResult.ignored;
+  }
+
+  int _estimateLineCount(String text) {
+    if (text.isEmpty) return 1;
+    return text.split('\n').length;
   }
 
   Future<void> _sendMessage() async {
