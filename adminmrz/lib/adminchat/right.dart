@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'chat_theme.dart';
 import 'chatprovider.dart';
 import 'dart:html' as html;
+import 'dart:math' as math;
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Static design tokens (same in both modes)
@@ -171,10 +172,32 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
   String _toggleFilter(String current, String target) =>
       current == target ? 'All' : target;
 
+  int _safeProfileLength(MatchedProfileProvider p) {
+    final lengths = <int>[
+      p.ids.length,
+      p.isPaidList.length,
+      p.isOnlineList.length,
+      p.firstNames.length,
+      p.lastNames.length,
+      p.memberiddd.length,
+      p.occupation.length,
+      p.matchingPercentages.length,
+      p.age.length,
+      p.gender.length,
+      p.profilePictures.length,
+      p.education.length,
+      p.marit.length,
+      p.country.length,
+    ];
+    return lengths.reduce(math.min);
+  }
+
   // ─────────────────────────────────────────────────────────────────────────
   List<int> _filterProfiles(MatchedProfileProvider p) {
     final List<int> out = [];
-    for (int i = 0; i < p.ids.length; i++) {
+    final safeLen = _safeProfileLength(p);
+    if (safeLen == 0) return out;
+    for (int i = 0; i < safeLen; i++) {
       if (_memberStatus == "Paid"   && !p.isPaidList[i])  continue;
       if (_memberStatus == "Free"   &&  p.isPaidList[i])  continue;
       if (_onlineStatus == "Online" && !p.isOnlineList[i]) continue;
@@ -193,7 +216,9 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
   }
 
   List<int> _sortProfiles(List<int> indices, MatchedProfileProvider p) {
-    final sorted = List<int>.from(indices);
+    final safeLen = _safeProfileLength(p);
+    if (safeLen == 0) return const [];
+    final sorted = indices.where((i) => i >= 0 && i < safeLen).toList();
     switch (_sortBy) {
       case "Match %":
         sorted.sort((a, b) =>
@@ -727,6 +752,15 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
         // (do NOT gate on _matchesLoaded – the flag may lag behind the data
         //  when the Consumer rebuilds before a setState propagates)
         if (provider.ids.isNotEmpty) {
+          final safeLen = _safeProfileLength(provider);
+          if (safeLen == 0) {
+            return _buildEmptyState(
+              icon: Icons.favorite_border,
+              title: 'No matches yet',
+              subtitle: 'No matching profiles found for this user',
+              showRefetch: true,
+            );
+          }
           final indices = _sortProfiles(_filterProfiles(provider), provider);
 
           if (indices.isEmpty) {
@@ -750,6 +784,9 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
                 return _buildPaginationFooter(provider);
               }
               final idx        = indices[i];
+              if (idx < 0 || idx >= safeLen) {
+                return const SizedBox.shrink();
+              }
               final profileId  = provider.ids[idx];
               final isPaid     = provider.isPaidList[idx];
               final isOnline   = provider.isOnlineList[idx];
