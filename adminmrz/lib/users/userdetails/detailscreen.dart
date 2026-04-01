@@ -513,8 +513,10 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
   }
 
   Widget _buildAdminActions(PersonalDetail p, UserDetailsProvider prov) {
-    final hasPendingPhoto =
-        p.photoRequest.isNotEmpty && p.photoRequest.toLowerCase() != 'approved';
+    final photoState = p.photoRequest.toLowerCase();
+    final hasPendingPhoto = photoState.contains('pending') ||
+        photoState.contains('request') ||
+        (photoState.isNotEmpty && photoState != 'approved');
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
       child: Column(
