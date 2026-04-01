@@ -72,4 +72,93 @@ class UserDetailsService {
       return false;
     }
   }
+
+  /// Fetch user activity stats (requests sent/received, chat requests, etc.)
+  Future<ActivityStats> getUserActivity(int userId) async {
+    try {
+      final token = await _getToken();
+      final response = await http.get(
+        Uri.parse('$_adminBaseUrl/get_user_activity.php?userid=$userId'),
+        headers: {
+          'Accept': 'application/json',
+          if (token != null) 'Authorization': token,
+        },
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final payload = data['data'] ?? data;
+        return ActivityStats.fromJson(payload is Map<String, dynamic> ? payload : {});
+      }
+      return ActivityStats.empty();
+    } catch (e) {
+      debugPrint('getUserActivity error: $e');
+      return ActivityStats.empty();
+    }
+  }
+
+  /// Approve or reject a user's pending profile photo.
+  /// [action] – 'approve' or 'reject'
+  /// [reason] – optional rejection reason
+  Future<bool> handleProfilePhotoRequest({
+    required int userId,
+    required String action,
+    String? reason,
+  }) async {
+    try {
+      final token = await _getToken();
+      final response = await http.post(
+        Uri.parse('$_adminBaseUrl/approve_profile_photo.php'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          if (token != null) 'Authorization': token,
+        },
+        body: json.encode({
+          'userid': userId,
+          'action': action,
+          if (reason != null && reason.isNotEmpty) 'reason': reason,
+        }),
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['success'] == true || data['status'] == 'success';
+      }
+      return false;
+    } catch (e) {
+      debugPrint('handleProfilePhotoRequest error: $e');
+      return false;
+    }
+  }
+
+  /// Send an admin notification directly to a user.
+  Future<bool> sendAdminNotification({
+    required int userId,
+    required String title,
+    required String message,
+  }) async {
+    try {
+      final token = await _getToken();
+      final response = await http.post(
+        Uri.parse('$_adminBaseUrl/send_admin_notification.php'),
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          if (token != null) 'Authorization': token,
+        },
+        body: json.encode({
+          'userid': userId,
+          'title': title,
+          'message': message,
+        }),
+      );
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['success'] == true || data['status'] == 'success';
+      }
+      return false;
+    } catch (e) {
+      debugPrint('sendAdminNotification error: $e');
+      return false;
+    }
+  }
 }

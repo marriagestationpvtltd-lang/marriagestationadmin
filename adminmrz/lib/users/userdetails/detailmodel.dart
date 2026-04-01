@@ -344,3 +344,44 @@ class PartnerPreference {
   String get ageRange => '$minAge - $maxAge years';
   String get weightRange => '$minWeight - $maxWeight lbs';
 }
+
+// ─────────────────────── Activity Stats ───────────────────────────────────────
+
+class ActivityStats {
+  final int requestsSent;
+  final int requestsReceived;
+  final int chatRequestsSent;
+  final int chatRequestsAccepted;
+  final int profileViews;
+  final int matchesCount;
+
+  ActivityStats({
+    required this.requestsSent,
+    required this.requestsReceived,
+    required this.chatRequestsSent,
+    required this.chatRequestsAccepted,
+    required this.profileViews,
+    required this.matchesCount,
+  });
+
+  factory ActivityStats.fromJson(Map<String, dynamic> json) {
+    int _parse(dynamic v) => v is int ? v : int.tryParse(v?.toString() ?? '0') ?? 0;
+    return ActivityStats(
+      requestsSent: _parse(json['requests_sent']),
+      requestsReceived: _parse(json['requests_received']),
+      chatRequestsSent: _parse(json['chat_requests_sent']),
+      chatRequestsAccepted: _parse(json['chat_requests_accepted']),
+      profileViews: _parse(json['profile_views']),
+      matchesCount: _parse(json['matches_count']),
+    );
+  }
+
+  factory ActivityStats.empty() => ActivityStats(
+        requestsSent: 0,
+        requestsReceived: 0,
+        chatRequestsSent: 0,
+        chatRequestsAccepted: 0,
+        profileViews: 0,
+        matchesCount: 0,
+      );
+}
