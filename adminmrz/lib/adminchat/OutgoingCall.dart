@@ -9,6 +9,9 @@ import 'package:audioplayers/audioplayers.dart';
 import 'package:provider/provider.dart';
 import 'tokengenerator.dart';
 
+// Call state progression: calling → ringing → connected
+enum _CallStatus { calling, ringing, connected }
+
 class CallScreen extends StatefulWidget {
   final String currentUserId;
   final String currentUserName;
@@ -37,7 +40,8 @@ class CallScreen extends StatefulWidget {
   State<CallScreen> createState() => _CallScreenState();
 }
 
-class _CallScreenState extends State<CallScreen> {
+class _CallScreenState extends State<CallScreen>
+    with TickerProviderStateMixin {
   late RtcEngine _engine;
 
   int _localUid = 0;
@@ -50,23 +54,44 @@ class _CallScreenState extends State<CallScreen> {
   bool _micMuted = false;
   bool _speakerOn = true;
   bool _ending = false;
-  bool _isCallRinging = true;
+
+  _CallStatus _callStatus = _CallStatus.calling;
 
   Timer? _timeoutTimer;
   Timer? _callTimer;
   Duration _duration = Duration.zero;
 
   late AudioPlayer _ringtonePlayer;
-  bool _isPlayingRingtone = false;
   Timer? _ringtoneRepeatTimer;
 
   StreamSubscription<DocumentSnapshot>? _callSignalSubscription;
+
+  // Animation controllers
+  late AnimationController _pulseController;
+  late AnimationController _signalController;
+  late Animation<double> _pulseAnimation;
 
   // ================= INIT =================
   @override
   void initState() {
     super.initState();
     _ringtonePlayer = AudioPlayer();
+
+    // Pulsing avatar scale animation (when calling/ringing)
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1200),
+    )..repeat(reverse: true);
+    _pulseAnimation = Tween<double>(begin: 0.85, end: 1.0).animate(
+      CurvedAnimation(parent: _pulseController, curve: Curves.easeInOut),
+    );
+
+    // Signal bars cycling animation (when calling/ringing)
+    _signalController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat();
+
     _setupAudio();
     _startCall();
   }
@@ -76,8 +101,7 @@ class _CallScreenState extends State<CallScreen> {
     _ringtonePlayer.setReleaseMode(ReleaseMode.stop);
     _ringtonePlayer.onPlayerStateChanged.listen((state) {
       if (!mounted) return;
-      setState(() => _isPlayingRingtone = state == PlayerState.playing);
-      // When the tone finishes, schedule the next repeat
+      // Only schedule repeat — no setState here to avoid layout shifts
       if (state == PlayerState.completed && widget.isOutgoingCall && !_ending) {
         _scheduleRepeat();
       }
@@ -115,22 +139,20 @@ class _CallScreenState extends State<CallScreen> {
         AssetSource(settings.selectedTone.asset),
         volume: 1.0,
       );
-    } catch (e) {
-    }
+    } catch (_) {}
   }
 
   Future<void> _stopRingtone() async {
     try {
       _ringtoneRepeatTimer?.cancel();
       await _ringtonePlayer.stop();
-      if (mounted) setState(() => _isPlayingRingtone = false);
-    } catch (e) {
-    }
+    } catch (_) {}
   }
 
   // ================= START CALL =================
   Future<void> _startCall() async {
     try {
+      // Phase 1 – "Calling..." (before notification is sent)
       if (widget.isOutgoingCall) {
         await _playRingtone();
       }
@@ -138,7 +160,7 @@ class _CallScreenState extends State<CallScreen> {
       _localUid = Random().nextInt(999999);
 
       _channel =
-      'call_${widget.currentUserId}_${widget.otherUserId}_${DateTime.now().millisecondsSinceEpoch}';
+          'call_${widget.currentUserId}_${widget.otherUserId}_${DateTime.now().millisecondsSinceEpoch}';
 
       _token = await AgoraTokenService.getToken(
         channelName: _channel,
@@ -158,7 +180,6 @@ class _CallScreenState extends State<CallScreen> {
       }
 
       // ================= FIRESTORE SIGNAL =================
-      // Write the call signal so the user app can acknowledge rejection in real-time.
       if (widget.isOutgoingCall) {
         await FirebaseFirestore.instance
             .collection('call_signals')
@@ -170,6 +191,11 @@ class _CallScreenState extends State<CallScreen> {
           'type': 'audio',
           'timestamp': FieldValue.serverTimestamp(),
         });
+
+        // Phase 2 – transition to "Ringing..." once notification+Firestore are set
+        if (mounted) {
+          setState(() => _callStatus = _CallStatus.ringing);
+        }
 
         // Listen for rejection from the user's app.
         _callSignalSubscription = FirebaseFirestore.instance
@@ -184,7 +210,7 @@ class _CallScreenState extends State<CallScreen> {
               await _endCall();
             }
           },
-          onError: (_) {/* Firestore errors are non-fatal; timeout will still fire */},
+          onError: (_) {/* non-fatal; timeout will still fire */},
         );
       }
 
@@ -200,27 +226,27 @@ class _CallScreenState extends State<CallScreen> {
         RtcEngineEventHandler(
           onUserJoined: (_, uid, __) async {
             if (!mounted) return;
-
-
+            // Phase 3 – "Connected"
             setState(() {
               _remoteUid = uid;
-              _isCallRinging = false;
               _callActive = true;
+              _callStatus = _CallStatus.connected;
             });
-
+            _pulseController.stop();
+            _pulseController.reset();
+            _signalController.stop();
+            _signalController.reset();
             await _stopRingtone();
             _startTimer();
           },
 
           onUserOffline: (_, __, ___) async {
-
             if (!_ending) {
               await _endCall();
             }
           },
 
-          onError: (code, msg) {
-          },
+          onError: (code, msg) {},
         ),
       );
 
@@ -243,11 +269,10 @@ class _CallScreenState extends State<CallScreen> {
             callerId: widget.currentUserId,
             callerName: widget.currentUserName,
           );
-
           await _endCall();
         }
       });
-    } catch (e) {
+    } catch (_) {
       _exit();
     }
   }
@@ -255,7 +280,6 @@ class _CallScreenState extends State<CallScreen> {
   // ================= TIMER =================
   void _startTimer() {
     _timeoutTimer?.cancel();
-
     _callTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted) {
         setState(() => _duration += const Duration(seconds: 1));
@@ -275,7 +299,6 @@ class _CallScreenState extends State<CallScreen> {
       await _callSignalSubscription?.cancel();
       _callSignalSubscription = null;
 
-      // Clean up the Firestore call signal document.
       if (widget.isOutgoingCall) {
         FirebaseFirestore.instance
             .collection('call_signals')
@@ -285,22 +308,15 @@ class _CallScreenState extends State<CallScreen> {
       }
 
       await _stopRingtone();
-
       await _engine.leaveChannel();
-
-      // 🔥 IMPORTANT: give time for Agora (web fix)
       await Future.delayed(const Duration(milliseconds: 300));
-
       await _engine.release();
-    } catch (e) {
-    }
+    } catch (_) {}
 
-    // Fire call-ended callback so the chat can save history.
     final String callStatus = _callActive ? 'answered' : 'missed';
     widget.onCallEnded?.call('audio', callStatus, _duration.inSeconds);
 
     if (!mounted) return;
-
     _exit();
   }
 
@@ -316,59 +332,252 @@ class _CallScreenState extends State<CallScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              _callActive ? Icons.phone_in_talk : Icons.phone,
-              color: Colors.white,
-              size: 80,
-            ),
-            const SizedBox(height: 20),
-            Text(
-              _callActive
-                  ? 'Connected with ${widget.otherUserName}'
-                  : 'Calling ${widget.otherUserName}...',
-              style: const TextStyle(color: Colors.white, fontSize: 22),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              _callActive ? _format(_duration) : 'Ringing...',
-              style: const TextStyle(color: Colors.white70),
-            ),
-            const SizedBox(height: 40),
+      backgroundColor: const Color(0xFF0D1117),
+      body: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFF1A1A2E), Color(0xFF0D1117)],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              // ── Top spacer
+              const SizedBox(height: 48),
 
-            // ================= BUTTONS =================
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                if (widget.onMinimize != null) ...[
-                  IconButton(
-                    icon: const Icon(Icons.picture_in_picture_alt,
-                        color: Colors.white, size: 36),
-                    tooltip: 'Minimize call',
-                    onPressed: widget.onMinimize,
-                  ),
-                  const SizedBox(width: 24),
-                ],
-                IconButton(
-                  icon: const Icon(Icons.call_end,
-                      color: Colors.red, size: 56),
-                  onPressed: _endCall,
+              // ── Call status label
+              _buildStatusLabel(),
+
+              const SizedBox(height: 32),
+
+              // ── Pulsing avatar
+              _buildAvatar(),
+
+              const SizedBox(height: 24),
+
+              // ── Callee name
+              Text(
+                widget.otherUserName,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
                 ),
-              ],
-            ),
-
-            if (_isPlayingRingtone)
-              const Padding(
-                padding: EdgeInsets.only(top: 10),
-                child: Text("Ringing...",
-                    style: TextStyle(color: Colors.green)),
               ),
+
+              const SizedBox(height: 8),
+
+              // ── Status text (Calling / Ringing / timer)
+              _buildSubtitle(),
+
+              const SizedBox(height: 20),
+
+              // ── Signal bars (only while not connected)
+              if (_callStatus != _CallStatus.connected) _buildSignalBars(),
+
+              const Spacer(),
+
+              // ── Bottom controls
+              _buildControls(),
+
+              const SizedBox(height: 40),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Status label chip at the top
+  Widget _buildStatusLabel() {
+    String label;
+    Color color;
+    switch (_callStatus) {
+      case _CallStatus.calling:
+        label = 'Calling';
+        color = const Color(0xFF6366F1);
+        break;
+      case _CallStatus.ringing:
+        label = 'Ringing';
+        color = const Color(0xFF10B981);
+        break;
+      case _CallStatus.connected:
+        label = 'Connected';
+        color = const Color(0xFF10B981);
+        break;
+    }
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 400),
+      child: Container(
+        key: ValueKey(label),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.15),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color.withOpacity(0.4)),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontSize: 13,
+            fontWeight: FontWeight.w600,
+            letterSpacing: 0.5,
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Pulsing avatar circle
+  Widget _buildAvatar() {
+    final initials = widget.otherUserName.trim().isNotEmpty
+        ? widget.otherUserName.trim()[0].toUpperCase()
+        : '?';
+    return AnimatedBuilder(
+      animation: _pulseAnimation,
+      builder: (_, child) {
+        final scale = _callStatus == _CallStatus.connected ? 1.0 : _pulseAnimation.value;
+        return Transform.scale(
+          scale: scale,
+          child: child,
+        );
+      },
+      child: Container(
+        width: 110,
+        height: 110,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          gradient: const LinearGradient(
+            colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF6366F1).withOpacity(0.45),
+              blurRadius: 28,
+              spreadRadius: 4,
+            ),
           ],
         ),
+        child: Center(
+          child: Text(
+            initials,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 44,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ── Subtitle: "Calling…" / "Ringing…" / timer
+  Widget _buildSubtitle() {
+    String text;
+    switch (_callStatus) {
+      case _CallStatus.calling:
+        text = 'Calling…';
+        break;
+      case _CallStatus.ringing:
+        text = 'Ringing…';
+        break;
+      case _CallStatus.connected:
+        text = _format(_duration);
+        break;
+    }
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 350),
+      child: Text(
+        text,
+        key: ValueKey(text),
+        style: TextStyle(
+          color: Colors.white.withOpacity(0.65),
+          fontSize: 16,
+        ),
+      ),
+    );
+  }
+
+  // ── Animated signal-strength bars (WhatsApp-style tower indicator)
+  static const int _signalBarCount = 4;
+
+  Widget _buildSignalBars() {
+    return AnimatedBuilder(
+      animation: _signalController,
+      builder: (_, __) {
+        // Cycle through 1–_signalBarCount active bars based on animation value
+        final active = (_signalController.value * _signalBarCount).floor() % _signalBarCount + 1;
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: List.generate(_signalBarCount, (i) {
+            final barActive = i < active;
+            final height = 6.0 + i * 5.0; // 6, 11, 16, 21
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 6,
+                height: height,
+                decoration: BoxDecoration(
+                  color: barActive
+                      ? const Color(0xFF10B981)
+                      : Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            );
+          }),
+        );
+      },
+    );
+  }
+
+  // ── Bottom control buttons row
+  Widget _buildControls() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          // Mute mic
+          _ControlButton(
+            icon: _micMuted ? Icons.mic_off : Icons.mic,
+            label: _micMuted ? 'Unmute' : 'Mute',
+            onTap: () {
+              setState(() => _micMuted = !_micMuted);
+              _engine.muteLocalAudioStream(_micMuted);
+            },
+          ),
+
+          // Speaker
+          _ControlButton(
+            icon: _speakerOn ? Icons.volume_up : Icons.volume_off,
+            label: _speakerOn ? 'Speaker' : 'Earpiece',
+            onTap: () {
+              setState(() => _speakerOn = !_speakerOn);
+              _engine.setEnableSpeakerphone(_speakerOn);
+            },
+          ),
+
+          // Minimize (optional)
+          if (widget.onMinimize != null)
+            _ControlButton(
+              icon: Icons.picture_in_picture_alt,
+              label: 'Minimize',
+              onTap: widget.onMinimize!,
+            ),
+
+          // End call (prominent red)
+          _EndCallButton(onTap: _endCall),
+        ],
       ),
     );
   }
@@ -379,6 +588,8 @@ class _CallScreenState extends State<CallScreen> {
   // ================= DISPOSE =================
   @override
   void dispose() {
+    _pulseController.dispose();
+    _signalController.dispose();
     _callTimer?.cancel();
     _timeoutTimer?.cancel();
     _ringtoneRepeatTimer?.cancel();
@@ -391,5 +602,90 @@ class _CallScreenState extends State<CallScreen> {
 
     _ringtonePlayer.dispose();
     super.dispose();
+  }
+}
+
+// ── Generic circular control button
+class _ControlButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _ControlButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withOpacity(0.12),
+              border: Border.all(color: Colors.white.withOpacity(0.18)),
+            ),
+            child: Icon(icon, color: Colors.white, size: 26),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── End call button (larger, red)
+class _EndCallButton extends StatelessWidget {
+  final VoidCallback onTap;
+  const _EndCallButton({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 68,
+            height: 68,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Color(0xFFEF4444),
+              boxShadow: [
+                BoxShadow(
+                  color: Color(0x66EF4444),
+                  blurRadius: 16,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: const Icon(Icons.call_end, color: Colors.white, size: 30),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            'End',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
