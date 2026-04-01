@@ -736,11 +736,11 @@ class _UsersPageState extends State<UsersPage> {
     );
   }
 
-    Widget _actionIconBtn(
-        IconData icon, String label, Color color, VoidCallback onTap) {
-      final isDark = Theme.of(context).brightness == Brightness.dark;
-      final Color baseTextColor =
-          Color.lerp(color, Colors.black, _kTextDarkenFactor)!;
+  Widget _actionIconBtn(
+      IconData icon, String label, Color color, VoidCallback onTap) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final Color baseTextColor =
+        Color.lerp(color, Colors.black, _kTextDarkenFactor)!;
     final Color textColor = isDark ? Colors.white : baseTextColor;
     return Tooltip(
       message: label,
