@@ -410,51 +410,69 @@ class _PackagesPageState extends State<PackagesPage>
 
   Widget _buildStatsRow(List<Package> pkgs) {
     final cardBg = Theme.of(context).colorScheme.surface;
-    return Container(
-      color: cardBg,
-      padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-      child: Row(
-        children: _kStats.map((s) {
-          return Expanded(
-            child: Container(
-              margin: const EdgeInsets.only(right: 8),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-              decoration: BoxDecoration(
-                color: s.color.withOpacity(0.06),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: s.color.withOpacity(0.18)),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(6),
-                    decoration: BoxDecoration(
-                      color: s.color.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(7),
-                    ),
-                    child: Icon(s.icon, color: s.color, size: 14),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 500;
+        final cards = _kStats.map((s) {
+          return Container(
+            margin: const EdgeInsets.only(right: 8, bottom: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: s.color.withOpacity(0.06),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: s.color.withOpacity(0.18)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: s.color.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(7),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(s.value(pkgs),
-                            style: TextStyle(
-                                fontSize: 14, fontWeight: FontWeight.w700, color: s.color)),
-                        Text(s.label,
-                            style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis),
-                      ],
-                    ),
+                  child: Icon(s.icon, color: s.color, size: 14),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(s.value(pkgs),
+                          style: TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w700, color: s.color)),
+                      Text(s.label,
+                          style: TextStyle(fontSize: 10, color: Colors.grey.shade500),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                    ],
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           );
-        }).toList(),
-      ),
+        }).toList();
+
+        if (isMobile) {
+          return Container(
+            color: cardBg,
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+            child: Column(
+              children: [
+                Row(children: [Expanded(child: cards[0]), Expanded(child: cards[1])]),
+                Row(children: [Expanded(child: cards[2]), Expanded(child: cards[3])]),
+              ],
+            ),
+          );
+        }
+
+        return Container(
+          color: cardBg,
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Row(
+            children: cards.map((card) => Expanded(child: card)).toList(),
+          ),
+        );
+      },
     );
   }
 

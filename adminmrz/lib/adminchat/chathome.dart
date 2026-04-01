@@ -31,8 +31,10 @@ class ChatWindow extends StatefulWidget {
   final String name;
   final bool isOnline;
   final dynamic receiverIdd;
+  /// Called on mobile when the admin taps the back arrow to return to the list.
+  final VoidCallback? onBack;
 
-  const ChatWindow({super.key, required this.name, required this.isOnline, required this.receiverIdd});
+  const ChatWindow({super.key, required this.name, required this.isOnline, required this.receiverIdd, this.onBack});
 
   @override
   State<ChatWindow> createState() => _ChatWindowState();
@@ -698,6 +700,22 @@ class _ChatWindowState extends State<ChatWindow> {
           ),
           child: Row(
             children: [
+              // Back button (mobile only — shown when onBack callback is provided)
+              if (widget.onBack != null) ...[
+                SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: widget.onBack,
+                      borderRadius: BorderRadius.circular(8),
+                      child: Icon(Icons.arrow_back_ios_new_rounded, size: 18, color: c.muted),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+              ],
               // Avatar + paid badge
               Stack(
                 children: [

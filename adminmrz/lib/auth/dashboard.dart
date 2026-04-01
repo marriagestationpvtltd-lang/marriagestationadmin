@@ -12,6 +12,9 @@ import '../payment/paymentscreen.dart';
 import '../settings/call_settings_screen.dart';
 import '../users/userscreen.dart';
 
+// ─── Breakpoints ─────────────────────────────────────────────────────────────
+const _kMobileBreakpoint = 768.0;
+
 // ─── Design tokens ────────────────────────────────────────────────────────────
 const _kSidebarBg     = Color(0xFF0F172A);
 const _kSidebarBorder = Color(0xFF1E293B);
@@ -42,6 +45,7 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   int _selectedIndex = 0;
   bool _isSidebarExpanded = true;
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
   late final List<Widget> _pages;
 
@@ -88,12 +92,313 @@ class _DashboardPageState extends State<DashboardPage> {
     final authProvider = Provider.of<AuthProvider>(context);
     final adminData    = authProvider.adminData;
 
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < _kMobileBreakpoint;
+        if (isMobile) {
+          return _buildMobileLayout(adminData, authProvider);
+        }
+        return Scaffold(
+          body: Row(
+            children: [
+              _buildSidebar(adminData, authProvider),
+              Expanded(child: _buildMainContent()),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ─── Mobile layout ──────────────────────────────────────────────────────────
+  Widget _buildMobileLayout(
+    Map<String, dynamic>? adminData,
+    AuthProvider authProvider,
+  ) {
+    final isChatPage = _selectedIndex == 5;
     return Scaffold(
-      body: Row(
+      key: _scaffoldKey,
+      drawer: _buildDrawer(adminData, authProvider),
+      body: Column(
         children: [
-          _buildSidebar(adminData, authProvider),
-          Expanded(child: _buildMainContent()),
+          _buildMobileTopBar(),
+          Expanded(
+            child: isChatPage
+                ? _pages[_selectedIndex]
+                : Container(
+                    color: Theme.of(context).scaffoldBackgroundColor,
+                    padding: const EdgeInsets.all(16),
+                    child: _pages[_selectedIndex],
+                  ),
+          ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildMobileTopBar() {
+    final title    = _navItems[_selectedIndex].label;
+    final cs       = Theme.of(context).colorScheme;
+    final isDark   = Theme.of(context).brightness == Brightness.dark;
+    final topBarBg = cs.surface;
+    final topBarBorder = cs.outlineVariant;
+    final iconBg   = isDark ? const Color(0xFF263248) : const Color(0xFFF8FAFC);
+    final mutedColor = cs.onSurface.withOpacity(0.45);
+
+    return Container(
+      height: 56,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: topBarBg,
+        border: Border(bottom: BorderSide(color: topBarBorder)),
+      ),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 36,
+            height: 36,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                borderRadius: BorderRadius.circular(8),
+                child: Icon(Icons.menu_rounded, size: 20, color: mutedColor),
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          _logoMark(),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w600,
+                color: cs.onSurface,
+              ),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          Container(
+            width: 34,
+            height: 34,
+            margin: const EdgeInsets.only(right: 6),
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: topBarBorder),
+            ),
+            child: IconButton(
+              onPressed: () => context.read<ThemeProvider>().toggleTheme(),
+              icon: Icon(
+                isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
+                size: 16,
+                color: mutedColor,
+              ),
+              padding: EdgeInsets.zero,
+              tooltip: isDark ? 'Light Mode' : 'Dark Mode',
+            ),
+          ),
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: topBarBorder),
+            ),
+            child: IconButton(
+              onPressed: () {},
+              icon: Icon(Icons.notifications_outlined, size: 16, color: mutedColor),
+              padding: EdgeInsets.zero,
+              tooltip: 'Notifications',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDrawer(
+    Map<String, dynamic>? adminData,
+    AuthProvider authProvider,
+  ) {
+    final name     = adminData?['name']?.toString() ?? 'Admin';
+    final role     = adminData?['role']?.toString() ?? 'admin';
+    final initials = name.isNotEmpty ? name[0].toUpperCase() : 'A';
+
+    return Drawer(
+      width: 260,
+      backgroundColor: _kSidebarBg,
+      child: Column(
+        children: [
+          Container(
+            height: 64,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: const BoxDecoration(
+              border: Border(bottom: BorderSide(color: _kSidebarBorder)),
+            ),
+            child: Row(
+              children: [
+                _logoMark(),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: const Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Marriage Station',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: _kTextPrimary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      SizedBox(height: 1),
+                      Text(
+                        'Admin Panel',
+                        style: TextStyle(fontSize: 10, color: _kTextMuted),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(vertical: 8),
+              itemCount: _navItems.length,
+              itemBuilder: (_, i) => _buildDrawerNavTile(i),
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: _kSidebarBorder)),
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 16,
+                  backgroundColor: _kAccent.withOpacity(0.2),
+                  child: Text(
+                    initials,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: _kAccentLight,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: _kTextPrimary,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        role,
+                        style: const TextStyle(fontSize: 10, color: _kTextMuted),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  width: 28,
+                  height: 28,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () async => await authProvider.logout(),
+                      borderRadius: BorderRadius.circular(6),
+                      child: const Icon(
+                        Icons.logout_rounded,
+                        size: 16,
+                        color: _kTextMuted,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildDrawerNavTile(int index) {
+    final isActive = _selectedIndex == index;
+    final item     = _navItems[index];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            _onItemTapped(index);
+            _scaffoldKey.currentState?.closeDrawer();
+          },
+          borderRadius: BorderRadius.circular(8),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+            decoration: BoxDecoration(
+              color: isActive ? _kAccent.withOpacity(0.14) : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              border: Border(
+                left: BorderSide(
+                  color: isActive ? _kAccent : Colors.transparent,
+                  width: 3,
+                ),
+              ),
+            ),
+            child: Row(
+              children: [
+                const SizedBox(width: 2),
+                Icon(
+                  item.icon,
+                  size: 18,
+                  color: isActive ? _kAccentLight : _kTextSecondary,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    item.label,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                      color: isActive ? _kTextPrimary : _kTextSecondary,
+                    ),
+                  ),
+                ),
+                if (isActive)
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: _kAccentLight,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

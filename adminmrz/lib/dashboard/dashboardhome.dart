@@ -283,22 +283,47 @@ class _DashboardHomeState extends State<DashboardHome> {
     final u = _dashboardData?.users;
     if (u == null) return const SizedBox.shrink();
 
-    // Use live online count from ChatProvider; fall back to API value if not loaded yet
     final chatList = context.watch<ChatProvider>().chatList;
     final liveOnline = chatList.isNotEmpty
         ? chatList.where((user) => user['online'] == 'true').length
         : u.online;
 
-    return Row(
-      children: [
-        Expanded(child: _buildKpiCard(label: 'Total Members', value: '${u.total}', icon: Icons.people_alt_rounded, color: _kPrimary, onTap: () => widget.onNavigate?.call(1))),
-        const SizedBox(width: 14),
-        Expanded(child: _buildKpiCard(label: 'Active Users', value: '${u.active}', icon: Icons.check_circle_rounded, color: _kEmerald, onTap: () => widget.onNavigate?.call(1))),
-        const SizedBox(width: 14),
-        Expanded(child: _buildKpiCard(label: 'Online Now', value: '$liveOnline', icon: Icons.wifi_rounded, color: _kSky, isLive: true, onTap: () => widget.onNavigate?.call(5))),
-        const SizedBox(width: 14),
-        Expanded(child: _buildKpiCard(label: 'Verified', value: '${u.verified}', icon: Icons.verified_rounded, color: _kViolet, onTap: () => widget.onNavigate?.call(1))),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 500;
+        if (isMobile) {
+          return Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(child: _buildKpiCard(label: 'Total Members', value: '${u.total}', icon: Icons.people_alt_rounded, color: _kPrimary, onTap: () => widget.onNavigate?.call(1))),
+                  const SizedBox(width: 12),
+                  Expanded(child: _buildKpiCard(label: 'Active Users', value: '${u.active}', icon: Icons.check_circle_rounded, color: _kEmerald, onTap: () => widget.onNavigate?.call(1))),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(child: _buildKpiCard(label: 'Online Now', value: '$liveOnline', icon: Icons.wifi_rounded, color: _kSky, isLive: true, onTap: () => widget.onNavigate?.call(5))),
+                  const SizedBox(width: 12),
+                  Expanded(child: _buildKpiCard(label: 'Verified', value: '${u.verified}', icon: Icons.verified_rounded, color: _kViolet, onTap: () => widget.onNavigate?.call(1))),
+                ],
+              ),
+            ],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: _buildKpiCard(label: 'Total Members', value: '${u.total}', icon: Icons.people_alt_rounded, color: _kPrimary, onTap: () => widget.onNavigate?.call(1))),
+            const SizedBox(width: 14),
+            Expanded(child: _buildKpiCard(label: 'Active Users', value: '${u.active}', icon: Icons.check_circle_rounded, color: _kEmerald, onTap: () => widget.onNavigate?.call(1))),
+            const SizedBox(width: 14),
+            Expanded(child: _buildKpiCard(label: 'Online Now', value: '$liveOnline', icon: Icons.wifi_rounded, color: _kSky, isLive: true, onTap: () => widget.onNavigate?.call(5))),
+            const SizedBox(width: 14),
+            Expanded(child: _buildKpiCard(label: 'Verified', value: '${u.verified}', icon: Icons.verified_rounded, color: _kViolet, onTap: () => widget.onNavigate?.call(1))),
+          ],
+        );
+      },
     );
   }
 
@@ -306,16 +331,42 @@ class _DashboardHomeState extends State<DashboardHome> {
   Widget _buildRevenueStatsRow() {
     final p = _dashboardData?.payments;
     if (p == null) return const SizedBox.shrink();
-    return Row(
-      children: [
-        Expanded(child: _buildKpiCard(label: 'Total Revenue', value: p.totalEarning, icon: Icons.account_balance_wallet_rounded, color: _kEmerald, onTap: () => widget.onNavigate?.call(4))),
-        const SizedBox(width: 14),
-        Expanded(child: _buildKpiCard(label: "Today's Revenue", value: p.todayEarning, icon: Icons.today_rounded, color: _kAmber, subtitle: 'earned today', onTap: () => widget.onNavigate?.call(4))),
-        const SizedBox(width: 14),
-        Expanded(child: _buildKpiCard(label: 'Monthly Revenue', value: p.thisMonthEarning, icon: Icons.calendar_month_rounded, color: _kSky, subtitle: 'this month', onTap: () => widget.onNavigate?.call(4))),
-        const SizedBox(width: 14),
-        Expanded(child: _buildKpiCard(label: 'Total Sales', value: '${p.totalSold}', icon: Icons.shopping_bag_rounded, color: _kRose, onTap: () => widget.onNavigate?.call(4))),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isMobile = constraints.maxWidth < 500;
+        if (isMobile) {
+          return Column(
+            children: [
+              Row(
+                children: [
+                  Expanded(child: _buildKpiCard(label: 'Total Revenue', value: p.totalEarning, icon: Icons.account_balance_wallet_rounded, color: _kEmerald, onTap: () => widget.onNavigate?.call(4))),
+                  const SizedBox(width: 12),
+                  Expanded(child: _buildKpiCard(label: "Today's Revenue", value: p.todayEarning, icon: Icons.today_rounded, color: _kAmber, subtitle: 'earned today', onTap: () => widget.onNavigate?.call(4))),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(child: _buildKpiCard(label: 'Monthly Revenue', value: p.thisMonthEarning, icon: Icons.calendar_month_rounded, color: _kSky, subtitle: 'this month', onTap: () => widget.onNavigate?.call(4))),
+                  const SizedBox(width: 12),
+                  Expanded(child: _buildKpiCard(label: 'Total Sales', value: '${p.totalSold}', icon: Icons.shopping_bag_rounded, color: _kRose, onTap: () => widget.onNavigate?.call(4))),
+                ],
+              ),
+            ],
+          );
+        }
+        return Row(
+          children: [
+            Expanded(child: _buildKpiCard(label: 'Total Revenue', value: p.totalEarning, icon: Icons.account_balance_wallet_rounded, color: _kEmerald, onTap: () => widget.onNavigate?.call(4))),
+            const SizedBox(width: 14),
+            Expanded(child: _buildKpiCard(label: "Today's Revenue", value: p.todayEarning, icon: Icons.today_rounded, color: _kAmber, subtitle: 'earned today', onTap: () => widget.onNavigate?.call(4))),
+            const SizedBox(width: 14),
+            Expanded(child: _buildKpiCard(label: 'Monthly Revenue', value: p.thisMonthEarning, icon: Icons.calendar_month_rounded, color: _kSky, subtitle: 'this month', onTap: () => widget.onNavigate?.call(4))),
+            const SizedBox(width: 14),
+            Expanded(child: _buildKpiCard(label: 'Total Sales', value: '${p.totalSold}', icon: Icons.shopping_bag_rounded, color: _kRose, onTap: () => widget.onNavigate?.call(4))),
+          ],
+        );
+      },
     );
   }
 
@@ -469,54 +520,62 @@ class _DashboardHomeState extends State<DashboardHome> {
   }
 
   // ─── User-distribution row ───────────────────────────────────────────────────
-  Widget _buildUserDistributionRow() {
+  Widget _buildUserDistributionRow({bool isMobile = false}) {
     final u = _dashboardData?.users;
     if (u == null) return const SizedBox.shrink();
     final total = u.total;
+    final userTypesCard = _buildCard(
+      onTap: () => widget.onNavigate?.call(1),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _cardTitle('User Types', Icons.category_rounded, _kPrimary),
+          const SizedBox(height: 14),
+          ...u.byType.map(
+            (t) => _buildDistributionRow(
+              t.usertype.isEmpty ? _kUnknownLabel : t.usertype,
+              t.total,
+              total,
+              _kPrimary,
+            ),
+          ),
+        ],
+      ),
+    );
+    final genderCard = _buildCard(
+      onTap: () => widget.onNavigate?.call(1),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _cardTitle('Gender', Icons.people_rounded, _kPink),
+          const SizedBox(height: 14),
+          ...u.byGender.map(
+            (g) => _buildDistributionRow(
+              g.gender.isEmpty ? _kUnknownLabel : g.gender,
+              g.total,
+              total,
+              _kPink,
+            ),
+          ),
+        ],
+      ),
+    );
+    if (isMobile) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          userTypesCard,
+          const SizedBox(height: 14),
+          genderCard,
+        ],
+      );
+    }
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: _buildCard(
-            onTap: () => widget.onNavigate?.call(1),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _cardTitle('User Types', Icons.category_rounded, _kPrimary),
-                const SizedBox(height: 14),
-                ...u.byType.map(
-                  (t) => _buildDistributionRow(
-                    t.usertype.isEmpty ? _kUnknownLabel : t.usertype,
-                    t.total,
-                    total,
-                    _kPrimary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+        Expanded(child: userTypesCard),
         const SizedBox(width: 14),
-        Expanded(
-          child: _buildCard(
-            onTap: () => widget.onNavigate?.call(1),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _cardTitle('Gender', Icons.people_rounded, _kPink),
-                const SizedBox(height: 14),
-                ...u.byGender.map(
-                  (g) => _buildDistributionRow(
-                    g.gender.isEmpty ? _kUnknownLabel : g.gender,
-                    g.total,
-                    total,
-                    _kPink,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+        Expanded(child: genderCard),
       ],
     );
   }
@@ -796,79 +855,97 @@ class _DashboardHomeState extends State<DashboardHome> {
   // ─── Main content ────────────────────────────────────────────────────────────
   Widget _buildDashboardContent() {
     return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Welcome banner
-          _buildWelcomeBanner(),
-          const SizedBox(height: 24),
-
-          // User KPIs
-          _buildSectionHeader(
-            'User Statistics',
-            onRefresh: _fetchDashboardData,
-            onViewAll: () => widget.onNavigate?.call(1),
-          ),
-          _buildUserStatsRow(),
-          const SizedBox(height: 22),
-
-          // Revenue KPIs
-          _buildSectionHeader(
-            'Revenue Overview',
-            onViewAll: () => widget.onNavigate?.call(4),
-          ),
-          _buildRevenueStatsRow(),
-          const SizedBox(height: 22),
-
-          // Best package + Payment methods (side by side)
-          Row(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isMobile = constraints.maxWidth < 600;
+          return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Column(
+              // Welcome banner
+              _buildWelcomeBanner(),
+              const SizedBox(height: 24),
+
+              // User KPIs
+              _buildSectionHeader(
+                'User Statistics',
+                onRefresh: _fetchDashboardData,
+                onViewAll: () => widget.onNavigate?.call(1),
+              ),
+              _buildUserStatsRow(),
+              const SizedBox(height: 22),
+
+              // Revenue KPIs
+              _buildSectionHeader(
+                'Revenue Overview',
+                onViewAll: () => widget.onNavigate?.call(4),
+              ),
+              _buildRevenueStatsRow(),
+              const SizedBox(height: 22),
+
+              // Best package + Payment methods
+              if (isMobile) ...[
+                _buildSectionHeader(
+                  'Package Performance',
+                  onViewAll: () => widget.onNavigate?.call(3),
+                ),
+                _buildBestPackageCard(),
+                const SizedBox(height: 22),
+                _buildSectionHeader(
+                  'Payment Methods',
+                  onViewAll: () => widget.onNavigate?.call(4),
+                ),
+                _buildPaymentMethodsCard(),
+              ] else
+                Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildSectionHeader(
-                      'Package Performance',
-                      onViewAll: () => widget.onNavigate?.call(3),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildSectionHeader(
+                            'Package Performance',
+                            onViewAll: () => widget.onNavigate?.call(3),
+                          ),
+                          _buildBestPackageCard(),
+                        ],
+                      ),
                     ),
-                    _buildBestPackageCard(),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _buildSectionHeader(
+                            'Payment Methods',
+                            onViewAll: () => widget.onNavigate?.call(4),
+                          ),
+                          _buildPaymentMethodsCard(),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
+              const SizedBox(height: 22),
+
+              // User analytics (types + gender)
+              _buildSectionHeader(
+                'User Analytics',
+                onViewAll: () => widget.onNavigate?.call(1),
               ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildSectionHeader(
-                      'Payment Methods',
-                      onViewAll: () => widget.onNavigate?.call(4),
-                    ),
-                    _buildPaymentMethodsCard(),
-                  ],
-                ),
+              _buildUserDistributionRow(isMobile: isMobile),
+              const SizedBox(height: 22),
+
+              // Geographic
+              _buildSectionHeader(
+                'Geographic Data',
+                onViewAll: () => widget.onNavigate?.call(1),
               ),
+              _buildGeographicCard(),
+              const SizedBox(height: 32),
             ],
-          ),
-          const SizedBox(height: 22),
-
-          // User analytics (types + gender)
-          _buildSectionHeader(
-            'User Analytics',
-            onViewAll: () => widget.onNavigate?.call(1),
-          ),
-          _buildUserDistributionRow(),
-          const SizedBox(height: 22),
-
-          // Geographic
-          _buildSectionHeader(
-            'Geographic Data',
-            onViewAll: () => widget.onNavigate?.call(1),
-          ),
-          _buildGeographicCard(),
-          const SizedBox(height: 32),
-        ],
+          );
+        },
       ),
     );
   }
