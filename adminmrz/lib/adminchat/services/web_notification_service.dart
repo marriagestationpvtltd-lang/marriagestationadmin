@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:js' as js;
+import 'package:flutter/foundation.dart';
 
 /// Service for browser notifications and message sounds on the web platform.
 ///
@@ -8,6 +10,16 @@ import 'dart:js' as js;
 /// - Foreground messages  → sound only (no notification popup)
 class WebNotificationService {
   WebNotificationService._();
+
+  /// Tracks in-flight permission requests to avoid duplicate prompts.
+  /// Cleared once the request finishes (success, denial, or error).
+  static Future<void>? _permissionRequestFuture;
+
+  /// Temporary gesture listeners used to trigger the permission prompt.
+  /// These are removed once the first gesture is detected.
+  static StreamSubscription<html.Event>? _permissionClickSubscription;
+  static StreamSubscription<html.KeyboardEvent>? _permissionKeySubscription;
+  static StreamSubscription<html.Event>? _permissionTouchSubscription;
 
   // ------------------------------------------------------------------
   // Permission
@@ -18,7 +30,71 @@ class WebNotificationService {
   static Future<void> requestPermission() async {
     if (!html.Notification.supported) return;
     if (html.Notification.permission == 'granted') return;
-    await html.Notification.requestPermission();
+    final result = await html.Notification.requestPermission();
+    if (result == 'denied') {
+      debugPrint('Notification permission denied by the user.');
+    }
+    if (result != 'default') {
+      _disposePermissionListeners();
+    }
+  }
+
+  /// Ensures we request permission on the next user gesture (click/tap/key).
+  /// This attaches temporary listeners and is safe to call multiple times.
+  /// Required because some browsers block permission prompts without a gesture.
+  static void ensurePermissionOnUserGesture() {
+    if (!html.Notification.supported) return;
+    if (html.Notification.permission != 'default') return;
+    if (_permissionRequestFuture != null) return;
+
+    _disposePermissionListeners();
+
+    final permissionGestureCompleter = Completer<void>();
+
+    void handleGesture([dynamic _]) {
+      if (permissionGestureCompleter.isCompleted) return;
+      permissionGestureCompleter.complete();
+      _disposePermissionListeners();
+    }
+
+    _permissionClickSubscription =
+        html.document.onClick.listen(handleGesture);
+    _permissionKeySubscription =
+        html.document.onKeyDown.listen(handleGesture);
+    _permissionTouchSubscription =
+        html.document.onTouchStart.listen(handleGesture);
+
+    _permissionRequestFuture = permissionGestureCompleter.future
+        .then((_) => requestPermission())
+        .catchError((error, stackTrace) {
+          FlutterError.reportError(
+            FlutterErrorDetails(
+              exception: error,
+              stack: stackTrace,
+              library: 'WebNotificationService',
+              context: ErrorDescription(
+                'requesting browser notification permission',
+              ),
+            ),
+          );
+          debugPrint(
+            'Notification permission request failed: $error '
+            '(state: ${html.Notification.permission})\n$stackTrace',
+          );
+        })
+        .whenComplete(() {
+          _permissionRequestFuture = null;
+          _disposePermissionListeners();
+        });
+  }
+
+  static void _disposePermissionListeners() {
+    _permissionClickSubscription?.cancel();
+    _permissionKeySubscription?.cancel();
+    _permissionTouchSubscription?.cancel();
+    _permissionClickSubscription = null;
+    _permissionKeySubscription = null;
+    _permissionTouchSubscription = null;
   }
 
   // ------------------------------------------------------------------
@@ -53,6 +129,11 @@ class WebNotificationService {
     bool showInForeground = false,
   }) {
     if (!html.Notification.supported) return;
+    if (html.Notification.permission == 'default') {
+      // Ensure we prompt for permission on the next user gesture.
+      ensurePermissionOnUserGesture();
+      return;
+    }
     if (html.Notification.permission != 'granted') return;
     if (!showInForeground && !isAppInBackground()) return;
 
