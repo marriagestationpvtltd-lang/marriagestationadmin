@@ -12,6 +12,9 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 
 // No need for dart:html import
 
+// Video call state progression: calling → ringing → connected
+enum _VCallStatus { calling, ringing, connected }
+
 class VideoCallScreen extends StatefulWidget {
   final String currentUserId;
   final String currentUserName;
@@ -59,14 +62,14 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   bool _videoEnabled = true;
   bool _cameraFront = true;
   bool _ending = false;
-  bool _isCallRinging = true;
+
+  _VCallStatus _callStatus = _VCallStatus.calling;
 
   Timer? _timeoutTimer;
   Timer? _callTimer;
   Duration _duration = Duration.zero;
 
   late AudioPlayer _ringtonePlayer;
-  bool _isPlayingRingtone = false;
   Timer? _ringtoneRepeatTimer;
 
   StreamSubscription<DocumentSnapshot>? _callSignalSubscription;
@@ -86,8 +89,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   void _setupAudioPlayer() {
     _ringtonePlayer.setReleaseMode(ReleaseMode.stop);
     _ringtonePlayer.onPlayerStateChanged.listen((PlayerState state) {
-      if (mounted) setState(() => _isPlayingRingtone = state == PlayerState.playing);
-      // When tone finishes, schedule next repeat
+      // Schedule repeat when tone completes — state tracking is not needed here
       if (state == PlayerState.completed && widget.isOutgoingCall && !_ending) {
         _scheduleRepeat();
       }
@@ -129,9 +131,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
     try {
       _ringtoneRepeatTimer?.cancel();
       await _ringtonePlayer.stop();
-      if (mounted) setState(() => _isPlayingRingtone = false);
-    } catch (e) {
-    }
+    } catch (_) {}
   }
 
   Future<void> _startCall() async {
@@ -181,6 +181,11 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
           'timestamp': FieldValue.serverTimestamp(),
         });
 
+        // Transition to "Ringing" — remote phone is now ringing
+        if (mounted) {
+          setState(() => _callStatus = _VCallStatus.ringing);
+        }
+
         // Listen for rejection from the user's app.
         _callSignalSubscription = FirebaseFirestore.instance
             .collection('call_signals')
@@ -209,7 +214,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       await _engine.enableAudio();
       await _engine.enableVideo();
 
-      // 🔥 Start preview – this will trigger the browser's camera permission prompt
+      // Start preview – triggers camera permission prompt
       await _engine.startPreview();
 
       // Register event handlers
@@ -218,7 +223,6 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
           onJoinChannelSuccess: (_, __) {
             if (mounted) {
               setState(() => _joined = true);
-              // Setup local video after join success
               _setupLocalVideo();
             }
           },
@@ -226,7 +230,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
             if (mounted) {
               setState(() {
                 _remoteUid = uid;
-                _isCallRinging = false;
+                _callStatus = _VCallStatus.connected;
               });
               _setupRemoteVideo(uid);
             }
@@ -236,8 +240,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
           onUserOffline: (_, __, ___) {
             _endCall();
           },
-          onError: (code, msg) {
-          },
+          onError: (code, msg) {},
         ),
       );
 
@@ -363,10 +366,7 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   Future<void> _toggleSpeaker() async {
     setState(() => _speakerOn = !_speakerOn);
     await _engine.setEnableSpeakerphone(_speakerOn);
-
-    if (_isPlayingRingtone) {
-      await _ringtonePlayer.setVolume(_speakerOn ? 1.0 : 0.8);
-    }
+    await _ringtonePlayer.setVolume(_speakerOn ? 1.0 : 0.8);
   }
 
   void _toggleMute() {
@@ -451,6 +451,22 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
   }
 
   Widget _buildStatus() {
+    String title;
+    String subtitle;
+    switch (_callStatus) {
+      case _VCallStatus.calling:
+        title = 'Calling ${widget.otherUserName}…';
+        subtitle = 'Connecting…';
+        break;
+      case _VCallStatus.ringing:
+        title = 'Calling ${widget.otherUserName}…';
+        subtitle = 'Ringing…';
+        break;
+      case _VCallStatus.connected:
+        title = 'Connected with ${widget.otherUserName}';
+        subtitle = _format(_duration);
+        break;
+    }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -460,28 +476,16 @@ class _VideoCallScreenState extends State<VideoCallScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            _callActive
-                ? 'Connected with ${widget.otherUserName}'
-                : (_isCallRinging
-                ? 'Calling ${widget.otherUserName}...'
-                : 'Connecting...'),
-            style: const TextStyle(color: Colors.white, fontSize: 14),
-          ),
+          Text(title, style: const TextStyle(color: Colors.white, fontSize: 14)),
           const SizedBox(height: 4),
-          Text(
-            _callActive
-                ? _format(_duration)
-                : (_isCallRinging ? 'Ringing...' : 'Connecting...'),
-            style: const TextStyle(color: Colors.white70, fontSize: 12),
-          ),
+          Text(subtitle, style: const TextStyle(color: Colors.white70, fontSize: 12)),
         ],
       ),
     );
   }
 
   Widget _buildControls() {
-    final bool controlsEnabled = _callActive || _isCallRinging;
+    final bool controlsEnabled = _callStatus != _VCallStatus.calling;
 
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 20),

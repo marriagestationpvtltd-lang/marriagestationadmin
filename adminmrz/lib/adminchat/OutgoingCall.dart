@@ -53,7 +53,11 @@ class _CallScreenState extends State<CallScreen>
   bool _callActive = false;
   bool _micMuted = false;
   bool _speakerOn = true;
+  bool _videoEnabled = false;
   bool _ending = false;
+
+  // Video
+  Widget? _localVideoView;
 
   _CallStatus _callStatus = _CallStatus.calling;
 
@@ -101,7 +105,7 @@ class _CallScreenState extends State<CallScreen>
     _ringtonePlayer.setReleaseMode(ReleaseMode.stop);
     _ringtonePlayer.onPlayerStateChanged.listen((state) {
       if (!mounted) return;
-      // Only schedule repeat — no setState here to avoid layout shifts
+      // Schedule repeat when tone completes — state tracking is not needed here
       if (state == PlayerState.completed && widget.isOutgoingCall && !_ending) {
         _scheduleRepeat();
       }
@@ -259,6 +263,7 @@ class _CallScreenState extends State<CallScreen>
         options: const ChannelMediaOptions(
           publishMicrophoneTrack: true,
           autoSubscribeAudio: true,
+          autoSubscribeVideo: true,
         ),
       );
 
@@ -285,6 +290,51 @@ class _CallScreenState extends State<CallScreen>
         setState(() => _duration += const Duration(seconds: 1));
       }
     });
+  }
+
+  // ================= VIDEO TOGGLE =================
+  Future<void> _toggleVideo() async {
+    try {
+      if (!_videoEnabled) {
+        // Enable video: initialize video engine and start camera preview
+        await _engine.enableVideo();
+        await _engine.startPreview();
+        await _engine.updateChannelMediaOptions(const ChannelMediaOptions(
+          publishMicrophoneTrack: true,
+          publishCameraTrack: true,
+          autoSubscribeAudio: true,
+          autoSubscribeVideo: true,
+        ));
+        final view = AgoraVideoView(
+          controller: VideoViewController(
+            rtcEngine: _engine,
+            canvas: const VideoCanvas(uid: 0),
+          ),
+        );
+        if (mounted) {
+          setState(() {
+            _videoEnabled = true;
+            _localVideoView = view;
+          });
+        }
+      } else {
+        // Disable video: stop camera
+        await _engine.stopPreview();
+        await _engine.disableVideo();
+        await _engine.updateChannelMediaOptions(const ChannelMediaOptions(
+          publishMicrophoneTrack: true,
+          publishCameraTrack: false,
+          autoSubscribeAudio: true,
+          autoSubscribeVideo: true,
+        ));
+        if (mounted) {
+          setState(() {
+            _videoEnabled = false;
+            _localVideoView = null;
+          });
+        }
+      }
+    } catch (_) {}
   }
 
   // ================= END CALL =================
@@ -333,60 +383,63 @@ class _CallScreenState extends State<CallScreen>
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF0D1117),
-      body: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF1A1A2E), Color(0xFF0D1117)],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            children: [
-              // ── Top spacer
-              const SizedBox(height: 48),
-
-              // ── Call status label
-              _buildStatusLabel(),
-
-              const SizedBox(height: 32),
-
-              // ── Pulsing avatar
-              _buildAvatar(),
-
-              const SizedBox(height: 24),
-
-              // ── Callee name
-              Text(
-                widget.otherUserName,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 26,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.3,
-                ),
+      body: Stack(
+        children: [
+          // ── Main call layout
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFF1A1A2E), Color(0xFF0D1117)],
               ),
-
-              const SizedBox(height: 8),
-
-              // ── Status text (Calling / Ringing / timer)
-              _buildSubtitle(),
-
-              const SizedBox(height: 20),
-
-              // ── Signal bars (only while not connected)
-              if (_callStatus != _CallStatus.connected) _buildSignalBars(),
-
-              const Spacer(),
-
-              // ── Bottom controls
-              _buildControls(),
-
-              const SizedBox(height: 40),
-            ],
+            ),
+            child: SafeArea(
+              child: Column(
+                children: [
+                  const SizedBox(height: 48),
+                  _buildStatusLabel(),
+                  const SizedBox(height: 32),
+                  _buildAvatar(),
+                  const SizedBox(height: 24),
+                  Text(
+                    widget.otherUserName,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 26,
+                      fontWeight: FontWeight.w600,
+                      letterSpacing: 0.3,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  _buildSubtitle(),
+                  const SizedBox(height: 20),
+                  if (_callStatus != _CallStatus.connected) _buildSignalBars(),
+                  const Spacer(),
+                  _buildControls(),
+                  const SizedBox(height: 40),
+                ],
+              ),
+            ),
           ),
-        ),
+
+          // ── Local camera overlay (visible when video mode is on)
+          if (_videoEnabled)
+            Positioned(
+              top: 56,
+              right: 16,
+              width: 130,
+              height: 190,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: _localVideoView ??
+                    Container(
+                      color: Colors.grey[900],
+                      child: const Icon(Icons.videocam, color: Colors.white54, size: 36),
+                    ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -543,7 +596,7 @@ class _CallScreenState extends State<CallScreen>
   // ── Bottom control buttons row
   Widget _buildControls() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
+      padding: const EdgeInsets.symmetric(horizontal: 20),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
@@ -551,20 +604,30 @@ class _CallScreenState extends State<CallScreen>
           _ControlButton(
             icon: _micMuted ? Icons.mic_off : Icons.mic,
             label: _micMuted ? 'Unmute' : 'Mute',
+            isActive: _micMuted,
             onTap: () {
               setState(() => _micMuted = !_micMuted);
               _engine.muteLocalAudioStream(_micMuted);
             },
           ),
 
-          // Speaker
+          // Speaker / Earpiece
           _ControlButton(
             icon: _speakerOn ? Icons.volume_up : Icons.volume_off,
             label: _speakerOn ? 'Speaker' : 'Earpiece',
+            isActive: _speakerOn,
             onTap: () {
               setState(() => _speakerOn = !_speakerOn);
               _engine.setEnableSpeakerphone(_speakerOn);
             },
+          ),
+
+          // Video mode enable
+          _ControlButton(
+            icon: _videoEnabled ? Icons.videocam : Icons.videocam_off,
+            label: 'Video',
+            isActive: _videoEnabled,
+            onTap: _toggleVideo,
           ),
 
           // Minimize (optional)
@@ -610,11 +673,13 @@ class _ControlButton extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
+  final bool isActive;
 
   const _ControlButton({
     required this.icon,
     required this.label,
     required this.onTap,
+    this.isActive = false,
   });
 
   @override
@@ -624,13 +689,20 @@ class _ControlButton extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 200),
             width: 58,
             height: 58,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.12),
-              border: Border.all(color: Colors.white.withOpacity(0.18)),
+              color: isActive
+                  ? const Color(0xFF6366F1).withOpacity(0.85)
+                  : Colors.white.withOpacity(0.12),
+              border: Border.all(
+                color: isActive
+                    ? const Color(0xFF6366F1)
+                    : Colors.white.withOpacity(0.18),
+              ),
             ),
             child: Icon(icon, color: Colors.white, size: 26),
           ),
