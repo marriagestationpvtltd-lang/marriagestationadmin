@@ -604,20 +604,20 @@ class _UsersPageState extends State<UsersPage> {
                   spacing: 10,
                   runSpacing: 8,
                   children: [
-                    if (hasPhone)
+                    if (hasPhone) ...[
                       _actionIconBtn(
                         Icons.chat_rounded,
                         'WhatsApp',
                         const Color(0xFF25D366),
                         () => _launchWhatsApp(cleanedPhone),
                       ),
-                    if (hasPhone)
                       _actionIconBtn(
                         Icons.videocam_rounded,
                         'Viber',
                         const Color(0xFF7360F2),
                         () => _launchViber(cleanedPhone),
                       ),
+                    ],
                     if (user.email.isNotEmpty)
                       _actionIconBtn(
                         Icons.email_outlined,
@@ -764,7 +764,7 @@ class _UsersPageState extends State<UsersPage> {
                 style: TextStyle(
                   fontSize: 12,
                   color: color,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   letterSpacing: 0.2,
                 ),
               ),
