@@ -229,6 +229,8 @@ class _UsersPageState extends State<UsersPage> {
     final bool isPhoneVerified = user.phoneVerified == 1;
     final Color genderAccentColor = isFemale ? const Color(0xFFE91E8C) : const Color(0xFF1976D2);
     final String? profileImageUrl = _normaliseImageUrl(user.profilePicture);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardBg = Theme.of(context).colorScheme.surface;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
@@ -238,14 +240,14 @@ class _UsersPageState extends State<UsersPage> {
         borderRadius: BorderRadius.circular(14),
         side: isSelected
             ? BorderSide(color: Colors.blue.shade400, width: 1.5)
-            : BorderSide(color: Colors.grey.shade100),
+            : BorderSide(color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.shade100),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: () => _navigateToUser(user),
         child: Container(
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: cardBg,
             border: Border(left: BorderSide(color: statusColor, width: 4)),
           ),
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
@@ -338,10 +340,10 @@ class _UsersPageState extends State<UsersPage> {
                         // Full name
                         Text(
                           user.fullName,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF0F172A),
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
                             letterSpacing: 0.1,
                           ),
                           maxLines: 1,
@@ -427,7 +429,7 @@ class _UsersPageState extends State<UsersPage> {
               ),
 
               const SizedBox(height: 9),
-              Divider(height: 1, thickness: 0.8, color: Colors.grey.shade100),
+              Divider(height: 1, thickness: 0.8, color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.shade100),
               const SizedBox(height: 7),
 
               // ── Row 2: Info chips ────────────────────────────────────────
@@ -469,7 +471,7 @@ class _UsersPageState extends State<UsersPage> {
               ),
 
               const SizedBox(height: 7),
-              Divider(height: 1, thickness: 0.8, color: Colors.grey.shade100),
+              Divider(height: 1, thickness: 0.8, color: isDark ? Colors.white.withOpacity(0.08) : Colors.grey.shade100),
               const SizedBox(height: 7),
 
               // ── Row 3: Action buttons (contact LEFT · admin RIGHT) ────────
@@ -630,8 +632,9 @@ class _UsersPageState extends State<UsersPage> {
   // ─── Filter chips row ────────────────────────────────────────────────────
 
   Widget _buildFilterRow(UserProvider provider) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -639,7 +642,7 @@ class _UsersPageState extends State<UsersPage> {
           children: [
             _selectAllChip(provider),
             const SizedBox(width: 10),
-            Container(width: 1, height: 22, color: Colors.grey.shade300),
+            Container(width: 1, height: 22, color: isDark ? Colors.white.withOpacity(0.15) : Colors.grey.shade300),
             const SizedBox(width: 10),
             ...[
               ('all', 'All'),
@@ -659,7 +662,7 @@ class _UsersPageState extends State<UsersPage> {
                     const SizedBox(width: 6),
                   ];
                 }),
-            Container(width: 1, height: 22, color: Colors.grey.shade300),
+            Container(width: 1, height: 22, color: isDark ? Colors.white.withOpacity(0.15) : Colors.grey.shade300),
             const SizedBox(width: 6),
             ...[
               ('all', 'All Plans'),
@@ -714,6 +717,7 @@ class _UsersPageState extends State<UsersPage> {
 
   Widget _selectAllChip(UserProvider provider) {
     final bool allSelected = provider.areAllFilteredSelected;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: provider.filteredUsers.isNotEmpty
           ? () => provider.selectAllUsers()
@@ -722,10 +726,10 @@ class _UsersPageState extends State<UsersPage> {
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: allSelected ? Colors.blue.shade50 : Colors.grey.shade100,
+          color: allSelected ? Colors.blue.shade50 : (isDark ? const Color(0xFF263248) : Colors.grey.shade100),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: allSelected ? Colors.blue.shade300 : Colors.grey.shade300,
+            color: allSelected ? Colors.blue.shade300 : (isDark ? Colors.white.withOpacity(0.15) : Colors.grey.shade300),
           ),
         ),
         child: Row(
@@ -741,7 +745,7 @@ class _UsersPageState extends State<UsersPage> {
               'All',
               style: TextStyle(
                 fontSize: 12,
-                color: allSelected ? Colors.blue : Colors.grey.shade700,
+                color: allSelected ? Colors.blue : (isDark ? Colors.grey.shade300 : Colors.grey.shade700),
                 fontWeight: allSelected ? FontWeight.w600 : FontWeight.w400,
               ),
             ),
@@ -753,23 +757,24 @@ class _UsersPageState extends State<UsersPage> {
 
   Widget _filterChip(
       String label, bool selected, Color color, VoidCallback onTap) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: selected ? color.withOpacity(0.14) : Colors.grey.shade100,
+          color: selected ? color.withOpacity(0.14) : (isDark ? const Color(0xFF263248) : Colors.grey.shade100),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: selected ? color.withOpacity(0.45) : Colors.grey.shade300,
+            color: selected ? color.withOpacity(0.45) : (isDark ? Colors.white.withOpacity(0.15) : Colors.grey.shade300),
           ),
         ),
         child: Text(
           label,
           style: TextStyle(
             fontSize: 12,
-            color: selected ? color : Colors.grey.shade700,
+            color: selected ? color : (isDark ? Colors.grey.shade300 : Colors.grey.shade700),
             fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
           ),
         ),
@@ -780,6 +785,7 @@ class _UsersPageState extends State<UsersPage> {
   // ─── Bulk action bar ─────────────────────────────────────────────────────
 
   Widget _buildBulkActionBar(UserProvider provider) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return AnimatedSize(
       duration: const Duration(milliseconds: 250),
       curve: Curves.easeInOut,
@@ -789,9 +795,9 @@ class _UsersPageState extends State<UsersPage> {
               padding:
                   const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: isDark ? const Color(0xFF1E293B) : Colors.blue.shade50,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.blue.shade200),
+                border: Border.all(color: isDark ? Colors.blue.withOpacity(0.3) : Colors.blue.shade200),
               ),
               child: Row(
                 children: [
@@ -887,8 +893,9 @@ class _UsersPageState extends State<UsersPage> {
   // ─── Top section: title + search + stats + filters ───────────────────────
 
   Widget _buildTopSection(UserProvider provider) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      color: Colors.white,
+      color: Theme.of(context).colorScheme.surface,
       child: Column(
         children: [
           // Row 1: Search bar + Refresh (title shown in dashboard topbar)
@@ -909,12 +916,12 @@ class _UsersPageState extends State<UsersPage> {
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide:
-                            BorderSide(color: Colors.grey.shade200),
+                            BorderSide(color: isDark ? Colors.white.withOpacity(0.10) : Colors.grey.shade200),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
                         borderSide:
-                            BorderSide(color: Colors.grey.shade200),
+                            BorderSide(color: isDark ? Colors.white.withOpacity(0.10) : Colors.grey.shade200),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -922,7 +929,7 @@ class _UsersPageState extends State<UsersPage> {
                             color: Colors.blue.shade300, width: 1.5),
                       ),
                       filled: true,
-                      fillColor: Colors.grey.shade50,
+                      fillColor: isDark ? const Color(0xFF263248) : Colors.grey.shade50,
                       contentPadding: const EdgeInsets.symmetric(
                           vertical: 9, horizontal: 12),
                       isDense: true,
@@ -950,10 +957,10 @@ class _UsersPageState extends State<UsersPage> {
                     child: Container(
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
+                        color: isDark ? const Color(0xFF263248) : Colors.grey.shade100,
                         borderRadius: BorderRadius.circular(8),
                         border:
-                            Border.all(color: Colors.grey.shade200),
+                            Border.all(color: isDark ? Colors.white.withOpacity(0.10) : Colors.grey.shade200),
                       ),
                       child: Icon(Icons.refresh_rounded,
                           size: 18, color: Colors.grey.shade600),
@@ -983,14 +990,14 @@ class _UsersPageState extends State<UsersPage> {
                   ],
                   const SizedBox(width: 12),
                   Container(
-                      width: 1, height: 22, color: Colors.grey.shade200),
+                      width: 1, height: 22, color: isDark ? Colors.white.withOpacity(0.10) : Colors.grey.shade200),
                   const SizedBox(width: 12),
                 ],
                 // Select-all chip
                 _selectAllChip(provider),
                 const SizedBox(width: 8),
                 Container(
-                    width: 1, height: 22, color: Colors.grey.shade300),
+                    width: 1, height: 22, color: isDark ? Colors.white.withOpacity(0.15) : Colors.grey.shade300),
                 const SizedBox(width: 8),
                 // Status filter chips
                 ...[
@@ -1012,7 +1019,7 @@ class _UsersPageState extends State<UsersPage> {
                   ];
                 }),
                 Container(
-                    width: 1, height: 22, color: Colors.grey.shade300),
+                    width: 1, height: 22, color: isDark ? Colors.white.withOpacity(0.15) : Colors.grey.shade300),
                 const SizedBox(width: 6),
                 // Plan filter chips
                 ...[

@@ -243,8 +243,9 @@ class _PackagesPageState extends State<PackagesPage>
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<PackageProvider>();
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
-      backgroundColor: const Color(0xFFF1F5F9),
+      backgroundColor: isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9),
       body: Stack(
         children: [
           Column(
@@ -365,6 +366,7 @@ class _PackagesPageState extends State<PackagesPage>
 
   Widget _buildSearchBar(PackageProvider provider) {
     final cardBg = Theme.of(context).colorScheme.surface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       color: cardBg,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -387,14 +389,14 @@ class _PackagesPageState extends State<PackagesPage>
                     })
                 : null,
             filled: true,
-            fillColor: const Color(0xFFF8FAFC),
+            fillColor: isDark ? const Color(0xFF263248) : const Color(0xFFF8FAFC),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: Colors.grey.shade200)),
+                borderSide: BorderSide(color: isDark ? Colors.white.withOpacity(0.10) : Colors.grey.shade200)),
             enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: Colors.grey.shade200)),
+                borderSide: BorderSide(color: isDark ? Colors.white.withOpacity(0.10) : Colors.grey.shade200)),
             focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5)),
@@ -484,6 +486,7 @@ class _PackagesPageState extends State<PackagesPage>
   Widget _buildPackageCard(Package pkg) {
     final cfg = _tierFor(pkg.name);
     final cardBg = Theme.of(context).colorScheme.surface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
@@ -504,7 +507,7 @@ class _PackagesPageState extends State<PackagesPage>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: cfg.bg,
+              color: isDark ? cfg.accent.withOpacity(0.12) : cfg.bg,
               borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
               border: Border(bottom: BorderSide(color: cfg.ring)),
             ),
@@ -599,7 +602,7 @@ class _PackagesPageState extends State<PackagesPage>
                       Text(pkg.description,
                           style: TextStyle(
                               fontSize: 13,
-                              color: const Color(0xFF475569),
+                              color: isDark ? Colors.grey.shade300 : const Color(0xFF475569),
                               height: 1.45),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis),
@@ -699,6 +702,7 @@ class _PackagesPageState extends State<PackagesPage>
   // ── empty / error states ───────────────────────────────────────────────────
 
   Widget _buildEmptyState() {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -706,17 +710,17 @@ class _PackagesPageState extends State<PackagesPage>
           Container(
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
-              color: const Color(0xFFEEF2FF),
+              color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEEF2FF),
               shape: BoxShape.circle,
-              border: Border.all(color: const Color(0xFFE0E7FF)),
+              border: Border.all(color: isDark ? const Color(0xFF4F46E5).withOpacity(0.4) : const Color(0xFFE0E7FF)),
             ),
             child: const Icon(Icons.card_membership_rounded,
                 size: 52, color: Color(0xFF6366F1)),
           ),
           const SizedBox(height: 20),
-          const Text('No Packages Found',
+          Text('No Packages Found',
               style: TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.w700, color: Color(0xFF1E293B))),
+                  fontSize: 18, fontWeight: FontWeight.w700, color: isDark ? Colors.white : const Color(0xFF1E293B))),
           const SizedBox(height: 8),
           Text('Create your first membership package to get started',
               style: TextStyle(fontSize: 13, color: Colors.grey.shade500)),
@@ -778,6 +782,7 @@ class _PackagesPageState extends State<PackagesPage>
   Widget _buildSidePanel(PackageProvider provider) {
     final isEdit = _editingPkg != null;
     final panelBg = Theme.of(context).colorScheme.surface;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Material(
       elevation: 24,
       shadowColor: Colors.black26,
@@ -839,9 +844,9 @@ class _PackagesPageState extends State<PackagesPage>
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFEEF2FF),
+                            color: isDark ? const Color(0xFF1E293B) : const Color(0xFFEEF2FF),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: const Color(0xFFE0E7FF)),
+                            border: Border.all(color: isDark ? const Color(0xFF4F46E5).withOpacity(0.4) : const Color(0xFFE0E7FF)),
                           ),
                           child: Row(
                             children: [
@@ -864,6 +869,7 @@ class _PackagesPageState extends State<PackagesPage>
                         label: 'Package Name',
                         hint: 'e.g. Diamond, Gold, Silver…',
                         icon: Icons.badge_rounded,
+                        isDark: isDark,
                         validator: (v) => (v == null || v.isEmpty)
                             ? 'Package name is required'
                             : null,
@@ -876,6 +882,7 @@ class _PackagesPageState extends State<PackagesPage>
                         hint: 'e.g. 1, 3, 6, 12',
                         icon: Icons.calendar_today_rounded,
                         suffixText: 'months',
+                        isDark: isDark,
                         inputType: TextInputType.number,
                         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
                         validator: (v) {
@@ -892,6 +899,7 @@ class _PackagesPageState extends State<PackagesPage>
                         hint: 'e.g. 299.00',
                         icon: Icons.currency_rupee_rounded,
                         prefixText: 'Rs ',
+                        isDark: isDark,
                         inputType: const TextInputType.numberWithOptions(decimal: true),
                         inputFormatters: [
                           FilteringTextInputFormatter.allow(RegExp(r'^\d+\.?\d{0,2}'))
@@ -910,6 +918,7 @@ class _PackagesPageState extends State<PackagesPage>
                         hint: 'Describe what this package includes…',
                         icon: Icons.description_rounded,
                         maxLines: 4,
+                        isDark: isDark,
                         validator: (v) => (v == null || v.isEmpty)
                             ? 'Description is required'
                             : null,
@@ -926,7 +935,7 @@ class _PackagesPageState extends State<PackagesPage>
                                 padding: const EdgeInsets.symmetric(vertical: 13),
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(10)),
-                                side: BorderSide(color: Colors.grey.shade300),
+                                side: BorderSide(color: isDark ? Colors.white.withOpacity(0.20) : Colors.grey.shade300),
                               ),
                               child: const Text('Cancel',
                                   style: TextStyle(fontWeight: FontWeight.w600)),
@@ -980,15 +989,16 @@ class _PackagesPageState extends State<PackagesPage>
     List<TextInputFormatter>? inputFormatters,
     int? maxLines,
     String? Function(String?)? validator,
+    bool isDark = false,
   }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(label,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF374151))),
+                color: isDark ? Colors.grey.shade300 : const Color(0xFF374151))),
         const SizedBox(height: 6),
         TextFormField(
           controller: controller,
@@ -996,24 +1006,24 @@ class _PackagesPageState extends State<PackagesPage>
           inputFormatters: inputFormatters,
           maxLines: maxLines ?? 1,
           validator: validator,
-          style: const TextStyle(fontSize: 14, color: Color(0xFF1E293B)),
+          style: TextStyle(fontSize: 14, color: isDark ? Colors.white : const Color(0xFF1E293B)),
           decoration: InputDecoration(
             hintText: hint,
             hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 13),
             prefixIcon: Icon(icon, size: 16, color: Colors.grey.shade400),
             suffixText: suffixText,
             prefixText: prefixText,
-            prefixStyle: const TextStyle(
-                fontSize: 14, color: Color(0xFF1E293B), fontWeight: FontWeight.w500),
+            prefixStyle: TextStyle(
+                fontSize: 14, color: isDark ? Colors.white : const Color(0xFF1E293B), fontWeight: FontWeight.w500),
             filled: true,
-            fillColor: const Color(0xFFF8FAFC),
+            fillColor: isDark ? const Color(0xFF263248) : const Color(0xFFF8FAFC),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: Colors.grey.shade200)),
+                borderSide: BorderSide(color: isDark ? Colors.white.withOpacity(0.10) : Colors.grey.shade200)),
             enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: BorderSide(color: Colors.grey.shade200)),
+                borderSide: BorderSide(color: isDark ? Colors.white.withOpacity(0.10) : Colors.grey.shade200)),
             focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
                 borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5)),
