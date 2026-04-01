@@ -17,6 +17,8 @@ const _kRose = Color(0xFFEF4444);
 const _kSky = Color(0xFF0EA5E9);
 const _kActionTextDarkenFactor = 0.25;
 const _kActionButtonMinWidth = 118.0;
+const _kActionButtonSpacing = 10.0;
+const _kActionButtonRunSpacing = 8.0;
 
 class UsersPage extends StatefulWidget {
   /// Called when admin taps "Direct Chat" on a member card.
@@ -603,8 +605,8 @@ class _UsersPageState extends State<UsersPage> {
 
                 // Action buttons
                 Wrap(
-                  spacing: 10,
-                  runSpacing: 8,
+                  spacing: _kActionButtonSpacing,
+                  runSpacing: _kActionButtonRunSpacing,
                   children: [
                     if (hasPhone) ...[
                       _actionIconBtn(
@@ -737,7 +739,7 @@ class _UsersPageState extends State<UsersPage> {
   Widget _actionIconBtn(
       IconData icon, String title, Color color, VoidCallback onTap) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final Color actionButtonTextColor =
+    final Color textColor =
         isDark ? Colors.white : Color.lerp(color, Colors.black, _kActionTextDarkenFactor)!;
     return Tooltip(
       message: title,
@@ -768,7 +770,7 @@ class _UsersPageState extends State<UsersPage> {
                 title,
                 style: TextStyle(
                   fontSize: 12,
-                  color: actionButtonTextColor,
+                  color: textColor,
                   fontWeight: FontWeight.w700,
                   letterSpacing: 0.2,
                 ),
