@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:html' as html;
 import 'dart:js' as js;
 
@@ -35,15 +36,25 @@ class WebNotificationService {
   // ------------------------------------------------------------------
 
   /// Shows a native browser notification with [senderName] as the title
-  /// and [message] as the body.  Only shown when the app is in the
-  /// background and permission has been granted.
+  /// and [message] as the body.
+  ///
+  /// By default the notification is only shown when the browser tab is hidden
+  /// (app in the background).  Pass [showInForeground] = true to also show
+  /// the popup when the tab is visible (e.g. from a global listener while the
+  /// admin is on a different page inside the same tab).
+  ///
+  /// [userId] is forwarded to the Flutter app via a custom browser event when
+  /// the admin clicks the notification, so the app can navigate directly to
+  /// that user's conversation.
   static void showMessageNotification({
     required String senderName,
     required String message,
+    String userId = '',
+    bool showInForeground = false,
   }) {
     if (!html.Notification.supported) return;
     if (html.Notification.permission != 'granted') return;
-    if (!isAppInBackground()) return;
+    if (!showInForeground && !isAppInBackground()) return;
 
     final notification = html.Notification(
       senderName,
@@ -54,9 +65,15 @@ class WebNotificationService {
     // Auto-close after 6 seconds.
     Future.delayed(const Duration(seconds: 6), notification.close);
 
-    // Clicking the notification focuses the tab.
+    // Clicking the notification focuses the tab and opens the conversation.
     notification.onClick.listen((_) {
       js.context.callMethod('eval', ['window.focus()']);
+      if (userId.isNotEmpty) {
+        // Dispatch a custom event so the Flutter app can navigate to the user.
+        js.context.callMethod('eval', [
+          'window.dispatchEvent(new CustomEvent("chatNotification", {detail: {userId: ${json.encode(userId)}}}))'
+        ]);
+      }
       notification.close();
     });
   }

@@ -1,10 +1,14 @@
+import 'dart:async';
+import 'dart:html' as html;
 import 'package:adminmrz/auth/service.dart';
 import 'package:adminmrz/core/theme_provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../adminchat/chatprovider.dart';
 import '../adminchat/loading.dart';
+import '../adminchat/services/web_notification_service.dart';
 import '../dashboard/dashboardhome.dart';
 import '../document/screens/docscreen.dart';
 import '../package/packageScreen.dart';
@@ -49,6 +53,18 @@ class _DashboardPageState extends State<DashboardPage> {
 
   late final List<Widget> _pages;
 
+  // ── Global chat notification listener ────────────────────────────────────
+  // Listens to Firestore conversations at all times so that chat notifications
+  // are delivered even when the admin is on a page other than the Chat tab.
+  static const int _adminSenderId = 1;
+  StreamSubscription<QuerySnapshot>? _globalConversationSub;
+  final Map<String, Timestamp?> _globalPrevTimestamps = {};
+  bool _isFirstGlobalSnapshot = true;
+  // Tracks known user names fetched lazily for notification display.
+  final Map<String, String> _globalUserNames = {};
+  // JS event listener reference kept so we can remove it on dispose.
+  late final void Function(html.Event) _onChatNotifEvent;
+
   @override
   void initState() {
     super.initState();
@@ -61,6 +77,140 @@ class _DashboardPageState extends State<DashboardPage> {
       Loading(),
       const CallSettingsScreen(),
     ];
+    _startGlobalConversationListener();
+    _onChatNotifEvent = _handleChatNotifJsEvent;
+    html.window.addEventListener('chatNotification', _onChatNotifEvent);
+  }
+
+  @override
+  void dispose() {
+    _globalConversationSub?.cancel();
+    html.window.removeEventListener('chatNotification', _onChatNotifEvent);
+    super.dispose();
+  }
+
+  /// Handles the custom browser event dispatched when the admin clicks a
+  /// chat browser notification.  Navigates to the Chat tab and opens the
+  /// conversation with the user.
+  void _handleChatNotifJsEvent(html.Event event) {
+    if (!mounted) return;
+    final detail = (event as html.CustomEvent).detail;
+    final userIdStr = detail != null ? detail['userId']?.toString() : null;
+    if (userIdStr == null || userIdStr.isEmpty) return;
+    final userId = int.tryParse(userIdStr);
+    if (userId == null) return;
+    _openChatForUser(userId);
+  }
+
+  /// Firestore listener that runs regardless of which page is active.
+  /// When a new message arrives and the Chat tab is NOT open, a browser
+  /// notification is shown so the admin is always informed.
+  void _startGlobalConversationListener() {
+    _isFirstGlobalSnapshot = true;
+    _globalConversationSub = FirebaseFirestore.instance
+        .collection('conversations')
+        .where('participants', arrayContains: _adminSenderId.toString())
+        .orderBy('lastTimestamp', descending: true)
+        .snapshots()
+        .listen((snapshot) {
+      if (!mounted) return;
+
+      if (!_isFirstGlobalSnapshot) {
+        for (final change in snapshot.docChanges) {
+          if (change.type != DocumentChangeType.added &&
+              change.type != DocumentChangeType.modified) continue;
+
+          final data = change.doc.data() as Map<String, dynamic>;
+
+          // Only react to messages sent by the user (not the admin).
+          final lastSenderId = data['lastSenderId']?.toString() ?? '';
+          if (lastSenderId == _adminSenderId.toString()) continue;
+
+          final List participants =
+              List<String>.from(data['participants'] ?? []);
+          final String otherUserId = participants.firstWhere(
+            (id) => id != _adminSenderId.toString(),
+            orElse: () => '',
+          );
+          if (otherUserId.isEmpty) continue;
+
+          final Timestamp? newTs = data['lastTimestamp'] as Timestamp?;
+          final Timestamp? prevTs = _globalPrevTimestamps[otherUserId];
+
+          final bool isNewMessage = newTs != null &&
+              (prevTs == null || newTs.compareTo(prevTs) > 0);
+          if (!isNewMessage) continue;
+
+          // Skip if the Chat tab is currently visible — ChatSidebar handles it.
+          if (_selectedIndex == 5) continue;
+
+          final String lastMessage = data['lastMessage']?.toString() ?? '';
+          _showGlobalNotification(
+            userId: otherUserId,
+            message: lastMessage,
+          );
+          break; // one notification per snapshot batch is enough (matches ChatSidebar behaviour)
+        }
+      }
+      _isFirstGlobalSnapshot = false;
+
+      // Update previous timestamps.
+      for (final doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final List participants = List<String>.from(data['participants'] ?? []);
+        final String otherUserId = participants.firstWhere(
+          (id) => id != _adminSenderId.toString(),
+          orElse: () => '',
+        );
+        if (otherUserId.isNotEmpty) {
+          _globalPrevTimestamps[otherUserId] =
+              data['lastTimestamp'] as Timestamp?;
+        }
+      }
+    });
+  }
+
+  /// Shows a browser notification and, when the tab is in the background,
+  /// also plays the notification sound.  Called by the global listener when
+  /// the admin is on a page other than the Chat tab.
+  Future<void> _showGlobalNotification({
+    required String userId,
+    required String message,
+  }) async {
+    // Resolve a display name; use the cache when available.
+    String senderName = _globalUserNames[userId] ?? '';
+    if (senderName.isEmpty) {
+      try {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .get();
+        if (doc.exists) {
+          final data = doc.data();
+          senderName =
+              data?['name']?.toString() ?? data?['displayName']?.toString() ?? '';
+        }
+      } catch (_) {}
+      if (senderName.isEmpty) senderName = 'Someone';
+      // Limit the cache size to avoid unbounded growth in long-running sessions.
+      if (_globalUserNames.length >= 200) _globalUserNames.clear();
+      _globalUserNames[userId] = senderName;
+    }
+
+    final String displayMessage = message.isEmpty ? '📷 Photo' : message;
+
+    // Play sound only when the browser tab is in the background.
+    if (WebNotificationService.isAppInBackground()) {
+      WebNotificationService.playMessageSound();
+    }
+
+    // Always show the browser notification popup (admin is on a different page).
+    WebNotificationService.showMessageNotification(
+      senderName: senderName,
+      message: displayMessage,
+      userId: userId,
+      showInForeground: true,
+    );
   }
 
   /// Navigate to the Chat tab and pre-select [userId] so the conversation
