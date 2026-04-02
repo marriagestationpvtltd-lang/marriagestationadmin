@@ -32,16 +32,23 @@ class _ChatSidebarState extends State<ChatSidebar> {
   List<dynamic> _filteredUsers = [];
   String _searchQuery = "";
 
+  static const int _maxUnreadBadge = 99;
+
   // Filter options
   bool _showOnlyPaid = false;
   bool _showOnlyOnline = false;
   bool _showWithMatches = false;
+  bool _showOnlyUnread = false;
   String _sortBy = 'recent'; // 'recent', 'name', 'matches', 'online'
+
+  // Unread message counts: userId -> count of unseen messages from that user
+  Map<String, int> _unreadCounts = {};
 
   Map<String, dynamic>? _selectedChat;
   final int senderId = 1;
   StreamSubscription? _conversationSub;
   StreamSubscription<QuerySnapshot>? _presenceSub;
+  StreamSubscription<QuerySnapshot>? _unreadSub;
 
   // Tracks the last known message timestamp per conversation so we can
   // detect truly NEW incoming messages (from users, not the admin).
@@ -72,6 +79,8 @@ class _ChatSidebarState extends State<ChatSidebar> {
     );
     // Real-time Firestore listener for immediate offline/online status updates
     _startPresenceListener();
+    // Real-time listener for per-user unread message counts
+    _startUnreadListener();
 
     // Sync selection when navigating from other modules (e.g., Members -> Chat)
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -85,6 +94,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
   void dispose() {
     _conversationSub?.cancel();
     _presenceSub?.cancel();
+    _unreadSub?.cancel();
     _scrollController.dispose();
     _searchDebounce?.cancel();
     _onlineStatusTimer?.cancel();
@@ -266,6 +276,33 @@ class _ChatSidebarState extends State<ChatSidebar> {
       }
     }, onError: (e) {
       debugPrint('Presence listener error: $e');
+    });
+  }
+
+  // Firestore real-time listener for unread message counts.
+  // Watches all messages sent TO the admin (receiverid == "1") that have not
+  // been seen yet.  Groups them by senderid to get per-user counts.
+  void _startUnreadListener() {
+    _unreadSub = FirebaseFirestore.instance
+        .collection('adminchat')
+        .where('receiverid', isEqualTo: senderId.toString())
+        .where('seen', isEqualTo: false)
+        .snapshots()
+        .listen((snapshot) {
+      if (!mounted) return;
+      final Map<String, int> counts = {};
+      for (final doc in snapshot.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        final uid = data['senderid']?.toString() ?? '';
+        if (uid.isNotEmpty) {
+          counts[uid] = (counts[uid] ?? 0) + 1;
+        }
+      }
+      // Update counts then re-apply filters in a single rebuild
+      _unreadCounts = counts;
+      if (mounted) _applyFilters();
+    }, onError: (e) {
+      debugPrint('Unread listener error: $e');
     });
   }
 
@@ -463,7 +500,11 @@ class _ChatSidebarState extends State<ChatSidebar> {
           int matchesCount = int.tryParse(user["matches"].toString()) ?? 0;
           bool matchesWithMatches = !_showWithMatches || (matchesCount > 0);
 
-          return matchesSearch && matchesPaid && matchesOnline && matchesWithMatches;
+          final uid = user["id"]?.toString() ?? '';
+          bool matchesUnread = !_showOnlyUnread || (_unreadCounts[uid] ?? 0) > 0;
+
+          return matchesSearch && matchesPaid && matchesOnline &&
+              matchesWithMatches && matchesUnread;
         }).toList();
       });
     });
@@ -517,7 +558,13 @@ class _ChatSidebarState extends State<ChatSidebar> {
         int matchesCount = int.tryParse(user["matches"].toString()) ?? 0;
         bool matchesWithMatches = !_showWithMatches || (matchesCount > 0);
 
-        return matchesSearch && matchesPaid && matchesOnline && matchesWithMatches;
+        // Unread filter
+        final uid = user["id"]?.toString() ?? '';
+        bool matchesUnread =
+            !_showOnlyUnread || (_unreadCounts[uid] ?? 0) > 0;
+
+        return matchesSearch && matchesPaid && matchesOnline &&
+            matchesWithMatches && matchesUnread;
       }).toList();
 
       // Apply sorting
@@ -581,6 +628,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
       _showOnlyPaid = false;
       _showOnlyOnline = false;
       _showWithMatches = false;
+      _showOnlyUnread = false;
       _sortBy = 'recent';
       _searchQuery = "";
     });
@@ -613,6 +661,8 @@ class _ChatSidebarState extends State<ChatSidebar> {
     // On mobile (when onUserTap is provided), take full available width;
     // on desktop keep the fixed sidebar width.
     final double? sidebarWidth = widget.onUserTap != null ? null : 280;
+    final int totalUnread =
+        _unreadCounts.values.fold(0, (a, b) => a + b);
 
     return Container(
       width: sidebarWidth,
@@ -650,6 +700,33 @@ class _ChatSidebarState extends State<ChatSidebar> {
                     ),
                   ),
                 ),
+                // Total unread badge in header
+                if (totalUnread > 0) ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF25D366),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.mark_chat_unread,
+                            size: 10, color: Colors.white),
+                        const SizedBox(width: 3),
+                        Text(
+                          '$totalUnread',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -763,6 +840,53 @@ class _ChatSidebarState extends State<ChatSidebar> {
                         side: BorderSide(color: c.border),
                       ),
                       const SizedBox(width: 6),
+                      FilterChip(
+                        label: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Text('Unread', style: TextStyle(fontSize: 10)),
+                            if (totalUnread > 0) ...[
+                              const SizedBox(width: 4),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 5, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: _showOnlyUnread
+                                      ? const Color(0xFF25D366)
+                                      : const Color(0xFF25D366).withOpacity(0.85),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Text(
+                                  '$totalUnread',
+                                  style: const TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                        selected: _showOnlyUnread,
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                        labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+                        onSelected: (bool selected) {
+                          setState(() {
+                            _showOnlyUnread = selected;
+                            _applyFilters();
+                          });
+                        },
+                        selectedColor: const Color(0xFF25D366).withOpacity(0.15),
+                        checkmarkColor: const Color(0xFF25D366),
+                        side: BorderSide(
+                          color: _showOnlyUnread
+                              ? const Color(0xFF25D366)
+                              : c.border,
+                        ),
+                      ),
+                      const SizedBox(width: 6),
                       Container(
                         height: 28,
                         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -797,7 +921,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
                   ),
                 ),
 
-                if (_showOnlyPaid || _showOnlyOnline || _showWithMatches || _searchQuery.isNotEmpty)
+                if (_showOnlyPaid || _showOnlyOnline || _showWithMatches || _showOnlyUnread || _searchQuery.isNotEmpty)
                   Align(
                     alignment: Alignment.centerRight,
                     child: TextButton.icon(
@@ -870,6 +994,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
                             if (_showOnlyPaid ||
                                 _showOnlyOnline ||
                                 _showWithMatches ||
+                                _showOnlyUnread ||
                                 _searchQuery.isNotEmpty)
                               TextButton(
                                 onPressed: _resetFilters,
@@ -920,6 +1045,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
                             user["is_online"] ?? false,
                             user["profile_picture"] ?? "",
                             isSelected,
+                            _unreadCounts[user["id"].toString()] ?? 0,
                             () {
                               setState(() {
                                 _selectedChat = user;
@@ -950,18 +1076,29 @@ class _ChatSidebarState extends State<ChatSidebar> {
     bool isOnline,
     String profileImage,
     bool isSelected,
+    int unreadCount,
     VoidCallback onTap,
   ) {
     final c = ChatColors.of(context);
+
+    final bool hasUnread = unreadCount > 0;
 
     return GestureDetector(
       onTap: onTap,
       child: Container(
         decoration: BoxDecoration(
-          color: isSelected ? c.selectedRow : c.sidebar,
+          color: isSelected
+              ? c.selectedRow
+              : hasUnread
+                  ? const Color(0xFF25D366).withOpacity(0.06)
+                  : c.sidebar,
           border: isSelected
               ? Border(left: BorderSide(color: c.primary, width: 3))
-              : null,
+              : hasUnread
+                  ? Border(
+                      left: const BorderSide(
+                          color: Color(0xFF25D366), width: 3))
+                  : null,
         ),
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
         child: Row(
@@ -1018,7 +1155,8 @@ class _ChatSidebarState extends State<ChatSidebar> {
                   Text(
                     name,
                     style: TextStyle(
-                      fontWeight: FontWeight.w600,
+                      fontWeight:
+                          hasUnread ? FontWeight.w700 : FontWeight.w600,
                       fontSize: 13,
                       color: isPaid ? c.primary : c.text,
                     ),
@@ -1051,7 +1189,13 @@ class _ChatSidebarState extends State<ChatSidebar> {
                   if (chatMessage.isNotEmpty)
                     Text(
                       chatMessage,
-                      style: TextStyle(fontSize: 11, color: c.muted),
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: hasUnread ? c.text : c.muted,
+                        fontWeight: hasUnread
+                            ? FontWeight.w600
+                            : FontWeight.normal,
+                      ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -1059,29 +1203,56 @@ class _ChatSidebarState extends State<ChatSidebar> {
               ),
             ),
 
-            if (matches > 0)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: c.primaryLight,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.favorite, color: c.primary, size: 10),
-                    const SizedBox(width: 2),
-                    Text(
-                      '$matches',
-                      style: TextStyle(
+            // Right column: unread badge + matches badge
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                // WhatsApp-style unread count badge
+                if (hasUnread)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 4),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF25D366),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      unreadCount > _maxUnreadBadge ? '$_maxUnreadBadge+' : '$unreadCount',
+                      style: const TextStyle(
                         fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: c.primary,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
                       ),
                     ),
-                  ],
-                ),
-              ),
+                  ),
+                if (matches > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: c.primaryLight,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.favorite, color: c.primary, size: 10),
+                        const SizedBox(width: 2),
+                        Text(
+                          '$matches',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: c.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
           ],
         ),
       ),
