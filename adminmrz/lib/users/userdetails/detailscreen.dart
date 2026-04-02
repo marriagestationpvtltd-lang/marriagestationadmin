@@ -81,6 +81,10 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
   final TextEditingController _notifBodyCtrl = TextEditingController();
   bool _isSaving = false;
 
+  // ── mobile collapsible section state ────────────────────────────────────────
+  // Sections expanded by default on mobile; all others start collapsed.
+  final Set<String> _expandedSections = {'personal', 'documents'};
+
   @override
   void initState() {
     super.initState();
@@ -501,7 +505,52 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
     required Color color,
     required List<Widget> rows,
     Widget? trailing,
+    bool collapsible = false,
+    String sectionKey = '',
   }) {
+    final isExpanded = !collapsible || _expandedSections.contains(sectionKey);
+
+    final headerRow = Row(
+      children: [
+        Icon(icon, size: 17, color: color),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Text(
+            title,
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w700,
+              color: color,
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
+        if (!collapsible) ...[
+          if (trailing != null) trailing,
+        ] else ...[
+          if (isExpanded && trailing != null) ...[
+            trailing,
+            const SizedBox(width: 6),
+          ],
+          AnimatedRotation(
+            turns: isExpanded ? 0.5 : 0,
+            duration: const Duration(milliseconds: 200),
+            child: Icon(
+              Icons.keyboard_arrow_down_rounded,
+              size: 22,
+              color: color.withOpacity(0.75),
+            ),
+          ),
+        ],
+      ],
+    );
+
+    final headerContainer = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      color: color.withOpacity(0.05),
+      child: headerRow,
+    );
+
     return Container(
       decoration: BoxDecoration(
         border: Border(left: BorderSide(color: color, width: 4)),
@@ -509,32 +558,40 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            color: color.withOpacity(0.05),
-            child: Row(
-              children: [
-                Icon(icon, size: 17, color: color),
-                const SizedBox(width: 10),
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: color,
-                    letterSpacing: 0.2,
+          collapsible
+              ? Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => setState(() {
+                      if (isExpanded) {
+                        _expandedSections.remove(sectionKey);
+                      } else {
+                        _expandedSections.add(sectionKey);
+                      }
+                    }),
+                    child: headerContainer,
                   ),
+                )
+              : headerContainer,
+          AnimatedCrossFade(
+            firstChild: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                  child: Column(children: rows),
                 ),
-                const Spacer(),
-                if (trailing != null) trailing,
+                const SizedBox(height: 8),
               ],
             ),
+            secondChild: const SizedBox(width: double.infinity, height: 0),
+            crossFadeState: isExpanded
+                ? CrossFadeState.showFirst
+                : CrossFadeState.showSecond,
+            duration: const Duration(milliseconds: 220),
+            sizeCurve: Curves.easeInOut,
           ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-            child: Column(children: rows),
-          ),
-          const SizedBox(height: 8),
         ],
       ),
     );
@@ -1284,10 +1341,12 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
 
   // ── section builders ─────────────────────────────────────────────────────────
 
-  Widget _buildPersonal(PersonalDetail p) => _section(
+  Widget _buildPersonal(PersonalDetail p, {bool collapsible = false}) => _section(
         title: 'Personal Details',
         icon: Icons.person_outline,
         color: _kPersonal,
+        collapsible: collapsible,
+        sectionKey: 'personal',
         trailing: _chipButton(
           label: 'Edit all',
           icon: Icons.edit_outlined,
@@ -1310,10 +1369,12 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
         ],
       );
 
-  Widget _buildEducation(PersonalDetail p) => _section(
+  Widget _buildEducation(PersonalDetail p, {bool collapsible = false}) => _section(
         title: 'Education & Career',
         icon: Icons.school_outlined,
         color: _kEducation,
+        collapsible: collapsible,
+        sectionKey: 'education',
         trailing: _chipButton(
           label: 'Edit all',
           icon: Icons.edit_outlined,
@@ -1335,10 +1396,12 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
         ],
       );
 
-  Widget _buildFamily(FamilyDetail f) => _section(
+  Widget _buildFamily(FamilyDetail f, {bool collapsible = false}) => _section(
         title: 'Family Details',
         icon: Icons.family_restroom,
         color: _kFamily,
+        collapsible: collapsible,
+        sectionKey: 'family',
         trailing: _chipButton(
           label: 'Edit all',
           icon: Icons.edit_outlined,
@@ -1360,10 +1423,12 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
         ],
       );
 
-  Widget _buildLifestyle(Lifestyle ls) => _section(
+  Widget _buildLifestyle(Lifestyle ls, {bool collapsible = false}) => _section(
         title: 'Lifestyle',
         icon: Icons.emoji_food_beverage,
         color: _kLifestyle,
+        collapsible: collapsible,
+        sectionKey: 'lifestyle',
         trailing: _chipButton(
           label: 'Edit all',
           icon: Icons.edit_outlined,
@@ -1757,10 +1822,12 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
     }
   }
 
-  Widget _buildPartner(PartnerPreference pp) => _section(
+  Widget _buildPartner(PartnerPreference pp, {bool collapsible = false}) => _section(
         title: 'Partner Preferences',
         icon: Icons.favorite,
         color: _kPartner,
+        collapsible: collapsible,
+        sectionKey: 'partner',
         trailing: _chipButton(
           label: 'Edit all',
           icon: Icons.edit_outlined,
@@ -1880,7 +1947,114 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
 
   // ── documents section ────────────────────────────────────────────────────────
 
-  Widget _buildDocumentsSection() {
+  Widget _buildDocumentsSection({bool collapsible = false}) {
+    const sectionKey = 'documents';
+    final isExpanded =
+        !collapsible || _expandedSections.contains(sectionKey);
+
+    final headerContainer = Container(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      color: _kDocs.withOpacity(0.05),
+      child: Row(
+        children: [
+          const Icon(Icons.description_outlined, size: 17, color: _kDocs),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'Submitted Documents',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: _kDocs,
+                letterSpacing: 0.2,
+              ),
+            ),
+          ),
+          if (!collapsible)
+            Consumer<DocumentsProvider>(
+              builder: (_, dp, __) => dp.isLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : IconButton(
+                      icon: const Icon(Icons.refresh, size: 16),
+                      color: _kDocs,
+                      tooltip: 'Refresh documents',
+                      onPressed: () => dp.fetchDocuments(),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+            )
+          else if (isExpanded)
+            Consumer<DocumentsProvider>(
+              builder: (_, dp, __) => dp.isLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : IconButton(
+                      icon: const Icon(Icons.refresh, size: 16),
+                      color: _kDocs,
+                      tooltip: 'Refresh documents',
+                      onPressed: () => dp.fetchDocuments(),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+            ),
+          if (collapsible) ...[
+            const SizedBox(width: 4),
+            AnimatedRotation(
+              turns: isExpanded ? 0.5 : 0,
+              duration: const Duration(milliseconds: 200),
+              child: Icon(
+                Icons.keyboard_arrow_down_rounded,
+                size: 22,
+                color: _kDocs.withOpacity(0.75),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+
+    final contentWidget = Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      child: Consumer<DocumentsProvider>(
+        builder: (_, dp, __) {
+          if (dp.isLoading) {
+            return const Padding(
+              padding: EdgeInsets.symmetric(vertical: 24),
+              child: Center(
+                  child: CircularProgressIndicator(strokeWidth: 2)),
+            );
+          }
+          final docs = dp.documentsForUser(widget.userId);
+          if (docs.isEmpty) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.folder_open_outlined,
+                        size: 36, color: Colors.grey.shade300),
+                    const SizedBox(height: 8),
+                    Text('No documents submitted',
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.grey.shade400)),
+                  ],
+                ),
+              ),
+            );
+          }
+          return Column(
+            children: docs.map((doc) => _docCard(doc)).toList(),
+          );
+        },
+      ),
+    );
+
     return Container(
       decoration: const BoxDecoration(
         border: Border(left: BorderSide(color: _kDocs, width: 4)),
@@ -1888,76 +2062,34 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            color: _kDocs.withOpacity(0.05),
-            child: Row(
-              children: [
-                const Icon(Icons.description_outlined, size: 17, color: _kDocs),
-                const SizedBox(width: 10),
-                const Text(
-                  'Submitted Documents',
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: _kDocs,
-                    letterSpacing: 0.2,
+          collapsible
+              ? Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: () => setState(() {
+                      if (isExpanded) {
+                        _expandedSections.remove(sectionKey);
+                      } else {
+                        _expandedSections.add(sectionKey);
+                      }
+                    }),
+                    child: headerContainer,
                   ),
-                ),
-                const Spacer(),
-                Consumer<DocumentsProvider>(
-                  builder: (_, dp, __) => dp.isLoading
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : IconButton(
-                          icon: const Icon(Icons.refresh, size: 16),
-                          color: _kDocs,
-                          tooltip: 'Refresh documents',
-                          onPressed: () => dp.fetchDocuments(),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                        ),
-                ),
+                )
+              : headerContainer,
+          AnimatedCrossFade(
+            firstChild: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                contentWidget,
               ],
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Consumer<DocumentsProvider>(
-              builder: (_, dp, __) {
-                if (dp.isLoading) {
-                  return const Padding(
-                    padding: EdgeInsets.symmetric(vertical: 24),
-                    child: Center(
-                        child: CircularProgressIndicator(strokeWidth: 2)),
-                  );
-                }
-                final docs = dp.documentsForUser(widget.userId);
-                if (docs.isEmpty) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 20),
-                    child: Center(
-                      child: Column(
-                        children: [
-                          Icon(Icons.folder_open_outlined,
-                              size: 36, color: Colors.grey.shade300),
-                          const SizedBox(height: 8),
-                          Text('No documents submitted',
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey.shade400)),
-                        ],
-                      ),
-                    ),
-                  );
-                }
-                return Column(
-                  children: docs.map((doc) => _docCard(doc)).toList(),
-                );
-              },
-            ),
+            secondChild: const SizedBox(width: double.infinity, height: 0),
+            crossFadeState: isExpanded
+                ? CrossFadeState.showFirst
+                : CrossFadeState.showSecond,
+            duration: const Duration(milliseconds: 220),
+            sizeCurve: Curves.easeInOut,
           ),
         ],
       ),
@@ -3122,7 +3254,7 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
                 child: Column(
                   children: [
                     _buildHeader(p, contact),
-                    _buildDocumentsSection(),
+                    _buildDocumentsSection(collapsible: true),
                     const Divider(height: 1, thickness: 1),
                     _buildMediaAndActivity(p, provider),
                     Padding(
@@ -3130,15 +3262,15 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
                       child: _buildRightAdminActions(p, provider),
                     ),
                     const Divider(height: 1, thickness: 1),
-                    _buildPersonal(p),
+                    _buildPersonal(p, collapsible: true),
                     const Divider(height: 1, thickness: 1),
-                    _buildEducation(p),
+                    _buildEducation(p, collapsible: true),
                     const Divider(height: 1, thickness: 1),
-                    _buildFamily(data.familyDetail),
+                    _buildFamily(data.familyDetail, collapsible: true),
                     const Divider(height: 1, thickness: 1),
-                    _buildLifestyle(data.lifestyle),
+                    _buildLifestyle(data.lifestyle, collapsible: true),
                     const Divider(height: 1, thickness: 1),
-                    _buildPartner(data.partner),
+                    _buildPartner(data.partner, collapsible: true),
                     const SizedBox(height: 8),
                   ],
                 ),
