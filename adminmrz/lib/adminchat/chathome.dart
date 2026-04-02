@@ -2638,19 +2638,18 @@ class _ChatWindowState extends State<ChatWindow> {
     );
   }
 
-  /// Single tick (sent) or double tick (seen) indicator for admin-sent messages.
+  /// WhatsApp-style read receipt tick for admin-sent messages.
+  /// Double grey ticks = delivered (not yet read by user).
+  /// Double blue ticks = read by user.
   Widget _buildSeenTick(bool seen) {
-    const kPrimary = Color(0xFFD81B60);
-    const kMuted = Color(0xFF94A3B8);
-    if (seen) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: const [
-          Icon(Icons.done_all, size: 13, color: kPrimary),
-        ],
-      );
-    }
-    return const Icon(Icons.done, size: 13, color: kMuted);
+    // WhatsApp blue (#34B7F1) for read, slate-grey for delivered-not-read.
+    const kReadBlue = Color(0xFF34B7F1);
+    const kDelivered = Color(0xFF94A3B8);
+    return Icon(
+      Icons.done_all,
+      size: 14,
+      color: seen ? kReadBlue : kDelivered,
+    );
   }
 
   /// Call history message bubble.
