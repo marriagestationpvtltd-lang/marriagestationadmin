@@ -2423,6 +2423,391 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
     );
   }
 
+  // ── Right-panel Documents card ──────────────────────────────────────────────
+
+  Widget _buildRightDocumentsCard() {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: _kDocs.withOpacity(0.05),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.description_outlined, size: 16, color: _kDocs),
+                const SizedBox(width: 8),
+                const Text(
+                  'Documents',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kDocs),
+                ),
+                const Spacer(),
+                Consumer<DocumentsProvider>(
+                  builder: (_, dp, __) => dp.isLoading
+                      ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                      : IconButton(
+                          icon: const Icon(Icons.refresh, size: 14),
+                          color: _kDocs,
+                          tooltip: 'Refresh documents',
+                          onPressed: () => dp.fetchDocuments(),
+                          padding: EdgeInsets.zero,
+                          constraints: const BoxConstraints(),
+                        ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Consumer<DocumentsProvider>(
+              builder: (_, dp, __) {
+                if (dp.isLoading) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16),
+                    child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                  );
+                }
+                final docs = dp.documentsForUser(widget.userId);
+                if (docs.isEmpty) {
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    child: Center(
+                      child: Column(
+                        children: [
+                          Icon(Icons.folder_open_outlined, size: 28, color: Colors.grey.shade300),
+                          const SizedBox(height: 6),
+                          Text(
+                            'No documents submitted',
+                            style: TextStyle(fontSize: 12, color: Colors.grey.shade400),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+                return Column(
+                  children: docs.map((doc) => _rightDocTile(doc, dp)).toList(),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _rightDocTile(Document doc, DocumentsProvider dp) {
+    final statusColor = doc.isApproved ? _kEmerald : doc.isRejected ? _kRose : _kAmber;
+    return InkWell(
+      onTap: () => _showDocActionDialog(doc, dp),
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade50,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: statusColor.withOpacity(0.28)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(6),
+                color: Colors.white,
+                border: Border.all(color: Colors.grey.shade200),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(5),
+                child: Image.network(
+                  doc.fullPhotoUrl,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (_, child, prog) =>
+                      prog == null ? child : const Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))),
+                  errorBuilder: (_, __, ___) =>
+                      Center(child: Icon(Icons.insert_drive_file_outlined, size: 20, color: Colors.grey.shade400)),
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    doc.documentType.isNotEmpty ? doc.documentType : '—',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: statusColor.withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      doc.status.toUpperCase(),
+                      style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: statusColor),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.chevron_right, size: 16, color: Colors.grey.shade400),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showDocActionDialog(Document doc, DocumentsProvider dp) async {
+    _rejectDocCtrl.clear();
+    bool showRejectField = false;
+    await showDialog(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          final statusColor = doc.isApproved ? _kEmerald : doc.isRejected ? _kRose : _kAmber;
+          return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            contentPadding: EdgeInsets.zero,
+            titlePadding: EdgeInsets.zero,
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Document image preview
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _showDocPreview(doc.fullPhotoUrl);
+                    },
+                    child: Stack(
+                      children: [
+                        ClipRRect(
+                          borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                          child: SizedBox(
+                            height: 180,
+                            width: double.infinity,
+                            child: Image.network(
+                              doc.fullPhotoUrl,
+                              fit: BoxFit.cover,
+                              loadingBuilder: (_, child, prog) => prog == null
+                                  ? child
+                                  : const SizedBox(height: 180, child: Center(child: CircularProgressIndicator(strokeWidth: 2))),
+                              errorBuilder: (_, __, ___) => Container(
+                                height: 180,
+                                color: Colors.grey.shade100,
+                                child: Center(
+                                  child: Icon(Icons.insert_drive_file_outlined, size: 48, color: Colors.grey.shade400),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                        const Positioned(
+                          bottom: 8,
+                          right: 8,
+                          child: Tooltip(
+                            message: 'Tap to view full image',
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                              child: Padding(
+                                padding: EdgeInsets.all(4),
+                                child: Icon(Icons.zoom_in, size: 16, color: Colors.white),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          doc.documentType.isNotEmpty ? doc.documentType : 'Document',
+                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700),
+                        ),
+                        if (doc.documentIdNumber.isNotEmpty) ...[
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              Icon(Icons.numbers_outlined, size: 13, color: Colors.teal.shade400),
+                              const SizedBox(width: 4),
+                              Text(doc.documentIdNumber,
+                                  style: TextStyle(fontSize: 12.5, color: Colors.grey.shade600)),
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: statusColor.withOpacity(0.10),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: statusColor.withOpacity(0.30)),
+                          ),
+                          child: Text(
+                            doc.status.toUpperCase(),
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: statusColor),
+                          ),
+                        ),
+                        if (doc.isPending) ...[
+                          const SizedBox(height: 14),
+                          if (showRejectField) ...[
+                            Text('Reason for rejection:',
+                                style: TextStyle(fontSize: 12, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 6),
+                            TextField(
+                              controller: _rejectDocCtrl,
+                              maxLines: 3,
+                              autofocus: true,
+                              decoration: InputDecoration(
+                                hintText: 'Enter rejection reason…',
+                                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                                contentPadding: const EdgeInsets.all(12),
+                              ),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: OutlinedButton(
+                                    onPressed: () => setDialogState(() => showRejectField = false),
+                                    style: OutlinedButton.styleFrom(
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    child: const Text('Back'),
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: ElevatedButton(
+                                    onPressed: () async {
+                                      if (_rejectDocCtrl.text.trim().isEmpty) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          const SnackBar(
+                                            content: Text('Please enter a rejection reason'),
+                                            backgroundColor: Color(0xFFEF4444),
+                                          ),
+                                        );
+                                        return;
+                                      }
+                                      Navigator.pop(ctx);
+                                      if (!mounted) return;
+                                      final ok = await dp.updateDocumentStatus(
+                                        userId: doc.userId,
+                                        action: 'reject',
+                                        rejectReason: _rejectDocCtrl.text.trim(),
+                                      );
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                          content: Text(ok ? 'Document rejected' : 'Failed: ${dp.error}'),
+                                          backgroundColor: ok ? _kAmber : _kRose,
+                                          behavior: SnackBarBehavior.floating,
+                                          margin: const EdgeInsets.all(16),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                        ));
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: _kRose,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                    ),
+                                    child: const Text('Reject'),
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                          ] else ...[
+                            Consumer<DocumentsProvider>(
+                              builder: (_, docP, __) => docP.isActionLoading
+                                  ? const Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                                  : Row(
+                                      children: [
+                                        Expanded(
+                                          child: ElevatedButton.icon(
+                                            icon: const Icon(Icons.check_circle_outline, size: 16),
+                                            label: const Text('Approve'),
+                                            onPressed: () async {
+                                              Navigator.pop(ctx);
+                                              if (!mounted) return;
+                                              final ok = await docP.updateDocumentStatus(
+                                                  userId: doc.userId, action: 'approve');
+                                              if (mounted) {
+                                                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                                                  content: Text(ok ? 'Document approved' : 'Failed: ${docP.error}'),
+                                                  backgroundColor: ok ? _kEmerald : _kRose,
+                                                  behavior: SnackBarBehavior.floating,
+                                                  margin: const EdgeInsets.all(16),
+                                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                                ));
+                                              }
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: _kEmerald,
+                                              foregroundColor: Colors.white,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Expanded(
+                                          child: ElevatedButton.icon(
+                                            icon: const Icon(Icons.cancel_outlined, size: 16),
+                                            label: const Text('Reject'),
+                                            onPressed: () => setDialogState(() => showRejectField = true),
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: _kRose,
+                                              foregroundColor: Colors.white,
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                            ),
+                            const SizedBox(height: 4),
+                          ],
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: const Text('Close'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _approveDocFromProfile(
       Document doc, DocumentsProvider dp) async {
     final confirmed = await showDialog<bool>(
@@ -2763,6 +3148,11 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
 
         // ── Admin Actions card ──
         _buildRightAdminActions(p, prov),
+
+        const SizedBox(height: 14),
+
+        // ── Documents card ──
+        _buildRightDocumentsCard(),
 
         const SizedBox(height: 14),
 
