@@ -71,10 +71,12 @@ class _ChatWindowState extends State<ChatWindow> {
 
   // Pagination
   static const int _pageSize = 20;
+  static const double _autoScrollThreshold = 120;
   int _currentLimit = 20;
   int? _cachedLimit;
   bool _isLoadingMore = false;
   bool _hasMoreMessages = true;
+  bool _suppressNextAutoScroll = false;
   int? _prevUserId;
 
   // Match-related data
@@ -583,7 +585,14 @@ class _ChatWindowState extends State<ChatWindow> {
 
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
-      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      final maxScrollExtent = _scrollController.position.maxScrollExtent;
+      if (maxScrollExtent > 0) {
+        _scrollController.jumpTo(maxScrollExtent);
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _scrollToBottom();
+        });
+      }
     } else {
       Future.delayed(Duration(milliseconds: 100), _scrollToBottom);
     }
@@ -601,6 +610,7 @@ class _ChatWindowState extends State<ChatWindow> {
     if (_isLoadingMore || !_hasMoreMessages) return;
     setState(() {
       _isLoadingMore = true;
+      _suppressNextAutoScroll = true;
       _currentLimit += _pageSize;
     });
     // _isLoadingMore is cleared in the StreamBuilder once the new snapshot arrives
@@ -846,6 +856,7 @@ class _ChatWindowState extends State<ChatWindow> {
       _cachedReceiverId = chatProvider.id;
       _currentLimit = _pageSize;
       _hasMoreMessages = true;
+      _suppressNextAutoScroll = false;
       _lastSnapshot = null; // clear stale messages from the previous user
       // Re-fetch match details for the newly selected user
       if (chatProvider.id != null) Future.microtask(_fetchMatchDetails);
@@ -1154,7 +1165,8 @@ class _ChatWindowState extends State<ChatWindow> {
                     : _lastSnapshot?.docs ?? <QueryDocumentSnapshot>[];
                 final isActiveSearch = _isSearching && _searchController.text.isNotEmpty;
                 final messages = isActiveSearch ? _filteredMessages : rawMessages;
-                final previousCount = _lastSnapshot?.docs.length ?? 0;
+                final previousSnapshot = _lastSnapshot;
+                final previousCount = previousSnapshot?.docs.length ?? 0;
 
                 if (snapshot.hasData) {
                   _lastSnapshot = snapshot.data;
@@ -1165,6 +1177,7 @@ class _ChatWindowState extends State<ChatWindow> {
                       if (mounted) setState(() {
                         _hasMoreMessages = !noMore;
                         _isLoadingMore = false;
+                        _suppressNextAutoScroll = false;
                       });
                     });
                   }
@@ -1196,14 +1209,12 @@ class _ChatWindowState extends State<ChatWindow> {
                 }
 
                 final messageGroups = _groupMessagesByDate(messages);
-                final shouldAutoScroll = !_isSearching &&
-                    !_isLoadingMore &&
-                    snapshot.hasData &&
-                    (previousCount != rawMessages.length ||
-                        !_scrollController.hasClients ||
-                        (_scrollController.position.maxScrollExtent -
-                                _scrollController.offset) <=
-                            120);
+                final shouldAutoScroll = _shouldAutoScrollToBottom(
+                  hasSnapshotData: snapshot.hasData,
+                  isSearching: _isSearching,
+                  previousCount: previousCount,
+                  currentCount: rawMessages.length,
+                );
 
                 if (shouldAutoScroll) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1258,8 +1269,7 @@ class _ChatWindowState extends State<ChatWindow> {
                               final doc = group.messages[index];
                               final data = doc.data() as Map<String, dynamic>;
                               final isSentByMe = data['senderid'] == senderId.toString();
-                              final timestamp = (data['timestamp'] as Timestamp?)?.toDate() ??
-                                  DateTime.now();
+                              final timestamp = _messageTimestampFromData(data);
                               final replyPayload = _buildReplyPayload(
                                 docId: doc.id,
                                 data: data,
@@ -1573,19 +1583,30 @@ class _ChatWindowState extends State<ChatWindow> {
   DateTime _dateOnly(DateTime dateTime) =>
       DateTime(dateTime.year, dateTime.month, dateTime.day);
 
-  bool _isToday(DateTime dateTime) {
-    final now = DateTime.now();
+  DateTime _messageTimestampFromData(
+    Map<String, dynamic> data, {
+    DateTime? fallback,
+  }) {
+    return (data['timestamp'] as Timestamp?)?.toDate() ??
+        fallback ??
+        DateTime.now();
+  }
+
+  bool _isToday(DateTime dateTime, [DateTime? reference]) {
+    final now = reference ?? DateTime.now();
     return _dateOnly(dateTime) == _dateOnly(now);
   }
 
-  bool _isYesterday(DateTime dateTime) {
-    final yesterday = _dateOnly(DateTime.now()).subtract(const Duration(days: 1));
+  bool _isYesterday(DateTime dateTime, [DateTime? reference]) {
+    final yesterday =
+        _dateOnly(reference ?? DateTime.now()).subtract(const Duration(days: 1));
     return _dateOnly(dateTime) == yesterday;
   }
 
-  String _formatDateHeader(DateTime dateTime) {
-    if (_isToday(dateTime)) return 'Today';
-    if (_isYesterday(dateTime)) return 'Yesterday';
+  String _formatDateHeader(DateTime dateTime, [DateTime? reference]) {
+    final now = reference ?? DateTime.now();
+    if (_isToday(dateTime, now)) return 'Today';
+    if (_isYesterday(dateTime, now)) return 'Yesterday';
     return DateFormat('MMM d, y').format(dateTime);
   }
 
@@ -1593,11 +1614,14 @@ class _ChatWindowState extends State<ChatWindow> {
     List<QueryDocumentSnapshot> messages,
   ) {
     final sorted = List<QueryDocumentSnapshot>.from(messages);
+    final fallbackTimestamp = DateTime.now();
     sorted.sort((a, b) {
       final aData = a.data() as Map<String, dynamic>;
       final bData = b.data() as Map<String, dynamic>;
-      final aTimestamp = (aData['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
-      final bTimestamp = (bData['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
+      final aTimestamp =
+          _messageTimestampFromData(aData, fallback: fallbackTimestamp);
+      final bTimestamp =
+          _messageTimestampFromData(bData, fallback: fallbackTimestamp);
       return aTimestamp.compareTo(bTimestamp);
     });
     return sorted;
@@ -1607,17 +1631,20 @@ class _ChatWindowState extends State<ChatWindow> {
     List<QueryDocumentSnapshot> messages,
   ) {
     final groups = <_ChatMessageDateGroup>[];
+    final fallbackTimestamp = DateTime.now();
+    final referenceNow = DateTime.now();
 
     for (final doc in _sortMessagesChronologically(messages)) {
       final data = doc.data() as Map<String, dynamic>;
-      final timestamp = (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
+      final timestamp =
+          _messageTimestampFromData(data, fallback: fallbackTimestamp);
       final date = _dateOnly(timestamp);
 
       if (groups.isEmpty || groups.last.date != date) {
         groups.add(
           _ChatMessageDateGroup(
             date: date,
-            headerLabel: _formatDateHeader(timestamp),
+            headerLabel: _formatDateHeader(timestamp, referenceNow),
             messages: [doc],
           ),
         );
@@ -1627,6 +1654,35 @@ class _ChatWindowState extends State<ChatWindow> {
     }
 
     return groups;
+  }
+
+  bool _shouldAutoScrollToBottom({
+    required bool hasSnapshotData,
+    required bool isSearching,
+    required int previousCount,
+    required int currentCount,
+  }) {
+    if (isSearching || _isLoadingMore || !hasSnapshotData) {
+      return false;
+    }
+
+    if (_suppressNextAutoScroll) {
+      return false;
+    }
+
+    if (!_scrollController.hasClients) {
+      // The first layout pass has not attached the controller yet; schedule a
+      // deferred scroll so the view still lands on the latest messages.
+      return true;
+    }
+
+    if (previousCount != currentCount) {
+      return true;
+    }
+
+    final distanceFromBottom =
+        _scrollController.position.maxScrollExtent - _scrollController.offset;
+    return distanceFromBottom <= _autoScrollThreshold;
   }
 
   Widget _buildChatBubble(String message, bool isSentByMe, DateTime timestamp,
@@ -3133,6 +3189,8 @@ class _ChatMessageDateGroup {
 }
 
 class _ChatDateHeaderDelegate extends SliverPersistentHeaderDelegate {
+  static const double _headerHeight = 44;
+
   _ChatDateHeaderDelegate({
     required this.label,
     required this.backgroundColor,
@@ -3148,10 +3206,10 @@ class _ChatDateHeaderDelegate extends SliverPersistentHeaderDelegate {
   final Color borderColor;
 
   @override
-  double get minExtent => 44;
+  double get minExtent => _headerHeight;
 
   @override
-  double get maxExtent => 44;
+  double get maxExtent => _headerHeight;
 
   @override
   Widget build(
