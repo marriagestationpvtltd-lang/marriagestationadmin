@@ -1058,7 +1058,7 @@ class _YourDetailsPageState extends State<YourDetailsPage> {
                                     radius: 55,
                                     backgroundImage: _profileImage != null
                                         ? FileImage(_profileImage!)
-                                        : (model.profilePictureFile != null ? FileImage(model.profilePictureFile!) : const AssetImage("assets/profile.jpg")) as ImageProvider,
+                                        : (model.profilePictureFile != null ? FileImage(model.profilePictureFile!) : const AssetImage("assets/images/user1.png")) as ImageProvider,
                                     child: _profileImage == null && model.profilePictureFile == null
                                         ? const Icon(Icons.person, size: 50, color: Colors.white)
                                         : null,
