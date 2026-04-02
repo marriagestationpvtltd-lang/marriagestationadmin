@@ -8,6 +8,10 @@ import 'package:provider/provider.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../document/docprovider/docmodel.dart';
+import '../document/docprovider/docservice.dart';
+import '../users/userdetails/detailscreen.dart';
+import '../users/userdetails/userdetailprovider.dart';
 import 'chat_theme.dart';
 import 'chatprovider.dart';
 import 'chatscreen.dart';
@@ -25,7 +29,8 @@ class ChatSidebar extends StatefulWidget {
   _ChatSidebarState createState() => _ChatSidebarState();
 }
 
-class _ChatSidebarState extends State<ChatSidebar> {
+class _ChatSidebarState extends State<ChatSidebar>
+    with SingleTickerProviderStateMixin {
   Map<String, Map<String, dynamic>> conversationMap = {};
 
   List<dynamic> _users = [];
@@ -67,9 +72,18 @@ class _ChatSidebarState extends State<ChatSidebar> {
   Timer? _onlineStatusTimer;
   ChatProvider? _chatProvider;
 
+  // ── Document tab ─────────────────────────────────────────────────────────
+  late TabController _tabController;
+  final TextEditingController _docSearchController = TextEditingController();
+  String _docQuery = '';
+  // 'all' | 'pending' | 'approved' | 'rejected'
+  String _docFilter = 'pending';
+  final TextEditingController _rejectReasonController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _scrollController.addListener(_onScroll);
     fetchUsers(reset: true);
     // Poll online status every 10 seconds so the list updates live
@@ -87,11 +101,20 @@ class _ChatSidebarState extends State<ChatSidebar> {
       _chatProvider = context.read<ChatProvider>();
       _chatProvider?.addListener(_handleExternalSelection);
       _handleExternalSelection();
+      // Pre-load documents for the Documents tab
+      context.read<DocumentsProvider>().fetchDocuments();
+    });
+
+    _docSearchController.addListener(() {
+      if (mounted) setState(() => _docQuery = _docSearchController.text.toLowerCase());
     });
   }
 
   @override
   void dispose() {
+    _tabController.dispose();
+    _docSearchController.dispose();
+    _rejectReasonController.dispose();
     _conversationSub?.cancel();
     _presenceSub?.cancel();
     _unreadSub?.cancel();
@@ -708,352 +731,421 @@ class _ChatSidebarState extends State<ChatSidebar> {
       color: c.sidebar,
       child: Column(
         children: [
-          // ── HEADER ──────────────────────────────────────────────────
-          Container(
-            height: 56,
-            color: c.sidebar,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Text(
-                  'Conversations',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: c.text,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // ── SEARCH BAR ──────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            child: SizedBox(
-              height: 40,
-              child: TextField(
-                decoration: InputDecoration(
-                  hintText: "Search conversations...",
-                  hintStyle: TextStyle(fontSize: 12, color: c.muted),
-                  prefixIcon: Icon(Icons.search, size: 18, color: c.muted),
-                  suffixIcon: _searchQuery.isNotEmpty
-                      ? IconButton(
-                          icon: Icon(Icons.clear, size: 16, color: c.muted),
-                          onPressed: () {
-                            _searchDebounce?.cancel();
-                            setState(() => _searchQuery = "");
-                            fetchUsers(reset: true);
-                          },
-                        )
-                      : null,
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: BorderSide(color: c.border, width: 1),
-                  ),
-                  enabledBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: BorderSide(color: c.border, width: 1),
-                  ),
-                  focusedBorder: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(20),
-                    borderSide: BorderSide(color: c.primary, width: 1),
-                  ),
-                  filled: true,
-                  fillColor: c.searchFill,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
-                  isDense: true,
-                ),
-                onChanged: (value) {
-                  setState(() => _searchQuery = value);
-                  _searchDebounce?.cancel();
-                  _searchDebounce = Timer(
-                    const Duration(milliseconds: 400),
-                    () => fetchUsers(reset: true),
-                  );
-                },
-              ),
-            ),
-          ),
-
-          // ── FILTER CHIPS ────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            child: Column(
-              children: [
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      FilterChip(
-                        label: const Text('Paid', style: TextStyle(fontSize: 10)),
-                        selected: _showOnlyPaid,
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                        labelPadding: const EdgeInsets.symmetric(horizontal: 2),
-                        onSelected: (bool selected) {
-                          setState(() {
-                            _showOnlyPaid = selected;
-                            _applyFilters();
-                          });
-                        },
-                        selectedColor: c.primaryLight,
-                        checkmarkColor: c.primary,
-                        side: BorderSide(color: c.border),
-                      ),
-                      const SizedBox(width: 6),
-                      FilterChip(
-                        label: const Text('Online', style: TextStyle(fontSize: 10)),
-                        selected: _showOnlyOnline,
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                        labelPadding: const EdgeInsets.symmetric(horizontal: 2),
-                        onSelected: (bool selected) {
-                          setState(() {
-                            _showOnlyOnline = selected;
-                            _applyFilters();
-                          });
-                        },
-                        selectedColor: c.primaryLight,
-                        checkmarkColor: c.primary,
-                        side: BorderSide(color: c.border),
-                      ),
-                      const SizedBox(width: 6),
-                      FilterChip(
-                        label: const Text('Matches', style: TextStyle(fontSize: 10)),
-                        selected: _showWithMatches,
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                        labelPadding: const EdgeInsets.symmetric(horizontal: 2),
-                        onSelected: (bool selected) {
-                          setState(() {
-                            _showWithMatches = selected;
-                            _applyFilters();
-                          });
-                        },
-                        selectedColor: c.primaryLight,
-                        checkmarkColor: c.primary,
-                        side: BorderSide(color: c.border),
-                      ),
-                      const SizedBox(width: 6),
-                      FilterChip(
-                        label: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Text('Unread', style: TextStyle(fontSize: 10)),
-                            if (unreadUsersCount > 0) ...[
-                              const SizedBox(width: 4),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 5, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: _showOnlyUnread
-                                      ? const Color(0xFF25D366)
-                                      : const Color(0xFF25D366).withOpacity(0.85),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: Text(
-                                  '$unreadUsersCount',
-                                  style: const TextStyle(
-                                    fontSize: 9,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                  ),
-                                ),
+          // ── TAB BAR HEADER ───────────────────────────────────────────
+          Consumer<DocumentsProvider>(
+            builder: (context, dp, _) {
+              final pendingCount = dp.pendingDocuments.length;
+              return Container(
+                height: 48,
+                color: c.sidebar,
+                child: TabBar(
+                  controller: _tabController,
+                  indicatorColor: c.primary,
+                  labelColor: c.primary,
+                  unselectedLabelColor: c.muted,
+                  indicatorWeight: 2,
+                  labelStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                  unselectedLabelStyle: const TextStyle(fontSize: 12),
+                  tabs: [
+                    Tab(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.chat_bubble_outline, size: 14),
+                          const SizedBox(width: 4),
+                          Text('Chats'),
+                          if (unreadUsersCount > 0) ...[
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: c.primary,
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                            ],
+                              child: Text(
+                                '$unreadUsersCount',
+                                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.white),
+                              ),
+                            ),
                           ],
-                        ),
-                        selected: _showOnlyUnread,
-                        visualDensity: VisualDensity.compact,
-                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
-                        labelPadding: const EdgeInsets.symmetric(horizontal: 2),
-                        onSelected: (bool selected) {
-                          setState(() {
-                            _showOnlyUnread = selected;
-                            _applyFilters();
-                          });
-                        },
-                        selectedColor: const Color(0xFF25D366).withOpacity(0.15),
-                        checkmarkColor: const Color(0xFF25D366),
-                        side: BorderSide(
-                          color: _showOnlyUnread
-                              ? const Color(0xFF25D366)
-                              : c.border,
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Container(
-                        height: 28,
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        decoration: BoxDecoration(
-                          color: c.searchFill,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: c.border),
-                        ),
-                        child: DropdownButton<String>(
-                          value: _sortBy,
-                          underline: const SizedBox(),
-                          icon: Icon(Icons.sort, size: 14, color: c.muted),
-                          style: TextStyle(fontSize: 10, color: c.text),
-                          dropdownColor: c.sidebar,
-                          items: const [
-                            DropdownMenuItem(value: 'recent', child: Text('Recent')),
-                            DropdownMenuItem(value: 'name', child: Text('Name')),
-                            DropdownMenuItem(value: 'matches', child: Text('Matches')),
-                            DropdownMenuItem(value: 'online', child: Text('Online First')),
-                          ],
-                          onChanged: (String? newValue) {
-                            if (newValue != null) {
-                              setState(() {
-                                _sortBy = newValue;
-                                _sortUsers();
-                              });
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                if (_showOnlyPaid || _showOnlyOnline || _showWithMatches || _showOnlyUnread || _searchQuery.isNotEmpty)
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: _resetFilters,
-                      icon: const Icon(Icons.clear_all, size: 14),
-                      label: const Text('Clear', style: TextStyle(fontSize: 11)),
-                      style: TextButton.styleFrom(
-                        foregroundColor: c.primary,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        minimumSize: Size.zero,
+                        ],
                       ),
                     ),
-                  ),
-              ],
-            ),
-          ),
-
-          // ── COUNT ROW ───────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                _totalUsers > 0
-                    ? '${_filteredUsers.length} / $_totalUsers users'
-                    : '${_filteredUsers.length} users',
-                style: TextStyle(fontSize: 11, color: c.muted),
-              ),
-            ),
+                    Tab(
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.folder_open_outlined, size: 14),
+                          const SizedBox(width: 4),
+                          Text('Docs'),
+                          if (pendingCount > 0) ...[
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF59E0B),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '$pendingCount',
+                                style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: Colors.white),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
 
           Container(height: 1, color: c.border),
 
-          // ── LIST ────────────────────────────────────────────────────
+          // ── TAB CONTENT ──────────────────────────────────────────────
           Expanded(
-            child: _isInitialLoading
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: c.primary,
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-                        Text(
-                          'Loading users...',
-                          style: TextStyle(color: c.muted, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  )
-                : _filteredUsers.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.person_off,
-                                size: 40, color: Colors.grey[300]),
-                            const SizedBox(height: 10),
-                            Text(
-                              'No users found',
-                              style: TextStyle(color: c.muted, fontSize: 13),
+            child: TabBarView(
+              controller: _tabController,
+              children: [
+                // ── TAB 0: CHATS ────────────────────────────────────────
+                Column(
+                  children: [
+                    // ── SEARCH BAR ──────────────────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      child: SizedBox(
+                        height: 40,
+                        child: TextField(
+                          decoration: InputDecoration(
+                            hintText: "Search conversations...",
+                            hintStyle: TextStyle(fontSize: 12, color: c.muted),
+                            prefixIcon: Icon(Icons.search, size: 18, color: c.muted),
+                            suffixIcon: _searchQuery.isNotEmpty
+                                ? IconButton(
+                                    icon: Icon(Icons.clear, size: 16, color: c.muted),
+                                    onPressed: () {
+                                      _searchDebounce?.cancel();
+                                      setState(() => _searchQuery = "");
+                                      fetchUsers(reset: true);
+                                    },
+                                  )
+                                : null,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              borderSide: BorderSide(color: c.border, width: 1),
                             ),
-                            if (_showOnlyPaid ||
-                                _showOnlyOnline ||
-                                _showWithMatches ||
-                                _showOnlyUnread ||
-                                _searchQuery.isNotEmpty)
-                              TextButton(
-                                onPressed: _resetFilters,
-                                style: TextButton.styleFrom(
-                                    foregroundColor: c.primary),
-                                child: const Text('Clear filters',
-                                    style: TextStyle(fontSize: 12)),
-                              ),
-                          ],
+                            enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              borderSide: BorderSide(color: c.border, width: 1),
+                            ),
+                            focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              borderSide: BorderSide(color: c.primary, width: 1),
+                            ),
+                            filled: true,
+                            fillColor: c.searchFill,
+                            contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                            isDense: true,
+                          ),
+                          onChanged: (value) {
+                            setState(() => _searchQuery = value);
+                            _searchDebounce?.cancel();
+                            _searchDebounce = Timer(
+                              const Duration(milliseconds: 400),
+                              () => fetchUsers(reset: true),
+                            );
+                          },
                         ),
-                      )
-                    : ListView.builder(
-                        controller: _scrollController,
-                        itemCount:
-                            _filteredUsers.length + (_isLoadingMore ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          // Loading footer
-                          if (index == _filteredUsers.length) {
-                            return Padding(
-                              padding:
-                                  const EdgeInsets.symmetric(vertical: 14),
-                              child: Center(
-                                child: SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: c.primary,
+                      ),
+                    ),
+
+                    // ── FILTER CHIPS ────────────────────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      child: Column(
+                        children: [
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                FilterChip(
+                                  label: const Text('Paid', style: TextStyle(fontSize: 10)),
+                                  selected: _showOnlyPaid,
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                                  labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+                                  onSelected: (bool selected) {
+                                    setState(() {
+                                      _showOnlyPaid = selected;
+                                      _applyFilters();
+                                    });
+                                  },
+                                  selectedColor: c.primaryLight,
+                                  checkmarkColor: c.primary,
+                                  side: BorderSide(color: c.border),
+                                ),
+                                const SizedBox(width: 6),
+                                FilterChip(
+                                  label: const Text('Online', style: TextStyle(fontSize: 10)),
+                                  selected: _showOnlyOnline,
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                                  labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+                                  onSelected: (bool selected) {
+                                    setState(() {
+                                      _showOnlyOnline = selected;
+                                      _applyFilters();
+                                    });
+                                  },
+                                  selectedColor: c.primaryLight,
+                                  checkmarkColor: c.primary,
+                                  side: BorderSide(color: c.border),
+                                ),
+                                const SizedBox(width: 6),
+                                FilterChip(
+                                  label: const Text('Matches', style: TextStyle(fontSize: 10)),
+                                  selected: _showWithMatches,
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                                  labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+                                  onSelected: (bool selected) {
+                                    setState(() {
+                                      _showWithMatches = selected;
+                                      _applyFilters();
+                                    });
+                                  },
+                                  selectedColor: c.primaryLight,
+                                  checkmarkColor: c.primary,
+                                  side: BorderSide(color: c.border),
+                                ),
+                                const SizedBox(width: 6),
+                                FilterChip(
+                                  label: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Text('Unread', style: TextStyle(fontSize: 10)),
+                                      if (unreadUsersCount > 0) ...[
+                                        const SizedBox(width: 4),
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                              horizontal: 5, vertical: 1),
+                                          decoration: BoxDecoration(
+                                            color: _showOnlyUnread
+                                                ? const Color(0xFF25D366)
+                                                : const Color(0xFF25D366).withOpacity(0.85),
+                                            borderRadius: BorderRadius.circular(8),
+                                          ),
+                                          child: Text(
+                                            '$unreadUsersCount',
+                                            style: const TextStyle(
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.w700,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  selected: _showOnlyUnread,
+                                  visualDensity: VisualDensity.compact,
+                                  padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 0),
+                                  labelPadding: const EdgeInsets.symmetric(horizontal: 2),
+                                  onSelected: (bool selected) {
+                                    setState(() {
+                                      _showOnlyUnread = selected;
+                                      _applyFilters();
+                                    });
+                                  },
+                                  selectedColor: const Color(0xFF25D366).withOpacity(0.15),
+                                  checkmarkColor: const Color(0xFF25D366),
+                                  side: BorderSide(
+                                    color: _showOnlyUnread
+                                        ? const Color(0xFF25D366)
+                                        : c.border,
                                   ),
                                 ),
+                                const SizedBox(width: 6),
+                                Container(
+                                  height: 28,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                                  decoration: BoxDecoration(
+                                    color: c.searchFill,
+                                    borderRadius: BorderRadius.circular(20),
+                                    border: Border.all(color: c.border),
+                                  ),
+                                  child: DropdownButton<String>(
+                                    value: _sortBy,
+                                    underline: const SizedBox(),
+                                    icon: Icon(Icons.sort, size: 14, color: c.muted),
+                                    style: TextStyle(fontSize: 10, color: c.text),
+                                    dropdownColor: c.sidebar,
+                                    items: const [
+                                      DropdownMenuItem(value: 'recent', child: Text('Recent')),
+                                      DropdownMenuItem(value: 'name', child: Text('Name')),
+                                      DropdownMenuItem(value: 'matches', child: Text('Matches')),
+                                      DropdownMenuItem(value: 'online', child: Text('Online First')),
+                                    ],
+                                    onChanged: (String? newValue) {
+                                      if (newValue != null) {
+                                        setState(() {
+                                          _sortBy = newValue;
+                                          _sortUsers();
+                                        });
+                                      }
+                                    },
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+
+                          if (_showOnlyPaid || _showOnlyOnline || _showWithMatches || _showOnlyUnread || _searchQuery.isNotEmpty)
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: TextButton.icon(
+                                onPressed: _resetFilters,
+                                icon: const Icon(Icons.clear_all, size: 14),
+                                label: const Text('Clear', style: TextStyle(fontSize: 11)),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: c.primary,
+                                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                                  minimumSize: Size.zero,
+                                ),
                               ),
-                            );
-                          }
-
-                          var user = _filteredUsers[index];
-                          bool isSelected = _selectedChat == user;
-
-                          return _buildUserRow(
-                            user["name"] ?? "",
-                            user["id"].toString(),
-                            conversationMap[user["id"].toString()]
-                                    ?['lastMessage'] ??
-                                user["chat_message"] ??
-                                "",
-                            user["last_seen_text"] ?? "",
-                            user["is_paid"] ?? false,
-                            user["is_online"] ?? false,
-                            user["profile_picture"] ?? "",
-                            isSelected,
-                            _unreadCounts[user["id"].toString()] ?? 0,
-                            () {
-                              setState(() {
-                                _selectedChat = user;
-                                _updateSelectedChat();
-                              });
-                              // Persist the selected user so the chat reopens to the same conversation.
-                              _saveLastSelectedUserId(user["id"].toString());
-                              // Notify parent so mobile view can switch to chat panel.
-                              widget.onUserTap?.call();
-                            },
-                          );
-                        },
+                            ),
+                        ],
                       ),
+                    ),
+
+                    // ── COUNT ROW ───────────────────────────────────────────────
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                      child: Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          _totalUsers > 0
+                              ? '${_filteredUsers.length} / $_totalUsers users'
+                              : '${_filteredUsers.length} users',
+                          style: TextStyle(fontSize: 11, color: c.muted),
+                        ),
+                      ),
+                    ),
+
+                    Container(height: 1, color: c.border),
+
+                    // ── LIST ────────────────────────────────────────────────────
+                    Expanded(
+                      child: _isInitialLoading
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: c.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Text(
+                                    'Loading users...',
+                                    style: TextStyle(color: c.muted, fontSize: 13),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : _filteredUsers.isEmpty
+                              ? Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.person_off,
+                                          size: 40, color: Colors.grey[300]),
+                                      const SizedBox(height: 10),
+                                      Text(
+                                        'No users found',
+                                        style: TextStyle(color: c.muted, fontSize: 13),
+                                      ),
+                                      if (_showOnlyPaid ||
+                                          _showOnlyOnline ||
+                                          _showWithMatches ||
+                                          _showOnlyUnread ||
+                                          _searchQuery.isNotEmpty)
+                                        TextButton(
+                                          onPressed: _resetFilters,
+                                          style: TextButton.styleFrom(
+                                              foregroundColor: c.primary),
+                                          child: const Text('Clear filters',
+                                              style: TextStyle(fontSize: 12)),
+                                        ),
+                                    ],
+                                  ),
+                                )
+                              : ListView.builder(
+                                  controller: _scrollController,
+                                  itemCount:
+                                      _filteredUsers.length + (_isLoadingMore ? 1 : 0),
+                                  itemBuilder: (context, index) {
+                                    // Loading footer
+                                    if (index == _filteredUsers.length) {
+                                      return Padding(
+                                        padding:
+                                            const EdgeInsets.symmetric(vertical: 14),
+                                        child: Center(
+                                          child: SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                              color: c.primary,
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    }
+
+                                    var user = _filteredUsers[index];
+                                    bool isSelected = _selectedChat == user;
+
+                                    return _buildUserRow(
+                                      user["name"] ?? "",
+                                      user["id"].toString(),
+                                      conversationMap[user["id"].toString()]
+                                              ?['lastMessage'] ??
+                                          user["chat_message"] ??
+                                          "",
+                                      user["last_seen_text"] ?? "",
+                                      user["is_paid"] ?? false,
+                                      user["is_online"] ?? false,
+                                      user["profile_picture"] ?? "",
+                                      isSelected,
+                                      _unreadCounts[user["id"].toString()] ?? 0,
+                                      () {
+                                        setState(() {
+                                          _selectedChat = user;
+                                          _updateSelectedChat();
+                                        });
+                                        // Persist the selected user so the chat reopens to the same conversation.
+                                        _saveLastSelectedUserId(user["id"].toString());
+                                        // Notify parent so mobile view can switch to chat panel.
+                                        widget.onUserTap?.call();
+                                      },
+                                    );
+                                  },
+                                ),
+                    ),
+                  ],
+                ),
+
+                // ── TAB 1: DOCUMENTS ────────────────────────────────────
+                _buildDocumentSection(c),
+              ],
+            ),
           ),
         ],
       ),
@@ -1218,5 +1310,423 @@ class _ChatSidebarState extends State<ChatSidebar> {
         ),
       ),
     );
+  }
+
+  // ── DOCUMENT SECTION ─────────────────────────────────────────────────────
+
+  List<Document> _filteredDocs(List<Document> docs) {
+    List<Document> result;
+    switch (_docFilter) {
+      case 'pending':
+        result = docs.where((d) => d.isPending).toList();
+        break;
+      case 'approved':
+        result = docs.where((d) => d.isApproved).toList();
+        break;
+      case 'rejected':
+        result = docs.where((d) => d.isRejected).toList();
+        break;
+      default:
+        result = docs;
+    }
+    if (_docQuery.isNotEmpty) {
+      result = result.where((d) =>
+          d.fullName.toLowerCase().contains(_docQuery) ||
+          d.documentType.toLowerCase().contains(_docQuery) ||
+          d.email.toLowerCase().contains(_docQuery)).toList();
+    }
+    return result;
+  }
+
+  Widget _buildDocumentSection(ChatColors c) {
+    return Column(
+      children: [
+        // ── SEARCH ────────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          child: SizedBox(
+            height: 36,
+            child: TextField(
+              controller: _docSearchController,
+              decoration: InputDecoration(
+                hintText: 'Search documents…',
+                hintStyle: TextStyle(fontSize: 12, color: c.muted),
+                prefixIcon: Icon(Icons.search, size: 16, color: c.muted),
+                suffixIcon: _docQuery.isNotEmpty
+                    ? IconButton(
+                        icon: Icon(Icons.clear, size: 14, color: c.muted),
+                        onPressed: () => _docSearchController.clear(),
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide(color: c.border, width: 1),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide(color: c.border, width: 1),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20),
+                  borderSide: BorderSide(color: c.primary, width: 1),
+                ),
+                filled: true,
+                fillColor: c.searchFill,
+                contentPadding: const EdgeInsets.symmetric(vertical: 0, horizontal: 12),
+                isDense: true,
+              ),
+            ),
+          ),
+        ),
+
+        // ── STATUS FILTER CHIPS ───────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _docFilterChip(c, 'All', 'all'),
+                const SizedBox(width: 6),
+                _docFilterChip(c, 'Pending', 'pending', color: const Color(0xFFF59E0B)),
+                const SizedBox(width: 6),
+                _docFilterChip(c, 'Approved', 'approved', color: const Color(0xFF10B981)),
+                const SizedBox(width: 6),
+                _docFilterChip(c, 'Rejected', 'rejected', color: const Color(0xFFEF4444)),
+              ],
+            ),
+          ),
+        ),
+
+        Container(height: 1, color: c.border, margin: const EdgeInsets.only(top: 6)),
+
+        // ── DOCUMENT LIST ─────────────────────────────────────────────
+        Expanded(
+          child: Consumer<DocumentsProvider>(
+            builder: (context, provider, _) {
+              if (provider.isLoading && !provider.isInitialized) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: c.primary),
+                      ),
+                      const SizedBox(height: 8),
+                      Text('Loading…', style: TextStyle(color: c.muted, fontSize: 12)),
+                    ],
+                  ),
+                );
+              }
+
+              final docs = _filteredDocs(provider.documents);
+
+              if (docs.isEmpty) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.folder_open, size: 36, color: Colors.grey[300]),
+                      const SizedBox(height: 8),
+                      Text(
+                        _docQuery.isNotEmpty ? 'No results' : 'No documents',
+                        style: TextStyle(color: c.muted, fontSize: 12),
+                      ),
+                      if (_docQuery.isNotEmpty || _docFilter != 'all')
+                        TextButton(
+                          onPressed: () {
+                            _docSearchController.clear();
+                            setState(() => _docFilter = 'all');
+                          },
+                          style: TextButton.styleFrom(foregroundColor: c.primary),
+                          child: const Text('Clear', style: TextStyle(fontSize: 11)),
+                        ),
+                    ],
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                itemCount: docs.length,
+                itemBuilder: (context, index) => _buildDocRow(docs[index], c, provider),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _docFilterChip(ChatColors c, String label, String value, {Color? color}) {
+    final selected = _docFilter == value;
+    final chipColor = color ?? c.primary;
+    return GestureDetector(
+      onTap: () => setState(() => _docFilter = value),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: selected ? chipColor.withOpacity(0.15) : c.searchFill,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: selected ? chipColor : c.border),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+            color: selected ? chipColor : c.muted,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDocRow(Document doc, ChatColors c, DocumentsProvider provider) {
+    Color statusColor;
+    String statusLabel;
+    switch (doc.status) {
+      case 'approved':
+        statusColor = const Color(0xFF10B981);
+        statusLabel = 'Approved';
+        break;
+      case 'rejected':
+        statusColor = const Color(0xFFEF4444);
+        statusLabel = 'Rejected';
+        break;
+      default:
+        statusColor = const Color(0xFFF59E0B);
+        statusLabel = 'Pending';
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: c.border, width: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Name + status badge row
+          Row(
+            children: [
+              // Avatar
+              CircleAvatar(
+                radius: 16,
+                backgroundColor: c.cardBg,
+                backgroundImage: doc.photo.isNotEmpty ? NetworkImage(doc.photo) : null,
+                child: doc.photo.isEmpty
+                    ? Icon(Icons.person, size: 16, color: Colors.grey[400])
+                    : null,
+              ),
+              const SizedBox(width: 8),
+              // Name + doc type
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    GestureDetector(
+                      onTap: () => _openDocUserProfile(doc),
+                      child: Text(
+                        doc.fullName,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: c.text,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Text(
+                      doc.documentType.isNotEmpty ? doc.documentType : 'Document',
+                      style: TextStyle(fontSize: 10, color: c.muted),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              // Status badge
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  statusLabel,
+                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: statusColor),
+                ),
+              ),
+            ],
+          ),
+          // Quick actions for pending docs
+          if (doc.isPending) ...[
+            const SizedBox(height: 6),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                // Reject
+                GestureDetector(
+                  onTap: () => _quickRejectDoc(doc, provider),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEF4444).withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+                    ),
+                    child: const Text(
+                      'Reject',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFFEF4444)),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                // Approve
+                GestureDetector(
+                  onTap: () => _quickApproveDoc(doc, provider),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF10B981).withOpacity(0.10),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: const Color(0xFF10B981).withOpacity(0.3)),
+                    ),
+                    child: const Text(
+                      'Approve',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: Color(0xFF10B981)),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  void _openDocUserProfile(Document doc) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ChangeNotifierProvider(
+          create: (_) => UserDetailsProvider(),
+          child: UserDetailsScreen(
+            userId: doc.userId,
+            myId: doc.userId,
+            email: doc.email,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _quickApproveDoc(Document doc, DocumentsProvider provider) async {
+    final ok = await provider.updateDocumentStatus(userId: doc.userId, action: 'approve');
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(ok ? '${doc.fullName}\'s document approved' : 'Failed: ${provider.error}'),
+        backgroundColor: ok ? const Color(0xFF10B981) : const Color(0xFFEF4444),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 2),
+      ));
+    }
+  }
+
+  Future<void> _quickRejectDoc(Document doc, DocumentsProvider provider) async {
+    _rejectReasonController.clear();
+    final c = ChatColors.of(context);
+    final confirmed = await showDialog<String>(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setDlgState) {
+          bool showError = false;
+          return AlertDialog(
+            backgroundColor: c.sidebar,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            title: Text('Reject Document',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: c.text)),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Rejecting ${doc.fullName}\'s document.', style: TextStyle(fontSize: 12, color: c.muted)),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: _rejectReasonController,
+                  maxLines: 2,
+                  autofocus: true,
+                  style: TextStyle(fontSize: 12, color: c.text),
+                  onChanged: (_) {
+                    if (showError) setDlgState(() => showError = false);
+                  },
+                  decoration: InputDecoration(
+                    hintText: 'Reason for rejection…',
+                    hintStyle: TextStyle(fontSize: 12, color: c.muted),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+                    errorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFFEF4444)),
+                    ),
+                    focusedErrorBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: Color(0xFFEF4444), width: 1.5),
+                    ),
+                    errorText: showError ? 'Please enter a reason' : null,
+                    errorStyle: const TextStyle(fontSize: 11, color: Color(0xFFEF4444)),
+                    contentPadding: const EdgeInsets.all(10),
+                    isDense: true,
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text('Cancel', style: TextStyle(color: c.muted, fontSize: 12)),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  if (_rejectReasonController.text.trim().isEmpty) {
+                    setDlgState(() => showError = true);
+                    return;
+                  }
+                  Navigator.pop(ctx, _rejectReasonController.text.trim());
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFEF4444),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  textStyle: const TextStyle(fontSize: 12),
+                ),
+                child: const Text('Reject'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (confirmed == null || !mounted) return;
+    final ok = await provider.updateDocumentStatus(
+      userId: doc.userId,
+      action: 'reject',
+      rejectReason: confirmed,
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(ok ? '${doc.fullName}\'s document rejected' : 'Failed: ${provider.error}'),
+        backgroundColor: ok ? const Color(0xFFF59E0B) : const Color(0xFFEF4444),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+        margin: const EdgeInsets.all(16),
+        duration: const Duration(seconds: 2),
+      ));
+    }
   }
 }
