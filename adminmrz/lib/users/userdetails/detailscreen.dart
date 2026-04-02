@@ -45,7 +45,10 @@ const _kFamily       = _kViolet;
 const _kLifestyle    = _kAmber;
 const _kPartner      = Color(0xFFDB2777);
 const _kDocs         = _kSky;
-const _kPageBg       = Color(0xFFF1F5F9);
+const _kPageBg           = Color(0xFFF1F5F9);
+const _kWideBreakpoint   = 960.0;
+const _kLeftPanelWidth   = 250.0;
+const _kRightPanelWidth  = 272.0;
 
 // ──────────────────────────── Screen ─────────────────────────────────────────
 class UserDetailsScreen extends StatefulWidget {
@@ -2405,6 +2408,417 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
     );
   }
 
+  // ── 3-column panel builders ──────────────────────────────────────────────────
+
+  /// Left column: Engagement & Activity stats
+  Widget _buildLeftPanel(UserDetailsProvider prov) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: _kPrimary.withOpacity(0.06),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.bar_chart_rounded, size: 16, color: _kPrimary),
+                const SizedBox(width: 8),
+                const Expanded(
+                  child: Text(
+                    'Engagement & Activity',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kPrimary),
+                  ),
+                ),
+                if (prov.isLoadingActivity)
+                  const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                else
+                  InkWell(
+                    onTap: () => prov.fetchActivityStats(widget.userId),
+                    borderRadius: BorderRadius.circular(4),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4),
+                      child: Icon(Icons.refresh, size: 15, color: _kPrimary.withOpacity(0.7)),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: _buildActivityStatColumn(prov),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityStatColumn(UserDetailsProvider prov) {
+    if (prov.isLoadingActivity && prov.activityStats == null) {
+      return const SizedBox(height: 60, child: Center(child: CircularProgressIndicator(strokeWidth: 2)));
+    }
+    final s = prov.activityStats ?? ActivityStats.empty();
+    return Column(
+      children: [
+        _activityStatCard('Requests Sent', '${s.requestsSent}', _kPrimary, Icons.send_rounded),
+        const SizedBox(height: 8),
+        _activityStatCard('Requests Received', '${s.requestsReceived}', _kViolet, Icons.inbox_outlined),
+        const SizedBox(height: 8),
+        _activityStatCard('Chat Sent', '${s.chatRequestsSent}', _kSky, Icons.chat_bubble_outline),
+        const SizedBox(height: 8),
+        _activityStatCard('Chat Accepted', '${s.chatRequestsAccepted}', _kEmerald, Icons.check_circle_outline),
+        const SizedBox(height: 8),
+        _activityStatCard('Profile Views', '${s.profileViews}', _kAmber, Icons.visibility_outlined),
+        const SizedBox(height: 8),
+        _activityStatCard('Matches', '${s.matchesCount}', _kPartner, Icons.favorite_outline),
+      ],
+    );
+  }
+
+  /// Right column: profile photo + approve/reject + contact info
+  Widget _buildRightPanel(PersonalDetail p, ContactDetail c, UserDetailsProvider prov) {
+    final isPhotoMissing = !p.hasProfilePicture;
+    final photoStatus = p.photoRequest.isNotEmpty
+        ? p.photoRequest
+        : (isPhotoMissing ? 'No profile photo' : 'Uploaded');
+    final photoColor = isPhotoMissing
+        ? _kAmber
+        : photoStatus.toLowerCase().contains('approve')
+            ? _kEmerald
+            : photoStatus.toLowerCase().contains('reject')
+                ? _kRose
+                : _kSky;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // ── Photo card ──
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 4)),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: _kSky.withOpacity(0.05),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.photo_camera_outlined, size: 16, color: _kSky),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Profile Photo',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kSky),
+                    ),
+                    const Spacer(),
+                    _statusPill(photoStatus.toUpperCase(), photoColor),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    GestureDetector(
+                      onTap: p.hasProfilePicture ? () => _showDocPreview(p.profilePicture) : null,
+                      child: Container(
+                        height: 200,
+                        width: double.infinity,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(12),
+                          gradient: LinearGradient(
+                            colors: [_kPrimary.withOpacity(0.08), _kViolet.withOpacity(0.08)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          border: Border.all(color: _kPrimary.withOpacity(0.18)),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: p.hasProfilePicture
+                            ? Stack(
+                                children: [
+                                  Positioned.fill(
+                                    child: Image.network(
+                                      p.profilePicture,
+                                      fit: BoxFit.cover,
+                                      loadingBuilder: (_, child, prog) =>
+                                          prog == null ? child : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                                      errorBuilder: (_, __, ___) =>
+                                          const Center(child: Icon(Icons.broken_image, size: 48, color: Colors.grey)),
+                                    ),
+                                  ),
+                                  const Positioned(
+                                    bottom: 10,
+                                    right: 10,
+                                    child: Tooltip(
+                                      message: 'Tap to view full image',
+                                      child: Icon(Icons.zoom_in_rounded, size: 20, color: Colors.white70),
+                                    ),
+                                  ),
+                                ],
+                              )
+                            : const Center(
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.photo_camera_outlined, size: 42, color: _kPrimaryDark),
+                                    SizedBox(height: 8),
+                                    Text(
+                                      'No profile photo yet',
+                                      style: TextStyle(fontSize: 13, color: Color(0xFF475569), fontWeight: FontWeight.w600),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    if (prov.isPhotoActioning)
+                      const Center(child: SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+                    else if (isPhotoMissing)
+                      _chipButton(
+                        label: 'Request Photo',
+                        icon: Icons.send_outlined,
+                        onTap: prov.isSendingNotification ? null : () => _requestPhotoUpload(p),
+                        color: _kPrimary,
+                      )
+                    else
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _chipButton(
+                              label: 'Approve',
+                              icon: Icons.verified_outlined,
+                              onTap: prov.isPhotoActioning ? null : () => _handlePhotoAction('approve'),
+                              color: _kEmerald,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: _chipButton(
+                              label: 'Reject',
+                              icon: Icons.cancel_outlined,
+                              onTap: prov.isPhotoActioning ? null : () => _handlePhotoAction('reject'),
+                              color: _kRose,
+                            ),
+                          ),
+                        ],
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 14),
+
+        // ── Contact info card ──
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 4)),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: _kPrimary.withOpacity(0.05),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.contact_mail_outlined, size: 16, color: _kPrimary),
+                    SizedBox(width: 8),
+                    Text(
+                      'Contact Information',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kPrimaryDark),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  children: [
+                    _contactTileVertical(
+                      icon: Icons.email_outlined,
+                      label: 'Email',
+                      value: c.hasEmail ? c.email : 'Not available',
+                    ),
+                    const SizedBox(height: 10),
+                    _contactTileVertical(
+                      icon: Icons.phone_outlined,
+                      label: 'Phone',
+                      value: c.hasPhone ? c.preferredPhone : 'Not available',
+                      onTap: widget.onOpenChat != null ? () => widget.onOpenChat!(widget.userId) : null,
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _contactTileVertical({
+    required IconData icon,
+    required String label,
+    required String value,
+    VoidCallback? onTap,
+  }) {
+    final missing = value.isEmpty || value == 'Not available' || value == 'null';
+    final tile = Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: missing ? Colors.grey.shade50 : Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: missing ? Colors.grey.shade200 : Colors.blue.shade100),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: missing ? Colors.grey.shade500 : Colors.blue.shade700),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label,
+                    style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 2),
+                Text(
+                  missing ? 'Not available' : value,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: missing ? Colors.grey.shade500 : Colors.blueGrey.shade900,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
+          ),
+          if (!missing && onTap != null) ...[
+            const SizedBox(width: 6),
+            Icon(Icons.chat_bubble_outline, size: 13, color: _kSky),
+          ],
+        ],
+      ),
+    );
+    if (onTap != null && !missing) {
+      return InkWell(onTap: onTap, borderRadius: BorderRadius.circular(10), child: tile);
+    }
+    return tile;
+  }
+
+  /// Center column header: name + meta + badges + about me (no photo)
+  Widget _buildCenterHeader(PersonalDetail p) {
+    return Container(
+      color: Colors.white,
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            p.fullName,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: _kPrimaryDark),
+          ),
+          const SizedBox(height: 6),
+          Wrap(
+            spacing: 18,
+            runSpacing: 4,
+            children: [
+              if (p.age != null)
+                _metaChip(Icons.cake, '${p.age} yrs', Colors.blue.shade700),
+              _metaChip(Icons.location_on, p.city, Colors.blue.shade700),
+              if (p.country != 'Not available')
+                _metaChip(Icons.public, p.country, Colors.teal.shade700),
+              _metaChip(Icons.favorite, p.maritalStatusName, Colors.pink.shade600),
+              _metaChip(Icons.badge, 'ID: ${p.memberId}', Colors.grey.shade600),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
+            children: [
+              _badge(
+                label: p.userType.isEmpty ? 'FREE' : p.userType.toUpperCase(),
+                icon: p.userType == 'paid' ? Icons.workspace_premium : Icons.person_outline,
+                bg: p.userType == 'paid' ? _kAmber.withOpacity(0.15) : Colors.grey.shade100,
+                border: p.userType == 'paid' ? _kAmber.withOpacity(0.6) : Colors.grey.shade300,
+                fg: p.userType == 'paid' ? const Color(0xFF92400E) : Colors.grey.shade700,
+              ),
+              _badge(
+                label: p.isVerified == 1 ? 'Verified' : 'Pending Verification',
+                icon: p.isVerified == 1 ? Icons.verified_user : Icons.pending_actions,
+                bg: p.isVerified == 1 ? _kEmerald.withOpacity(0.12) : _kAmber.withOpacity(0.12),
+                border: p.isVerified == 1 ? _kEmerald.withOpacity(0.4) : _kAmber.withOpacity(0.4),
+                fg: p.isVerified == 1 ? const Color(0xFF065F46) : const Color(0xFFB45309),
+              ),
+              if (p.privacy.isNotEmpty)
+                _badge(
+                  label: p.privacy,
+                  icon: Icons.lock_outline,
+                  bg: Colors.indigo.shade50,
+                  border: Colors.indigo.shade200,
+                  fg: Colors.indigo.shade800,
+                ),
+            ],
+          ),
+          if (p.aboutMe.isNotEmpty && p.aboutMe != 'Not available') ...[
+            const SizedBox(height: 14),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.blue.shade100),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('About Me',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kPrimary)),
+                  const SizedBox(height: 6),
+                  Text(p.aboutMe,
+                      style: TextStyle(fontSize: 14, color: Colors.blueGrey.shade800, height: 1.6)),
+                ],
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
   // ── loading / error ───────────────────────────────────────────────────────────
 
   Widget _buildLoading() => const Center(
@@ -2459,46 +2873,111 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
       phone: widget.phone,
       whatsapp: widget.whatsapp,
     );
-    return SingleChildScrollView(
-      child: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 860),
-          child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(6),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.10),
-                  blurRadius: 24,
-                  offset: const Offset(0, 4),
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // ── Wide layout: 3 columns ──────────────────────────────────────────
+        if (constraints.maxWidth >= _kWideBreakpoint) {
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Left column: activity stats
+                SizedBox(
+                  width: _kLeftPanelWidth,
+                  child: _buildLeftPanel(provider),
+                ),
+                const SizedBox(width: 14),
+                // Center column: user information
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(10),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.08),
+                          blurRadius: 20,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        _buildCenterHeader(p),
+                        _buildDocumentsSection(),
+                        const Divider(height: 1, thickness: 1),
+                        _buildAdminActions(p, provider),
+                        const Divider(height: 1, thickness: 1),
+                        _buildPersonal(p),
+                        const Divider(height: 1, thickness: 1),
+                        _buildEducation(p),
+                        const Divider(height: 1, thickness: 1),
+                        _buildFamily(data.familyDetail),
+                        const Divider(height: 1, thickness: 1),
+                        _buildLifestyle(data.lifestyle),
+                        const Divider(height: 1, thickness: 1),
+                        _buildPartner(data.partner),
+                        const SizedBox(height: 8),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                // Right column: photo + contact
+                SizedBox(
+                  width: _kRightPanelWidth,
+                  child: _buildRightPanel(p, contact, provider),
                 ),
               ],
             ),
-            child: Column(
-              children: [
-                _buildHeader(p, contact),
-                _buildDocumentsSection(),
-                const Divider(height: 1, thickness: 1),
-                _buildMediaAndActivity(p, provider),
-                _buildAdminActions(p, provider),
-                const Divider(height: 1, thickness: 1),
-                _buildPersonal(p),
-                const Divider(height: 1, thickness: 1),
-                _buildEducation(p),
-                const Divider(height: 1, thickness: 1),
-                _buildFamily(data.familyDetail),
-                const Divider(height: 1, thickness: 1),
-                _buildLifestyle(data.lifestyle),
-                const Divider(height: 1, thickness: 1),
-                _buildPartner(data.partner),
-                const SizedBox(height: 8),
-              ],
+          );
+        }
+
+        // ── Narrow layout: single column (original) ─────────────────────────
+        return SingleChildScrollView(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 860),
+              child: Container(
+                margin: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.10),
+                      blurRadius: 24,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    _buildHeader(p, contact),
+                    _buildDocumentsSection(),
+                    const Divider(height: 1, thickness: 1),
+                    _buildMediaAndActivity(p, provider),
+                    _buildAdminActions(p, provider),
+                    const Divider(height: 1, thickness: 1),
+                    _buildPersonal(p),
+                    const Divider(height: 1, thickness: 1),
+                    _buildEducation(p),
+                    const Divider(height: 1, thickness: 1),
+                    _buildFamily(data.familyDetail),
+                    const Divider(height: 1, thickness: 1),
+                    _buildLifestyle(data.lifestyle),
+                    const Divider(height: 1, thickness: 1),
+                    _buildPartner(data.partner),
+                    const SizedBox(height: 8),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
