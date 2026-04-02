@@ -9,6 +9,9 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:ms2026/pushnotification/pushservice.dart';
 import 'package:provider/provider.dart';
 
+// Web-specific imports
+import 'package:flutter_web_plugins/flutter_web_plugins.dart' show setUrlStrategy, PathUrlStrategy;
+
 import 'Calling/incomingvideocall.dart';
 import 'Calling/incommingcall.dart';
 import 'Startup/SplashScreen.dart';
@@ -17,6 +20,7 @@ import 'Startup/onboarding.dart';
 import 'otherenew/modelfile.dart';
 import 'otherenew/othernew.dart';
 import 'otherenew/service.dart';
+import 'theme/app_theme.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -454,10 +458,21 @@ Future<void> setupFirebaseMessaging() async {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+
+  // Configure URL strategy for web (clean URLs without #)
+  if (kIsWeb) {
+    setUrlStrategy(PathUrlStrategy());
+  } else {
+    // Only set portrait orientation on mobile
+    await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+  }
 
   await Firebase.initializeApp();
-  await initLocalNotifications();
+
+  // Initialize local notifications only on mobile
+  if (!kIsWeb) {
+    await initLocalNotifications();
+  }
 
   runApp(
     MultiProvider(
@@ -471,9 +486,12 @@ void main() async {
     ),
   );
 
-  WidgetsBinding.instance.addPostFrameCallback((_) {
-    setupFirebaseMessaging();
-  });
+  // Setup Firebase Messaging only on mobile
+  if (!kIsWeb) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      setupFirebaseMessaging();
+    });
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -484,11 +502,10 @@ class MyApp extends StatelessWidget {
     return MaterialApp(
       navigatorKey: navigatorKey,
       debugShowCheckedModeBanner: false,
-      title: 'MS2026',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
+      title: 'Marriage Station - Find Your Perfect Match',
+      theme: buildAppTheme(),
+      darkTheme: buildDarkTheme(),
+      themeMode: ThemeMode.light,
       home: const SplashScreen(),
       routes: {
         '/login': (context) => const OnboardingScreen(),
