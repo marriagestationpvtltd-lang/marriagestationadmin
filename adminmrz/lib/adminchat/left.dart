@@ -1191,29 +1191,23 @@ class _ChatSidebarState extends State<ChatSidebar> {
               ),
             ),
 
-            // Right column: unread message count badge
+            // Right column: WhatsApp-style unread message count badge
             if (hasUnread)
               Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 6, vertical: 2),
+                constraints: const BoxConstraints(minWidth: 20, minHeight: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
-                  color: c.primaryLight,
-                  borderRadius: BorderRadius.circular(10),
+                  color: c.primary,
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.favorite, color: c.primary, size: 10),
-                    const SizedBox(width: 2),
-                    Text(
-                      unreadCount > _maxUnreadBadge ? '$_maxUnreadBadge+' : '$unreadCount',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: c.primary,
-                      ),
-                    ),
-                  ],
+                child: Text(
+                  unreadCount > _maxUnreadBadge ? '$_maxUnreadBadge+' : '$unreadCount',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
                 ),
               ),
           ],
