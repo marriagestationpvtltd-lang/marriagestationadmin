@@ -56,8 +56,9 @@ class AuthProvider with ChangeNotifier {
         final responseData = json.decode(response.body);
 
         if (responseData['success'] == true) {
-          _token = responseData['data']['token'];
-          _adminData = responseData['data']['admin'];
+          // Match mobile app structure: bearer_token at root level, user data in 'data'
+          _token = responseData['bearer_token'];
+          _adminData = responseData['data'];
 
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('token', _token!);
@@ -106,8 +107,9 @@ class AuthProvider with ChangeNotifier {
         final responseData = json.decode(response.body);
 
         if (responseData['success'] == true) {
-          _token = responseData['data']['token'];
-          _adminData = responseData['data']['admin'];
+          // Match mobile app structure: bearer_token at root level, user data in 'data'
+          _token = responseData['bearer_token'];
+          _adminData = responseData['data'];
 
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('token', _token!);
@@ -153,8 +155,9 @@ class AuthProvider with ChangeNotifier {
         final responseData = json.decode(response.body);
 
         if (responseData['success'] == true) {
-          _token = responseData['data']['token'];
-          _adminData = responseData['data']['admin'];
+          // Match mobile app structure: bearer_token at root level, user data in 'data'
+          _token = responseData['bearer_token'];
+          _adminData = responseData['data'];
 
           final prefs = await SharedPreferences.getInstance();
           await prefs.setString('token', _token!);
