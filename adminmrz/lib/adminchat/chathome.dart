@@ -99,6 +99,12 @@ class _ChatWindowState extends State<ChatWindow> {
   static const String _kDeletedMessageText = 'This message was deleted.';
   static const String _kUnsentMessageText = 'This message was unsent.';
   static const String _kDefaultMessageText = 'Message';
+  static const double _kEstimatedMessageExtent = 112;
+
+  final Map<String, GlobalKey> _messageKeys = <String, GlobalKey>{};
+  final Map<String, int> _messageIndexMap = <String, int>{};
+  Timer? _replyHighlightTimer;
+  String? _highlightedMessageId;
 
   @override
   void initState() {
@@ -611,6 +617,103 @@ class _ChatWindowState extends State<ChatWindow> {
     });
   }
 
+  GlobalKey _messageKeyFor(String messageId) {
+    return _messageKeys.putIfAbsent(messageId, () => GlobalKey(debugLabel: 'message-$messageId'));
+  }
+
+  void _highlightMessage(String messageId) {
+    _replyHighlightTimer?.cancel();
+    if (!mounted) return;
+
+    setState(() {
+      _highlightedMessageId = messageId;
+    });
+
+    _replyHighlightTimer = Timer(const Duration(milliseconds: 1600), () {
+      if (!mounted || _highlightedMessageId != messageId) return;
+      setState(() {
+        _highlightedMessageId = null;
+      });
+    });
+  }
+
+  Future<bool> _ensureMessageLoaded(String messageId) async {
+    for (int attempt = 0; attempt < 20; attempt++) {
+      final docs = _lastSnapshot?.docs ?? const <QueryDocumentSnapshot>[];
+      final bool found = docs.any((doc) => doc.id == messageId);
+      if (found) return true;
+      if (!_hasMoreMessages || _isLoadingMore) {
+        await Future.delayed(const Duration(milliseconds: 250));
+        continue;
+      }
+      _loadMoreMessages();
+      await Future.delayed(const Duration(milliseconds: 450));
+    }
+
+    final docs = _lastSnapshot?.docs ?? const <QueryDocumentSnapshot>[];
+    return docs.any((doc) => doc.id == messageId);
+  }
+
+  Duration _navigationDurationForDistance(double distance) {
+    final int millis = (320 + (distance * 0.35)).round().clamp(320, 950);
+    return Duration(milliseconds: millis);
+  }
+
+  Future<void> _scrollToMessage(String messageId) async {
+    if (messageId.isEmpty) return;
+
+    final bool isLoaded = await _ensureMessageLoaded(messageId);
+    if (!mounted) return;
+
+    if (!isLoaded) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Original message could not be found.')),
+      );
+      return;
+    }
+
+    if (_scrollController.hasClients) {
+      final int? targetIndex = _messageIndexMap[messageId];
+      if (targetIndex != null) {
+        final position = _scrollController.position;
+        final double estimatedOffset =
+            (targetIndex * _kEstimatedMessageExtent).clamp(0.0, position.maxScrollExtent);
+        final double distance = (position.pixels - estimatedOffset).abs();
+        await _scrollController.animateTo(
+          estimatedOffset,
+          duration: _navigationDurationForDistance(distance),
+          curve: Curves.easeInOutCubic,
+        );
+      }
+    }
+
+    for (int attempt = 0; attempt < 6; attempt++) {
+      await WidgetsBinding.instance.endOfFrame;
+      final BuildContext? targetContext = _messageKeys[messageId]?.currentContext;
+      if (targetContext == null) {
+        await Future.delayed(const Duration(milliseconds: 80));
+        continue;
+      }
+
+      await Scrollable.ensureVisible(
+        targetContext,
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeInOutCubic,
+        alignment: 0.45,
+      );
+      _highlightMessage(messageId);
+      return;
+    }
+
+    _highlightMessage(messageId);
+  }
+
+  Future<void> _handleReplyPreviewTap(Map<String, dynamic>? replyTo) async {
+    final String messageId = replyTo?['docId']?.toString() ?? '';
+    if (messageId.isEmpty) return;
+    await _scrollToMessage(messageId);
+  }
+
   Future<void> _sendMatchProfile(Map<String, dynamic> profileData) async {
     final chatProvider = Provider.of<ChatProvider>(context, listen: false);
 
@@ -847,6 +950,10 @@ class _ChatWindowState extends State<ChatWindow> {
       _currentLimit = _pageSize;
       _hasMoreMessages = true;
       _lastSnapshot = null; // clear stale messages from the previous user
+      _messageKeys.clear();
+      _messageIndexMap.clear();
+      _replyHighlightTimer?.cancel();
+      _highlightedMessageId = null;
       // Re-fetch match details for the newly selected user
       if (chatProvider.id != null) Future.microtask(_fetchMatchDetails);
       // Reset user-typing state and subscribe to new user's typing status.
@@ -1193,6 +1300,14 @@ class _ChatWindowState extends State<ChatWindow> {
                 }
 
                 final itemCount = messages.length;
+                _messageIndexMap
+                  ..clear()
+                  ..addEntries(
+                    List.generate(
+                      itemCount,
+                      (index) => MapEntry(messages[index].id, index),
+                    ),
+                  );
                 // Extra slot at the end of the reversed list (= visual top) for the
                 // load-more indicator.
                 final listItemCount = itemCount + (_hasMoreMessages || _isLoadingMore ? 1 : 0);
@@ -1256,7 +1371,6 @@ class _ChatWindowState extends State<ChatWindow> {
                     }
 
                     return GestureDetector(
-                      key: ValueKey(doc.id),
                       onLongPress: () {
                         _showMessageOptions(
                           context,
@@ -1267,27 +1381,31 @@ class _ChatWindowState extends State<ChatWindow> {
                           canMutate: canMutate,
                         );
                       },
-                      child: _buildChatBubble(
-                        data['message'],
-                        isSentByMe,
-                        timestamp,
-                        data['type'],
-                        data.containsKey('profileData') ? data['profileData'] : null,
-                        data.containsKey('imageUrl') ? data['imageUrl'] : null,
-                        data['seen'] == true,
-                        data['callType']?.toString(),
-                        data['callStatus']?.toString(),
-                        (data['callDuration'] as num?)?.toInt() ?? 0,
-                        doc.id,
-                        data['replyto'] is Map<String, dynamic>
-                            ? data['replyto'] as Map<String, dynamic>
-                            : null,
-                        data['edited'] == true,
-                        data['deleted'] == true,
-                        data['unsent'] == true,
-                        canEdit,
-                        canMutate,
-                        replyPayload,
+                      child: _HighlightableMessageContainer(
+                        key: _messageKeyFor(doc.id),
+                        isHighlighted: _highlightedMessageId == doc.id,
+                        child: _buildChatBubble(
+                          data['message'],
+                          isSentByMe,
+                          timestamp,
+                          data['type'],
+                          data.containsKey('profileData') ? data['profileData'] : null,
+                          data.containsKey('imageUrl') ? data['imageUrl'] : null,
+                          data['seen'] == true,
+                          data['callType']?.toString(),
+                          data['callStatus']?.toString(),
+                          (data['callDuration'] as num?)?.toInt() ?? 0,
+                          doc.id,
+                          data['replyto'] is Map<String, dynamic>
+                              ? data['replyto'] as Map<String, dynamic>
+                              : null,
+                          data['edited'] == true,
+                          data['deleted'] == true,
+                          data['unsent'] == true,
+                          canEdit,
+                          canMutate,
+                          replyPayload,
+                        ),
                       ),
                     );
                   },
@@ -1563,6 +1681,12 @@ class _ChatWindowState extends State<ChatWindow> {
     const kPrimary = Color(0xFFD81B60);
     const kText = Color(0xFF1E293B);
     const kMuted = Color(0xFF64748B);
+    final replyPreview = _buildReplyPreview(
+      replyTo: replyTo,
+      isSentByMe: isSentByMe,
+      mutedColor: kMuted,
+      primaryColor: kPrimary,
+    );
 
     final statusMessage = deleted
         ? _kDeletedMessageText
@@ -1603,6 +1727,7 @@ class _ChatWindowState extends State<ChatWindow> {
               child: Column(
                 crossAxisAlignment: isSentByMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                 children: [
+                  if (replyPreview != null) replyPreview,
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                     margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 6),
@@ -1629,6 +1754,7 @@ class _ChatWindowState extends State<ChatWindow> {
               callDuration,
               isSentByMe,
               timestamp,
+              replyPreview: replyPreview,
             );
       return _buildMessageWithActions(
         bubble: callBubble,
@@ -1646,6 +1772,7 @@ class _ChatWindowState extends State<ChatWindow> {
         child: Column(
           crossAxisAlignment: isSentByMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
+            if (replyPreview != null) replyPreview,
             if (statusMessage != null)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
@@ -1738,6 +1865,7 @@ class _ChatWindowState extends State<ChatWindow> {
         child: Column(
           crossAxisAlignment: isSentByMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
+            if (replyPreview != null) replyPreview,
             if (statusMessage != null)
               Container(
                 width: MediaQuery.of(context).size.width * 0.22,
@@ -2061,64 +2189,6 @@ class _ChatWindowState extends State<ChatWindow> {
       );
     }
 
-    Widget? replyQuote;
-    if (replyTo != null && replyTo['message'] != null) {
-      final String quotedMsg = replyTo['message'] as String;
-      final String quotedSender = replyTo['senderName'] as String? ?? 'User';
-      replyQuote = Container(
-        margin: const EdgeInsets.only(bottom: 4, left: 6, right: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSentByMe
-              ? Colors.white.withOpacity(0.2)
-              : kPrimary.withOpacity(0.07),
-          borderRadius: BorderRadius.circular(10),
-          border: Border(
-            left: BorderSide(
-              color: isSentByMe ? Colors.white.withOpacity(0.7) : kPrimary,
-              width: 3,
-            ),
-          ),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              quotedSender,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: isSentByMe ? Colors.white : kPrimary,
-              ),
-            ),
-            if (replyTo['edited'] == true &&
-                replyTo['deleted'] != true &&
-                replyTo['unsent'] != true) ...[
-              const SizedBox(height: 2),
-              Text(
-                'Edited',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontStyle: FontStyle.italic,
-                  color: isSentByMe ? Colors.white.withOpacity(0.85) : kMuted,
-                ),
-              ),
-            ],
-            const SizedBox(height: 2),
-            Text(
-              quotedMsg.length > _kMaxQuoteLength ? '${quotedMsg.substring(0, _kMaxQuoteLength)}…' : quotedMsg,
-              style: TextStyle(
-                fontSize: 11,
-                color: isSentByMe ? Colors.white.withOpacity(0.85) : kMuted,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ],
-        ),
-      );
-    }
-
     final bubble = Align(
       alignment: isSentByMe ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
@@ -2151,7 +2221,7 @@ class _ChatWindowState extends State<ChatWindow> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (replyQuote != null) replyQuote,
+                  if (replyPreview != null) replyPreview,
                   Text(
                     displayedMessage,
                     style: TextStyle(
@@ -2208,6 +2278,98 @@ class _ChatWindowState extends State<ChatWindow> {
     );
   }
 
+  Widget? _buildReplyPreview({
+    required Map<String, dynamic>? replyTo,
+    required bool isSentByMe,
+    required Color mutedColor,
+    required Color primaryColor,
+  }) {
+    if (replyTo == null || replyTo['message'] == null) return null;
+
+    final String quotedMsg = replyTo['message'] as String;
+    final String quotedSender = replyTo['senderName'] as String? ?? 'User';
+    final bool canNavigate = (replyTo['docId']?.toString() ?? '').isNotEmpty;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 4, left: 6, right: 6),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: canNavigate ? () => _handleReplyPreviewTap(replyTo) : null,
+          borderRadius: BorderRadius.circular(10),
+          child: Ink(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: isSentByMe
+                  ? Colors.white.withOpacity(0.18)
+                  : primaryColor.withOpacity(0.07),
+              borderRadius: BorderRadius.circular(10),
+              border: Border(
+                left: BorderSide(
+                  color: isSentByMe ? Colors.white.withOpacity(0.78) : primaryColor,
+                  width: 3,
+                ),
+              ),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        quotedSender,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: isSentByMe ? Colors.white : primaryColor,
+                        ),
+                      ),
+                      if (replyTo['edited'] == true &&
+                          replyTo['deleted'] != true &&
+                          replyTo['unsent'] != true) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          'Edited',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontStyle: FontStyle.italic,
+                            color: isSentByMe ? Colors.white.withOpacity(0.85) : mutedColor,
+                          ),
+                        ),
+                      ],
+                      const SizedBox(height: 2),
+                      Text(
+                        quotedMsg.length > _kMaxQuoteLength
+                            ? '${quotedMsg.substring(0, _kMaxQuoteLength)}…'
+                            : quotedMsg,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: isSentByMe ? Colors.white.withOpacity(0.85) : mutedColor,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                if (canNavigate) ...[
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.subdirectory_arrow_left_rounded,
+                    size: 16,
+                    color: isSentByMe ? Colors.white.withOpacity(0.88) : primaryColor,
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Single tick (sent) or double tick (seen) indicator for admin-sent messages.
   Widget _buildSeenTick(bool seen) {
     const kPrimary = Color(0xFFD81B60);
@@ -2225,7 +2387,8 @@ class _ChatWindowState extends State<ChatWindow> {
 
   /// Call history message bubble.
   Widget _buildCallBubble(
-      String callType, String status, int durationSeconds, bool isSentByMe, DateTime timestamp) {
+      String callType, String status, int durationSeconds, bool isSentByMe, DateTime timestamp,
+      {Widget? replyPreview}) {
     const kPrimary = Color(0xFFD81B60);
     const kMuted = Color(0xFF64748B);
     final bool isMissed = status == 'missed';
@@ -2241,37 +2404,43 @@ class _ChatWindowState extends State<ChatWindow> {
 
     return Align(
       alignment: isSentByMe ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 6),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isMissed ? Colors.red.shade50 : const Color(0xFFFCE4EC),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isMissed ? Colors.red.shade200 : const Color(0xFFFFCDD2),
-            width: 1,
-          ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 18),
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      child: Column(
+        crossAxisAlignment: isSentByMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+        children: [
+          if (replyPreview != null) replyPreview,
+          Container(
+            margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: isMissed ? Colors.red.shade50 : const Color(0xFFFCE4EC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isMissed ? Colors.red.shade200 : const Color(0xFFFFCDD2),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  '$label$dur',
-                  style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
-                ),
-                Text(
-                  DateFormat('hh:mm a').format(timestamp),
-                  style: const TextStyle(fontSize: 10, color: kMuted),
+                Icon(icon, color: color, size: 18),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '$label$dur',
+                      style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                    Text(
+                      DateFormat('hh:mm a').format(timestamp),
+                      style: const TextStyle(fontSize: 10, color: kMuted),
+                    ),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -3024,6 +3193,7 @@ class _ChatWindowState extends State<ChatWindow> {
   void dispose() {
     _removeCallOverlay();
     _typingTimer?.cancel();
+    _replyHighlightTimer?.cancel();
     _typingSubscription?.cancel();
     _clearAdminTypingStatus();
     _scrollController.dispose();
@@ -3032,6 +3202,34 @@ class _ChatWindowState extends State<ChatWindow> {
     _searchController.dispose();
     _recorder.closeRecorder();
     super.dispose();
+  }
+}
+
+class _HighlightableMessageContainer extends StatelessWidget {
+  const _HighlightableMessageContainer({
+    super.key,
+    required this.child,
+    required this.isHighlighted,
+  });
+
+  final Widget child;
+  final bool isHighlighted;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = ChatColors.of(context);
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeInOut,
+      margin: const EdgeInsets.symmetric(vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
+      decoration: BoxDecoration(
+        color: isHighlighted ? colors.primaryLight.withOpacity(0.9) : Colors.transparent,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: child,
+    );
   }
 }
 
