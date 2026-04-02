@@ -1307,8 +1307,6 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
           _row('p_marital', 'Marital Status', p.maritalStatusName, section: 'personal', apiField: 'maritalStatusName', icon: Icons.favorite_border),
           _row('p_manglik', 'Manglik', p.manglik, section: 'personal', apiField: 'manglik', icon: Icons.star_border),
           _row('p_disability', 'Disability', p.disability, section: 'personal', apiField: 'Disability', icon: Icons.accessible),
-          _row('p_photo', 'Photo Request', p.photoRequest, section: 'personal', apiField: 'photo_request', icon: Icons.photo_camera_outlined),
-          _row('p_privacy', 'Privacy Setting', p.privacy, section: 'personal', apiField: 'privacy', icon: Icons.lock_outline),
         ],
       );
 
@@ -2631,6 +2629,11 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
 
         const SizedBox(height: 14),
 
+        // ── Admin Actions card ──
+        _buildRightAdminActions(p, prov),
+
+        const SizedBox(height: 14),
+
         // ── Contact info card ──
         Container(
           decoration: BoxDecoration(
@@ -2683,6 +2686,165 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildRightAdminActions(PersonalDetail p, UserDetailsProvider prov) {
+    final privacyOptions = ['public', 'private', 'friends'];
+    final currentPrivacy = p.privacy.isNotEmpty && p.privacy != 'Not available' ? p.privacy.toLowerCase() : '';
+
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 4)),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            decoration: BoxDecoration(
+              color: _kPrimary.withOpacity(0.05),
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.admin_panel_settings_outlined, size: 16, color: _kPrimary),
+                SizedBox(width: 8),
+                Text(
+                  'Admin Actions',
+                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: _kPrimaryDark),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                if (widget.onOpenChat != null) ...[
+                  _chipButton(
+                    label: 'Chat with User',
+                    icon: Icons.chat_bubble_outline,
+                    onTap: () => widget.onOpenChat!(widget.userId),
+                    color: _kSky,
+                  ),
+                  const SizedBox(height: 8),
+                ],
+                _chipButton(
+                  label: 'Send Notification',
+                  icon: Icons.notifications_active_outlined,
+                  onTap: prov.isSendingNotification ? null : _showSendNotificationDialog,
+                  color: _kPrimary,
+                ),
+                if (prov.isSendingNotification) ...[
+                  const SizedBox(height: 6),
+                  const Center(
+                    child: SizedBox(
+                      height: 14,
+                      width: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                // ── Privacy Setting ──
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: Colors.grey.shade200),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.lock_outline, size: 15, color: Colors.blueGrey.shade400),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text('Privacy',
+                                style: TextStyle(
+                                    fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+                            const SizedBox(height: 2),
+                            Text(
+                              currentPrivacy.isEmpty ? '—' : currentPrivacy,
+                              style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: currentPrivacy.isEmpty
+                                      ? Colors.grey.shade400
+                                      : Colors.blueGrey.shade900),
+                            ),
+                          ],
+                        ),
+                      ),
+                      PopupMenuButton<String>(
+                        tooltip: 'Change privacy',
+                        icon: Icon(Icons.edit_outlined, size: 14, color: Colors.blueGrey.shade300),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        onSelected: (val) async {
+                          final ok = await context
+                              .read<UserDetailsProvider>()
+                              .updateField(section: 'personal', field: 'privacy', value: val);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(ok ? 'Privacy updated to $val' : 'Update failed'),
+                                backgroundColor: ok ? _kEmerald : _kRose,
+                                behavior: SnackBarBehavior.floating,
+                                margin: const EdgeInsets.all(16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                              ),
+                            );
+                          }
+                        },
+                        itemBuilder: (_) => privacyOptions.map((opt) {
+                          final selected = opt == currentPrivacy;
+                          return PopupMenuItem<String>(
+                            value: opt,
+                            child: Row(
+                              children: [
+                                Icon(
+                                  opt == 'public'
+                                      ? Icons.public
+                                      : opt == 'private'
+                                          ? Icons.lock_outline
+                                          : Icons.people_outline,
+                                  size: 15,
+                                  color: selected ? _kPrimary : Colors.grey.shade600,
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  opt.isEmpty ? opt : opt[0].toUpperCase() + opt.substring(1),
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                                    color: selected ? _kPrimary : Colors.grey.shade800,
+                                  ),
+                                ),
+                                if (selected) ...[
+                                  const Spacer(),
+                                  const Icon(Icons.check, size: 14, color: _kPrimary),
+                                ],
+                              ],
+                            ),
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -2876,66 +3038,70 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        // ── Wide layout: 3 columns ──────────────────────────────────────────
+        // ── Wide layout: 3 columns, sticky side panels ──────────────────────
         if (constraints.maxWidth >= _kWideBreakpoint) {
-          return SingleChildScrollView(
+          return Padding(
             padding: const EdgeInsets.all(20),
             child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Left column: activity stats
+                // Left column: activity stats (sticky)
                 SizedBox(
                   width: _kLeftPanelWidth,
-                  child: _buildLeftPanel(provider),
+                  child: SingleChildScrollView(
+                    child: _buildLeftPanel(provider),
+                  ),
                 ),
                 const SizedBox(width: 14),
-                // Center column: user information
+                // Center column: scrollable user information
                 Expanded(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.08),
-                          blurRadius: 20,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Column(
-                      children: [
-                        _buildCenterHeader(p),
-                        _buildDocumentsSection(),
-                        const Divider(height: 1, thickness: 1),
-                        _buildAdminActions(p, provider),
-                        const Divider(height: 1, thickness: 1),
-                        _buildPersonal(p),
-                        const Divider(height: 1, thickness: 1),
-                        _buildEducation(p),
-                        const Divider(height: 1, thickness: 1),
-                        _buildFamily(data.familyDetail),
-                        const Divider(height: 1, thickness: 1),
-                        _buildLifestyle(data.lifestyle),
-                        const Divider(height: 1, thickness: 1),
-                        _buildPartner(data.partner),
-                        const SizedBox(height: 8),
-                      ],
+                  child: SingleChildScrollView(
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 20,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: Column(
+                        children: [
+                          _buildCenterHeader(p),
+                          _buildDocumentsSection(),
+                          const Divider(height: 1, thickness: 1),
+                          _buildPersonal(p),
+                          const Divider(height: 1, thickness: 1),
+                          _buildEducation(p),
+                          const Divider(height: 1, thickness: 1),
+                          _buildFamily(data.familyDetail),
+                          const Divider(height: 1, thickness: 1),
+                          _buildLifestyle(data.lifestyle),
+                          const Divider(height: 1, thickness: 1),
+                          _buildPartner(data.partner),
+                          const SizedBox(height: 8),
+                        ],
+                      ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 14),
-                // Right column: photo + contact
+                // Right column: photo + admin actions + contact (sticky)
                 SizedBox(
                   width: _kRightPanelWidth,
-                  child: _buildRightPanel(p, contact, provider),
+                  child: SingleChildScrollView(
+                    child: _buildRightPanel(p, contact, provider),
+                  ),
                 ),
               ],
             ),
           );
         }
 
-        // ── Narrow layout: single column (original) ─────────────────────────
+        // ── Narrow layout: single column ─────────────────────────────────────
         return SingleChildScrollView(
           child: Center(
             child: ConstrainedBox(
@@ -2959,7 +3125,10 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
                     _buildDocumentsSection(),
                     const Divider(height: 1, thickness: 1),
                     _buildMediaAndActivity(p, provider),
-                    _buildAdminActions(p, provider),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                      child: _buildRightAdminActions(p, provider),
+                    ),
                     const Divider(height: 1, thickness: 1),
                     _buildPersonal(p),
                     const Divider(height: 1, thickness: 1),
