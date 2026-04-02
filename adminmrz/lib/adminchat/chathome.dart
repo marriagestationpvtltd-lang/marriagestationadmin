@@ -96,6 +96,8 @@ class _ChatWindowState extends State<ChatWindow> {
   String _editingOriginalText = ''; // original message text before user edits it
 
   static const int _kMaxQuoteLength = 80; // max chars shown in reply/edit preview
+  static const String _kDeletedMessageText = 'This message was deleted.';
+  static const String _kUnsentMessageText = 'This message was unsent.';
 
   @override
   void initState() {
@@ -270,6 +272,143 @@ class _ChatWindowState extends State<ChatWindow> {
     }
     final String dur = _formatCallDuration(seconds);
     return isVideo ? '📹 Video Call • $dur' : '📞 Audio Call • $dur';
+  }
+
+  String _messagePreviewText(Map<String, dynamic> data) {
+    if (data['deleted'] == true) return _kDeletedMessageText;
+    if (data['unsent'] == true) return _kUnsentMessageText;
+
+    switch (data['type']?.toString()) {
+      case 'image':
+        return '📷 Image';
+      case 'profile_card':
+        return '👤 Profile shared';
+      case 'call':
+        return _callLabel(
+          data['callType']?.toString() ?? 'audio',
+          data['callStatus']?.toString() ?? 'missed',
+          (data['callDuration'] as num?)?.toInt() ?? 0,
+        );
+      case 'text':
+      case null:
+        final text = data['message']?.toString().trim() ?? '';
+        return text.isEmpty ? 'Message' : text;
+      default:
+        return data['message']?.toString() ?? 'Message';
+    }
+  }
+
+  Map<String, dynamic> _buildReplyPayload({
+    required String docId,
+    required Map<String, dynamic> data,
+    required String senderId,
+    required String senderName,
+  }) {
+    return {
+      'docId': docId,
+      'message': _messagePreviewText(data),
+      'senderid': senderId,
+      'senderName': senderName,
+      'type': data['type']?.toString() ?? 'text',
+      'edited': data['edited'] == true,
+      'deleted': data['deleted'] == true,
+      'unsent': data['unsent'] == true,
+    };
+  }
+
+  bool _canEditMessage(Map<String, dynamic> data, bool isSentByMe) {
+    if (!isSentByMe) return false;
+    if (data['deleted'] == true || data['unsent'] == true) return false;
+    final type = data['type']?.toString();
+    return type == null || type == 'text';
+  }
+
+  bool _canMutateMessage(Map<String, dynamic> data, bool isSentByMe) {
+    return isSentByMe && data['deleted'] != true && data['unsent'] != true;
+  }
+
+  Future<void> _syncReplySnapshots(
+    String sourceDocId,
+    Map<String, dynamic> replyData,
+  ) async {
+    final snapshot = await _firestore
+        .collection('adminchat')
+        .where('replyto.docId', isEqualTo: sourceDocId)
+        .get();
+
+    if (snapshot.docs.isEmpty) return;
+
+    final batch = _firestore.batch();
+    for (final doc in snapshot.docs) {
+      batch.update(doc.reference, {'replyto': replyData});
+    }
+    await batch.commit();
+  }
+
+  Future<void> _updateConversationPreviewIfLatest({
+    required String docId,
+    required String receiverId,
+    required String lastMessage,
+  }) async {
+    final latestSnapshot = await _firestore
+        .collection('adminchat')
+        .where('senderid', whereIn: [senderId.toString(), receiverId])
+        .where('receiverid', whereIn: [senderId.toString(), receiverId])
+        .orderBy('timestamp', descending: true)
+        .limit(1)
+        .get();
+
+    if (latestSnapshot.docs.isEmpty || latestSnapshot.docs.first.id != docId) {
+      return;
+    }
+
+    await _firestore
+        .collection('conversations')
+        .doc(getConversationId(senderId.toString(), receiverId))
+        .set({
+      'lastMessage': lastMessage,
+      'lastTimestamp': FieldValue.serverTimestamp(),
+      'lastSenderId': senderId.toString(),
+    }, SetOptions(merge: true));
+  }
+
+  Future<void> _applyMessageMutation({
+    required String docId,
+    required Map<String, dynamic> updates,
+  }) async {
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+    final receiverId = chatProvider.id?.toString();
+    if (receiverId == null) return;
+
+    final docRef = _firestore.collection('adminchat').doc(docId);
+    await docRef.update(updates);
+
+    final latestData = {
+      ...(await docRef.get()).data() ?? <String, dynamic>{},
+      ...updates,
+    };
+
+    final replyData = {
+      'docId': docId,
+      'message': _messagePreviewText(latestData),
+      'senderid': latestData['senderid']?.toString() ?? senderId.toString(),
+      'senderName': latestData['senderid']?.toString() == senderId.toString()
+          ? 'You'
+          : (chatProvider.namee ?? 'User'),
+      'type': latestData['type']?.toString() ?? 'text',
+      'edited': latestData['edited'] == true,
+      'deleted': latestData['deleted'] == true,
+      'unsent': latestData['unsent'] == true,
+    };
+
+    await Future.wait([
+      _syncReplySnapshots(docId, replyData),
+      _updateConversationPreviewIfLatest(
+        docId: docId,
+        receiverId: receiverId,
+        lastMessage: replyData['message'] as String,
+      ),
+    ]);
   }
 
   String _formatCallDuration(int seconds) {
@@ -1073,6 +1212,16 @@ class _ChatWindowState extends State<ChatWindow> {
                     DateTime timestamp = (data['timestamp'] != null)
                         ? (data['timestamp'] as Timestamp).toDate()
                         : DateTime.now();
+                    final replyPayload = _buildReplyPayload(
+                      docId: doc.id,
+                      data: data,
+                      senderId: isSentByMe
+                          ? senderId.toString()
+                          : (chatProvider.id?.toString() ?? ''),
+                      senderName: isSentByMe ? 'You' : (chatProvider.namee ?? 'User'),
+                    );
+                    final canEdit = _canEditMessage(data, isSentByMe);
+                    final canMutate = _canMutateMessage(data, isSentByMe);
 
                     if (index == 0 && !_isSearching) {
                       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1086,10 +1235,14 @@ class _ChatWindowState extends State<ChatWindow> {
                     return GestureDetector(
                       key: ValueKey(doc.id),
                       onLongPress: () {
-                        final String msgText = data['message']?.toString() ?? '';
-                        if (data['type'] == 'text' || data['type'] == null) {
-                          _showMessageOptions(context, doc.id, msgText, isSentByMe);
-                        }
+                        _showMessageOptions(
+                          context,
+                          doc.id,
+                          replyPayload,
+                          isSentByMe,
+                          canEdit: canEdit,
+                          canMutate: canMutate,
+                        );
                       },
                       child: _buildChatBubble(
                         data['message'],
@@ -1106,6 +1259,12 @@ class _ChatWindowState extends State<ChatWindow> {
                         data['replyto'] is Map<String, dynamic>
                             ? data['replyto'] as Map<String, dynamic>
                             : null,
+                        data['edited'] == true,
+                        data['deleted'] == true,
+                        data['unsent'] == true,
+                        canEdit,
+                        canMutate,
+                        replyPayload,
                       ),
                     );
                   },
@@ -1371,73 +1530,161 @@ class _ChatWindowState extends State<ChatWindow> {
       String? callStatus,
       int callDuration = 0,
       String? docId,
-      Map<String, dynamic>? replyTo]) {
+      Map<String, dynamic>? replyTo,
+      bool edited = false,
+      bool deleted = false,
+      bool unsent = false,
+      bool canEdit = false,
+      bool canMutate = false,
+      Map<String, dynamic>? replyPayload]) {
     const kPrimary = Color(0xFFD81B60);
     const kText = Color(0xFF1E293B);
     const kMuted = Color(0xFF64748B);
 
-    // ── Call history bubble ──────────────────────────────────────────────
+    final statusMessage = deleted
+        ? _kDeletedMessageText
+        : (unsent ? _kUnsentMessageText : null);
+    final displayedMessage = statusMessage ?? message;
+    final showEditedLabel = edited && statusMessage == null;
+
+    Widget footer({bool includeSeen = true}) {
+      return Padding(
+        padding: const EdgeInsets.only(right: 8, left: 8, bottom: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (showEditedLabel) ...[
+              const Text(
+                'edited',
+                style: TextStyle(fontSize: 10, color: kMuted, fontStyle: FontStyle.italic),
+              ),
+              const SizedBox(width: 4),
+            ],
+            Text(
+              DateFormat('hh:mm a').format(timestamp),
+              style: const TextStyle(fontSize: 10, color: kMuted),
+            ),
+            if (includeSeen && isSentByMe) ...[
+              const SizedBox(width: 3),
+              _buildSeenTick(seen),
+            ],
+          ],
+        ),
+      );
+    }
+
     if (type == 'call') {
-      return _buildCallBubble(
-          callType ?? 'audio', callStatus ?? 'missed', callDuration, isSentByMe, timestamp);
+      final callBubble = statusMessage != null
+          ? Align(
+              alignment: isSentByMe ? Alignment.centerRight : Alignment.centerLeft,
+              child: Column(
+                crossAxisAlignment: isSentByMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                    margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 6),
+                    decoration: BoxDecoration(
+                      color: isSentByMe ? kPrimary : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      displayedMessage,
+                      style: TextStyle(
+                        color: isSentByMe ? Colors.white : kText,
+                        fontSize: 13,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ),
+                  footer(),
+                ],
+              ),
+            )
+          : _buildCallBubble(
+              callType ?? 'audio',
+              callStatus ?? 'missed',
+              callDuration,
+              isSentByMe,
+              timestamp,
+            );
+      return _buildMessageWithActions(
+        bubble: callBubble,
+        isSentByMe: isSentByMe,
+        canEdit: false,
+        canMutate: canMutate,
+        docId: docId,
+        replyPayload: replyPayload,
+      );
     }
 
     if (type == 'image' && imageUrl != null) {
-      return Align(
+      final bubble = Align(
         alignment: isSentByMe ? Alignment.centerRight : Alignment.centerLeft,
         child: Column(
           crossAxisAlignment: isSentByMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 6),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(12),
-                boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 4, offset: const Offset(0, 1))],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.network(
-                  imageUrl,
-                  width: MediaQuery.of(context).size.width * 0.24,
-                  fit: BoxFit.cover,
-                  cacheWidth: (MediaQuery.of(context).size.width * 0.24).toInt(),
-                  loadingBuilder: (context, child, loadingProgress) {
-                    if (loadingProgress == null) return child;
-                    return const Center(child: CircularProgressIndicator(color: kPrimary));
-                  },
-                  errorBuilder: (context, error, stackTrace) {
-                    return Column(
-                      children: [
-                        const Text('Error loading image'),
-                        Text('Details: $error', style: const TextStyle(fontSize: 10)),
-                        ElevatedButton(
-                          onPressed: () => setState(() {}),
-                          child: const Text("Retry"),
-                        ),
-                      ],
-                    );
-                  },
+            if (statusMessage != null)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 6),
+                decoration: BoxDecoration(
+                  color: isSentByMe ? kPrimary : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  displayedMessage,
+                  style: TextStyle(
+                    color: isSentByMe ? Colors.white : kText,
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              )
+            else
+              Container(
+                margin: const EdgeInsets.symmetric(vertical: 3, horizontal: 6),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 4, offset: const Offset(0, 1))],
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    imageUrl,
+                    width: MediaQuery.of(context).size.width * 0.24,
+                    fit: BoxFit.cover,
+                    cacheWidth: (MediaQuery.of(context).size.width * 0.24).toInt(),
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return const Center(child: CircularProgressIndicator(color: kPrimary));
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return Column(
+                        children: [
+                          const Text('Error loading image'),
+                          Text('Details: $error', style: const TextStyle(fontSize: 10)),
+                          ElevatedButton(
+                            onPressed: () => setState(() {}),
+                            child: const Text("Retry"),
+                          ),
+                        ],
+                      );
+                    },
+                  ),
                 ),
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(right: 6, left: 6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    DateFormat('hh:mm a').format(timestamp),
-                    style: const TextStyle(fontSize: 10, color: kMuted),
-                  ),
-                  if (isSentByMe) ...[
-                    const SizedBox(width: 3),
-                    _buildSeenTick(seen),
-                  ],
-                ],
-              ),
-            ),
+            footer(),
           ],
         ),
+      );
+
+      return _buildMessageWithActions(
+        bubble: bubble,
+        isSentByMe: isSentByMe,
+        canEdit: false,
+        canMutate: canMutate,
+        docId: docId,
+        replyPayload: replyPayload,
       );
     }
 
@@ -1450,7 +1697,6 @@ class _ChatWindowState extends State<ChatWindow> {
 
       final bool isPaid = profileData['is_paid'] == true;
       final String bioText = profileData['bio'] ?? '';
-      // Parse match percentage from bio like "72% Matched"
       final matchRegex = RegExp(r'(\d+(?:\.\d+)?)%');
       final matchMatch = matchRegex.firstMatch(bioText);
       final double matchPct = matchMatch != null ? double.tryParse(matchMatch.group(1)!) ?? 0 : 0;
@@ -1464,337 +1710,334 @@ class _ChatWindowState extends State<ChatWindow> {
         matchColor = const Color(0xFF78909C);
       }
 
-      return Align(
+      final bubble = Align(
         alignment: isSentByMe ? Alignment.centerRight : Alignment.centerLeft,
         child: Column(
           crossAxisAlignment: isSentByMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
           children: [
-            Container(
-              width: MediaQuery.of(context).size.width * 0.22,
-              margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
-              decoration: BoxDecoration(
-                color: kCardSurface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: kCardBorder, width: 1),
-                boxShadow: [
-                  BoxShadow(color: const Color(0xFFD81B60).withOpacity(0.08), blurRadius: 16, offset: const Offset(0, 4)),
-                  BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 2)),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  // ── Header gradient with avatar ──────────────────────────
-                  ClipRRect(
-                    borderRadius: const BorderRadius.only(
-                      topLeft: Radius.circular(15),
-                      topRight: Radius.circular(15),
-                    ),
-                    child: Container(
-                      height: 72,
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xFFD81B60), Color(0xFFAD1457), Color(0xFF880E4F)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
+            if (statusMessage != null)
+              Container(
+                width: MediaQuery.of(context).size.width * 0.22,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                decoration: BoxDecoration(
+                  color: isSentByMe ? kPrimary : Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  displayedMessage,
+                  style: TextStyle(
+                    color: isSentByMe ? Colors.white : kText,
+                    fontSize: 13,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              )
+            else
+              Container(
+                width: MediaQuery.of(context).size.width * 0.22,
+                margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 6),
+                decoration: BoxDecoration(
+                  color: kCardSurface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: kCardBorder, width: 1),
+                  boxShadow: [
+                    BoxShadow(color: const Color(0xFFD81B60).withOpacity(0.08), blurRadius: 16, offset: const Offset(0, 4)),
+                    BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 2)),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    ClipRRect(
+                      borderRadius: const BorderRadius.only(
+                        topLeft: Radius.circular(15),
+                        topRight: Radius.circular(15),
                       ),
-                      child: Stack(
-                        children: [
-                          // Subtle pattern dots
-                          Positioned(
-                            top: -10,
-                            right: -10,
-                            child: Container(
-                              width: 60,
-                              height: 60,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white.withOpacity(0.06),
+                      child: Container(
+                        height: 72,
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFFD81B60), Color(0xFFAD1457), Color(0xFF880E4F)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                        child: Stack(
+                          children: [
+                            Positioned(
+                              top: -10,
+                              right: -10,
+                              child: Container(
+                                width: 60,
+                                height: 60,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withOpacity(0.06),
+                                ),
                               ),
                             ),
-                          ),
-                          Positioned(
-                            bottom: -8,
-                            left: -8,
-                            child: Container(
-                              width: 40,
-                              height: 40,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: Colors.white.withOpacity(0.06),
+                            Positioned(
+                              bottom: -8,
+                              left: -8,
+                              child: Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: Colors.white.withOpacity(0.06),
+                                ),
                               ),
                             ),
-                          ),
-                          // "Profile Shared" label
-                          Positioned(
-                            top: 8,
-                            left: 10,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.18),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: const [
-                                  Icon(Icons.person_pin_rounded, size: 9, color: Colors.white),
-                                  SizedBox(width: 3),
-                                  Text('Profile Shared', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.w600, letterSpacing: 0.2)),
-                                ],
-                              ),
-                            ),
-                          ),
-                          // Premium badge
-                          if (isPaid)
                             Positioned(
                               top: 8,
-                              right: 10,
+                              left: 10,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                 decoration: BoxDecoration(
-                                  gradient: const LinearGradient(colors: [Color(0xFFFFD54F), Color(0xFFFFA000)]),
+                                  color: Colors.white.withOpacity(0.18),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
-                                child: const Row(
+                                child: Row(
                                   mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Icon(Icons.workspace_premium, size: 8, color: Colors.white),
-                                    SizedBox(width: 2),
-                                    Text('Premium', style: TextStyle(color: Colors.white, fontSize: 7.5, fontWeight: FontWeight.w700, letterSpacing: 0.2)),
+                                  children: const [
+                                    Icon(Icons.person_pin_rounded, size: 9, color: Colors.white),
+                                    SizedBox(width: 3),
+                                    Text('Profile Shared', style: TextStyle(color: Colors.white, fontSize: 8.5, fontWeight: FontWeight.w600, letterSpacing: 0.2)),
                                   ],
                                 ),
                               ),
                             ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // ── Avatar overlapping the gradient ──────────────────────
-                  Transform.translate(
-                    offset: const Offset(0, -28),
-                    child: Column(
-                      children: [
-                        Center(
-                          child: Stack(
-                            alignment: Alignment.center,
-                            clipBehavior: Clip.none,
-                            children: [
-                              // Match ring
-                              if (matchPct > 0)
-                                Container(
-                                  width: 60,
-                                  height: 60,
+                            if (isPaid)
+                              Positioned(
+                                top: 8,
+                                right: 10,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    border: Border.all(color: matchColor, width: 2.5),
+                                    gradient: const LinearGradient(colors: [Color(0xFFFFD54F), Color(0xFFFFA000)]),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.workspace_premium, size: 8, color: Colors.white),
+                                      SizedBox(width: 2),
+                                      Text('Premium', style: TextStyle(color: Colors.white, fontSize: 7.5, fontWeight: FontWeight.w700, letterSpacing: 0.2)),
+                                    ],
                                   ),
                                 ),
-                              Container(
-                                width: 54,
-                                height: 54,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  border: Border.all(color: Colors.white, width: 2.5),
-                                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 8, offset: const Offset(0, 3))],
-                                ),
-                                child: ClipOval(
-                                  child: profileData['profileImage'] != null &&
-                                          profileData['profileImage'].toString().isNotEmpty
-                                      ? Image.network(
-                                          profileData['profileImage'],
-                                          fit: BoxFit.cover,
-                                          errorBuilder: (_, __, ___) => Container(
+                              ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Transform.translate(
+                      offset: const Offset(0, -28),
+                      child: Column(
+                        children: [
+                          Center(
+                            child: Stack(
+                              alignment: Alignment.center,
+                              clipBehavior: Clip.none,
+                              children: [
+                                if (matchPct > 0)
+                                  Container(
+                                    width: 60,
+                                    height: 60,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: matchColor, width: 2.5),
+                                    ),
+                                  ),
+                                Container(
+                                  width: 54,
+                                  height: 54,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    border: Border.all(color: Colors.white, width: 2.5),
+                                    boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.12), blurRadius: 8, offset: const Offset(0, 3))],
+                                  ),
+                                  child: ClipOval(
+                                    child: profileData['profileImage'] != null &&
+                                            profileData['profileImage'].toString().isNotEmpty
+                                        ? Image.network(
+                                            profileData['profileImage'],
+                                            fit: BoxFit.cover,
+                                            errorBuilder: (_, __, ___) => Container(
+                                              color: const Color(0xFFF8BBD9),
+                                              child: const Icon(Icons.person_rounded, size: 28, color: Color(0xFFD81B60)),
+                                            ),
+                                          )
+                                        : Container(
                                             color: const Color(0xFFF8BBD9),
                                             child: const Icon(Icons.person_rounded, size: 28, color: Color(0xFFD81B60)),
                                           ),
-                                        )
-                                      : Container(
-                                          color: const Color(0xFFF8BBD9),
-                                          child: const Icon(Icons.person_rounded, size: 28, color: Color(0xFFD81B60)),
-                                        ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                        // ── Name & match badge ─────────────────────────────
-                        const SizedBox(height: 4),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 10),
-                          child: Text(
-                            profileData['name'] ?? 'Unknown',
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: kInfoValue,
-                              letterSpacing: 0.1,
-                            ),
-                            textAlign: TextAlign.center,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        if (matchPct > 0)
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: matchColor.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: matchColor.withOpacity(0.35), width: 1),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.favorite_rounded, size: 9, color: matchColor),
-                                const SizedBox(width: 3),
-                                Text(
-                                  '${matchPct.toStringAsFixed(0)}% Match',
-                                  style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: matchColor),
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-
-                  // ── Info grid ──────────────────────────────────────────
-                  Transform.translate(
-                    offset: const Offset(0, -18),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12),
-                      child: Column(
-                        children: [
-                          // ── User ID (mandatory) ──────────────────────────
-                          Container(
-                            margin: const EdgeInsets.only(bottom: 4),
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: kCardPrimary.withOpacity(0.07),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(color: kCardPrimary.withOpacity(0.25), width: 0.8),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.tag_rounded, size: 10, color: kCardPrimary),
-                                const SizedBox(width: 4),
-                                const Text(
-                                  'User ID',
-                                  style: TextStyle(fontSize: 9.5, color: kCardPrimary, fontWeight: FontWeight.w600),
-                                ),
-                                const Spacer(),
-                                Text(
-                                  '#${profileData['id']}',
-                                  style: const TextStyle(fontSize: 9.5, color: kCardPrimary, fontWeight: FontWeight.w700),
-                                ),
-                              ],
-                            ),
-                          ),
-                          _buildInfoRow(Icons.badge_rounded, 'Member ID', profileData['Member ID'], kInfoLabel, kInfoValue),
-                          _buildInfoRow(Icons.wc_rounded, 'Gender', profileData['gender'], kInfoLabel, kInfoValue),
-                          _buildInfoRow(Icons.location_on_rounded, 'Country', profileData['country'], kInfoLabel, kInfoValue),
-                          _buildInfoRow(Icons.work_rounded, 'Occupation', profileData['occupation'], kInfoLabel, kInfoValue),
-                          _buildInfoRow(Icons.school_rounded, 'Education', profileData['education'], kInfoLabel, kInfoValue),
-                          _buildInfoRow(Icons.favorite_border_rounded, 'Marital', profileData['marit'], kInfoLabel, kInfoValue),
-                          _buildInfoRow(Icons.cake_rounded, 'Age', profileData['age']?.toString(), kInfoLabel, kInfoValue),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // ── Action buttons ─────────────────────────────────────
-                  Transform.translate(
-                    offset: const Offset(0, -12),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
-                      child: Row(
-                        children: [
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () => openUrl("https://digitallami.com/profile.php?id=${profileData['id']}"),
-                              child: Container(
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  border: Border.all(color: kCardPrimary, width: 1.2),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.open_in_new_rounded, size: 12, color: kCardPrimary),
-                                    SizedBox(width: 4),
-                                    Text('Profile', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kCardPrimary)),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  Provider.of<ChatProvider>(context, listen: false)
-                                      .updateName("${profileData['last']}  ${profileData['first']}");
-                                  Provider.of<ChatProvider>(context, listen: false)
-                                      .updateidd(profileData['id']);
-                                });
-                              },
-                              child: Container(
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  gradient: const LinearGradient(
-                                    colors: [Color(0xFFD81B60), Color(0xFFAD1457)],
                                   ),
-                                  borderRadius: BorderRadius.circular(8),
-                                  boxShadow: [BoxShadow(color: const Color(0xFFD81B60).withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 2))],
                                 ),
-                                child: const Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(Icons.chat_bubble_rounded, size: 12, color: Colors.white),
-                                    SizedBox(width: 4),
-                                    Text('Chat', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white)),
-                                  ],
-                                ),
-                              ),
+                              ],
                             ),
                           ),
+                          const SizedBox(height: 4),
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            child: Text(
+                              profileData['name'] ?? 'Unknown',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
+                                color: kInfoValue,
+                                letterSpacing: 0.1,
+                              ),
+                              textAlign: TextAlign.center,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          if (matchPct > 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: matchColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: matchColor.withOpacity(0.35), width: 1),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(Icons.favorite_rounded, size: 9, color: matchColor),
+                                  const SizedBox(width: 3),
+                                  Text(
+                                    '${matchPct.toStringAsFixed(0)}% Match',
+                                    style: TextStyle(fontSize: 9, fontWeight: FontWeight.w700, color: matchColor),
+                                  ),
+                                ],
+                              ),
+                            ),
                         ],
                       ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.only(right: 8, left: 8, bottom: 2),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    DateFormat('hh:mm a').format(timestamp),
-                    style: const TextStyle(fontSize: 10, color: kMuted),
-                  ),
-                  if (isSentByMe) ...[
-                    const SizedBox(width: 3),
-                    _buildSeenTick(seen),
+                    Transform.translate(
+                      offset: const Offset(0, -18),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Column(
+                          children: [
+                            Container(
+                              margin: const EdgeInsets.only(bottom: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: kCardPrimary.withOpacity(0.07),
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: kCardPrimary.withOpacity(0.25), width: 0.8),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.tag_rounded, size: 10, color: kCardPrimary),
+                                  const SizedBox(width: 4),
+                                  const Text(
+                                    'User ID',
+                                    style: TextStyle(fontSize: 9.5, color: kCardPrimary, fontWeight: FontWeight.w600),
+                                  ),
+                                  const Spacer(),
+                                  Text(
+                                    '#${profileData['id']}',
+                                    style: const TextStyle(fontSize: 9.5, color: kCardPrimary, fontWeight: FontWeight.w700),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            _buildInfoRow(Icons.badge_rounded, 'Member ID', profileData['Member ID'], kInfoLabel, kInfoValue),
+                            _buildInfoRow(Icons.wc_rounded, 'Gender', profileData['gender'], kInfoLabel, kInfoValue),
+                            _buildInfoRow(Icons.location_on_rounded, 'Country', profileData['country'], kInfoLabel, kInfoValue),
+                            _buildInfoRow(Icons.work_rounded, 'Occupation', profileData['occupation'], kInfoLabel, kInfoValue),
+                            _buildInfoRow(Icons.school_rounded, 'Education', profileData['education'], kInfoLabel, kInfoValue),
+                            _buildInfoRow(Icons.favorite_border_rounded, 'Marital', profileData['marit'], kInfoLabel, kInfoValue),
+                            _buildInfoRow(Icons.cake_rounded, 'Age', profileData['age']?.toString(), kInfoLabel, kInfoValue),
+                          ],
+                        ),
+                      ),
+                    ),
+                    Transform.translate(
+                      offset: const Offset(0, -12),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(10, 0, 10, 12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () => openUrl("https://digitallami.com/profile.php?id=${profileData['id']}"),
+                                child: Container(
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    border: Border.all(color: kCardPrimary, width: 1.2),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.open_in_new_rounded, size: 12, color: kCardPrimary),
+                                      SizedBox(width: 4),
+                                      Text('Profile', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: kCardPrimary)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    Provider.of<ChatProvider>(context, listen: false)
+                                        .updateName("${profileData['last']}  ${profileData['first']}");
+                                    Provider.of<ChatProvider>(context, listen: false)
+                                        .updateidd(profileData['id']);
+                                  });
+                                },
+                                child: Container(
+                                  height: 32,
+                                  decoration: BoxDecoration(
+                                    gradient: const LinearGradient(
+                                      colors: [Color(0xFFD81B60), Color(0xFFAD1457)],
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                    boxShadow: [BoxShadow(color: const Color(0xFFD81B60).withOpacity(0.3), blurRadius: 6, offset: const Offset(0, 2))],
+                                  ),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(Icons.chat_bubble_rounded, size: 12, color: Colors.white),
+                                      SizedBox(width: 4),
+                                      Text('Chat', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: Colors.white)),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ],
-                ],
+                ),
               ),
-            ),
+            footer(),
           ],
         ),
       );
+
+      return _buildMessageWithActions(
+        bubble: bubble,
+        isSentByMe: isSentByMe,
+        canEdit: false,
+        canMutate: canMutate,
+        docId: docId,
+        replyPayload: replyPayload,
+      );
     }
 
-    // Text message bubble
-    // ── Reply quote block ────────────────────────────────────────────────
     Widget? replyQuote;
     if (replyTo != null && replyTo['message'] != null) {
       final String quotedMsg = replyTo['message'] as String;
@@ -1825,6 +2068,19 @@ class _ChatWindowState extends State<ChatWindow> {
                 color: isSentByMe ? Colors.white : kPrimary,
               ),
             ),
+            if (replyTo['edited'] == true &&
+                replyTo['deleted'] != true &&
+                replyTo['unsent'] != true) ...[
+              const SizedBox(height: 2),
+              Text(
+                'Edited',
+                style: TextStyle(
+                  fontSize: 10,
+                  fontStyle: FontStyle.italic,
+                  color: isSentByMe ? Colors.white.withOpacity(0.85) : kMuted,
+                ),
+              ),
+            ],
             const SizedBox(height: 2),
             Text(
               quotedMsg.length > _kMaxQuoteLength ? '${quotedMsg.substring(0, _kMaxQuoteLength)}…' : quotedMsg,
@@ -1840,7 +2096,7 @@ class _ChatWindowState extends State<ChatWindow> {
       );
     }
 
-    final bubbleContent = Align(
+    final bubble = Align(
       alignment: isSentByMe ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.24),
@@ -1874,59 +2130,58 @@ class _ChatWindowState extends State<ChatWindow> {
                 children: [
                   if (replyQuote != null) replyQuote,
                   Text(
-                    message,
+                    displayedMessage,
                     style: TextStyle(
                       color: isSentByMe ? Colors.white : kText,
                       fontSize: 13,
+                      fontStyle: statusMessage != null ? FontStyle.italic : FontStyle.normal,
                     ),
                   ),
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.only(right: 8, left: 8, bottom: 2),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    DateFormat('hh:mm a').format(timestamp),
-                    style: const TextStyle(fontSize: 10, color: kMuted),
-                  ),
-                  if (isSentByMe) ...[
-                    const SizedBox(width: 3),
-                    _buildSeenTick(seen),
-                  ],
-                ],
-              ),
-            ),
+            footer(),
           ],
         ),
       ),
     );
 
-    if (docId == null) return bubbleContent;
+    return _buildMessageWithActions(
+      bubble: bubble,
+      isSentByMe: isSentByMe,
+      canEdit: canEdit,
+      canMutate: canMutate,
+      docId: docId,
+      replyPayload: replyPayload,
+    );
+  }
 
-    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+  Widget _buildMessageWithActions({
+    required Widget bubble,
+    required bool isSentByMe,
+    required bool canEdit,
+    required bool canMutate,
+    required String? docId,
+    required Map<String, dynamic>? replyPayload,
+  }) {
+    if (docId == null || replyPayload == null) return bubble;
 
-    if (isSentByMe) {
-      return _HoverableTextBubble(
-        bubble: bubbleContent,
-        onReply: () => _startReply(docId, message, senderId.toString(), 'You'),
-        onEdit: () => _startEdit(docId, message),
-        onDelete: () => _firestore.collection('adminchat').doc(docId).delete(),
-        onUnsend: () => _unsendMessage(docId),
-      );
-    }
-
-    // Received message – show hover with Reply action
-    return _HoverableReceivedBubble(
-      bubble: bubbleContent,
+    return _HoverableMessageBubble(
+      bubble: bubble,
+      isSentByMe: isSentByMe,
+      canEdit: canEdit,
+      canDelete: canMutate,
+      canUnsend: canMutate,
       onReply: () => _startReply(
         docId,
-        message,
-        chatProvider.id?.toString() ?? '',
-        chatProvider.namee ?? 'User',
+        replyPayload['message']?.toString() ?? '',
+        replyPayload['senderid']?.toString() ?? '',
+        replyPayload['senderName']?.toString() ?? 'User',
+        replyPayload,
       ),
+      onEdit: canEdit ? () => _startEdit(docId, replyPayload['message']?.toString() ?? '') : null,
+      onDelete: canMutate ? () => _deleteMessage(docId) : null,
+      onUnsend: canMutate ? () => _unsendMessage(docId) : null,
     );
   }
 
@@ -2053,7 +2308,12 @@ class _ChatWindowState extends State<ChatWindow> {
   Widget _buildActionBanner(ChatColors colors) {
     const kPrimary = Color(0xFFD81B60);
     final bool isEditing = _editingDocId != null;
-    final String label = isEditing ? 'Editing' : 'Replying to ${_replyingTo?['senderName'] ?? 'User'}';
+    final bool replyingToEdited = _replyingTo?['edited'] == true &&
+        _replyingTo?['deleted'] != true &&
+        _replyingTo?['unsent'] != true;
+    final String label = isEditing
+        ? 'Editing'
+        : 'Replying to ${_replyingTo?['senderName'] ?? 'User'}${replyingToEdited ? ' • edited' : ''}';
     final String preview = isEditing
         ? (_editingOriginalText.length > _kMaxQuoteLength
             ? '${_editingOriginalText.substring(0, _kMaxQuoteLength)}…'
@@ -2460,10 +2720,15 @@ class _ChatWindowState extends State<ChatWindow> {
       FocusScope.of(context).requestFocus(_messageFocusNode);
       _clearAdminTypingStatus();
       try {
-        await _firestore
-            .collection('adminchat')
-            .doc(docId)
-            .update({'message': messageText, 'edited': true});
+        await _applyMessageMutation(
+          docId: docId,
+          updates: {
+            'message': messageText,
+            'edited': true,
+            'deleted': false,
+            'unsent': false,
+          },
+        );
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context)
@@ -2487,14 +2752,7 @@ class _ChatWindowState extends State<ChatWindow> {
       await _firestore.collection('adminchat').add({
         'message': messageText,
         'liked': false,
-        'replyto': replySnapshot != null
-            ? {
-                'docId': replySnapshot['docId'],
-                'message': replySnapshot['message'],
-                'senderid': replySnapshot['senderid'],
-                'senderName': replySnapshot['senderName'],
-              }
-            : null,
+        'replyto': replySnapshot,
         'senderid': senderId.toString(),
         'receiverid': chatProvider.id.toString(),
         'timestamp': FieldValue.serverTimestamp(),
@@ -2547,7 +2805,14 @@ class _ChatWindowState extends State<ChatWindow> {
     return (a.compareTo(b) < 0) ? '${a}_$b' : '${b}_$a';
   }
 
-  void _showMessageOptions(BuildContext context, String docId, String currentMessage, bool isSentByMe) {
+  void _showMessageOptions(
+    BuildContext context,
+    String docId,
+    Map<String, dynamic> replyPayload,
+    bool isSentByMe, {
+    required bool canEdit,
+    required bool canMutate,
+  }) {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
@@ -2561,27 +2826,32 @@ class _ChatWindowState extends State<ChatWindow> {
               title: const Text("Reply", style: TextStyle(fontSize: 14)),
               onTap: () {
                 Navigator.pop(context);
-                final chatProvider = Provider.of<ChatProvider>(context, listen: false);
-                final senderName = isSentByMe ? 'You' : (chatProvider.namee ?? 'User');
-                final senderid = isSentByMe ? senderId.toString() : (chatProvider.id?.toString() ?? '');
-                _startReply(docId, currentMessage, senderid, senderName);
+                _startReply(
+                  docId,
+                  replyPayload['message']?.toString() ?? '',
+                  replyPayload['senderid']?.toString() ?? '',
+                  replyPayload['senderName']?.toString() ?? 'User',
+                  replyPayload,
+                );
               },
             ),
-            if (isSentByMe) ...[
+            if (isSentByMe && canEdit) ...[
               ListTile(
                 leading: const Icon(Icons.edit, size: 20, color: Color(0xFF0EA5E9)),
                 title: const Text("Edit", style: TextStyle(fontSize: 14)),
                 onTap: () {
                   Navigator.pop(context);
-                  _startEdit(docId, currentMessage);
+                  _startEdit(docId, replyPayload['message']?.toString() ?? '');
                 },
               ),
+            ],
+            if (isSentByMe && canMutate) ...[
               ListTile(
                 leading: const Icon(Icons.delete, size: 20, color: Color(0xFFEF4444)),
                 title: const Text("Delete", style: TextStyle(fontSize: 14)),
                 onTap: () {
-                  _firestore.collection('adminchat').doc(docId).delete();
                   Navigator.pop(context);
+                  _deleteMessage(docId);
                 },
               ),
               ListTile(
@@ -2607,24 +2877,51 @@ class _ChatWindowState extends State<ChatWindow> {
     _startReply(docId, originalMessage, senderid, senderName);
   }
 
+  void _deleteMessage(String docId) {
+    _applyMessageMutation(
+      docId: docId,
+      updates: {
+        'message': _kDeletedMessageText,
+        'deleted': true,
+        'unsent': false,
+        'edited': false,
+      },
+    ).catchError((_) {});
+  }
+
   void _unsendMessage(String docId) {
-    _firestore
-        .collection('adminchat')
-        .doc(docId)
-        .update({'message': 'This message was unsent.', 'unsent': true})
-        .catchError((_) {});
+    _applyMessageMutation(
+      docId: docId,
+      updates: {
+        'message': _kUnsentMessageText,
+        'unsent': true,
+        'deleted': false,
+        'edited': false,
+      },
+    ).catchError((_) {});
   }
 
   // ── INLINE REPLY / EDIT ─────────────────────────────────────────────────
 
-  void _startReply(String docId, String message, String senderid, String senderName) {
+  void _startReply(
+    String docId,
+    String message,
+    String senderid,
+    String senderName, [
+    Map<String, dynamic>? payload,
+  ]) {
     setState(() {
-      _replyingTo = {
-        'docId': docId,
-        'message': message,
-        'senderid': senderid,
-        'senderName': senderName,
-      };
+      _replyingTo = payload ??
+          {
+            'docId': docId,
+            'message': message,
+            'senderid': senderid,
+            'senderName': senderName,
+            'type': 'text',
+            'edited': false,
+            'deleted': false,
+            'unsent': false,
+          };
       _editingDocId = null;
     });
     FocusScope.of(context).requestFocus(_messageFocusNode);
@@ -2707,29 +3004,34 @@ class _ChatWindowState extends State<ChatWindow> {
   }
 }
 
-/// A WhatsApp-web-style hoverable wrapper for sent text message bubbles.
-/// On hover, shows a small action icon (chevron/dots) to the left of the bubble.
-/// Clicking the icon opens a popup menu with Reply, Edit, Delete, Unsend.
-class _HoverableTextBubble extends StatefulWidget {
-  const _HoverableTextBubble({
+class _HoverableMessageBubble extends StatefulWidget {
+  const _HoverableMessageBubble({
     required this.bubble,
+    required this.isSentByMe,
     required this.onReply,
-    required this.onEdit,
-    required this.onDelete,
-    required this.onUnsend,
+    this.onEdit,
+    this.onDelete,
+    this.onUnsend,
+    this.canEdit = false,
+    this.canDelete = false,
+    this.canUnsend = false,
   });
 
   final Widget bubble;
+  final bool isSentByMe;
   final VoidCallback onReply;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-  final VoidCallback onUnsend;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+  final VoidCallback? onUnsend;
+  final bool canEdit;
+  final bool canDelete;
+  final bool canUnsend;
 
   @override
-  State<_HoverableTextBubble> createState() => _HoverableTextBubbleState();
+  State<_HoverableMessageBubble> createState() => _HoverableMessageBubbleState();
 }
 
-class _HoverableTextBubbleState extends State<_HoverableTextBubble>
+class _HoverableMessageBubbleState extends State<_HoverableMessageBubble>
     with SingleTickerProviderStateMixin {
   bool _isHovered = false;
   late AnimationController _fadeController;
@@ -2767,25 +3069,45 @@ class _HoverableTextBubbleState extends State<_HoverableTextBubble>
       onEnter: _onEnter,
       onExit: _onExit,
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
+        mainAxisAlignment:
+            widget.isSentByMe ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.center,
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Action icon – only visible on hover
+          if (widget.isSentByMe)
+            FadeTransition(
+              opacity: _fadeAnimation,
+              child: IgnorePointer(
+                ignoring: !_isHovered,
+                child: _MessageActionMenu(
+                  onReply: widget.onReply,
+                  onEdit: widget.onEdit,
+                  onDelete: widget.onDelete,
+                  onUnsend: widget.onUnsend,
+                  canEdit: widget.canEdit,
+                  canDelete: widget.canDelete,
+                  canUnsend: widget.canUnsend,
+                ),
+              ),
+            ),
+          widget.bubble,
           FadeTransition(
             opacity: _fadeAnimation,
             child: IgnorePointer(
               ignoring: !_isHovered,
-              child: _MessageActionMenu(
-                onReply: widget.onReply,
-                onEdit: widget.onEdit,
-                onDelete: widget.onDelete,
-                onUnsend: widget.onUnsend,
-              ),
+              child: widget.isSentByMe
+                  ? const SizedBox.shrink()
+                  : _MessageActionMenu(
+                      onReply: widget.onReply,
+                      onEdit: widget.onEdit,
+                      onDelete: widget.onDelete,
+                      onUnsend: widget.onUnsend,
+                      canEdit: widget.canEdit,
+                      canDelete: widget.canDelete,
+                      canUnsend: widget.canUnsend,
+                    ),
             ),
           ),
-          // The actual bubble (stays in place)
-          widget.bubble,
         ],
       ),
     );
@@ -2796,15 +3118,21 @@ class _HoverableTextBubbleState extends State<_HoverableTextBubble>
 class _MessageActionMenu extends StatelessWidget {
   const _MessageActionMenu({
     required this.onReply,
-    required this.onEdit,
-    required this.onDelete,
-    required this.onUnsend,
+    this.onEdit,
+    this.onDelete,
+    this.onUnsend,
+    this.canEdit = false,
+    this.canDelete = false,
+    this.canUnsend = false,
   });
 
   final VoidCallback onReply;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-  final VoidCallback onUnsend;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
+  final VoidCallback? onUnsend;
+  final bool canEdit;
+  final bool canDelete;
+  final bool canUnsend;
 
   @override
   Widget build(BuildContext context) {
@@ -2830,21 +3158,24 @@ class _MessageActionMenu extends StatelessWidget {
             onReply();
             break;
           case _MsgAction.edit:
-            onEdit();
+            onEdit?.call();
             break;
           case _MsgAction.delete:
-            onDelete();
+            onDelete?.call();
             break;
           case _MsgAction.unsend:
-            onUnsend();
+            onUnsend?.call();
             break;
         }
       },
       itemBuilder: (context) => [
         _menuItem(_MsgAction.reply, Icons.reply_rounded, 'Reply', kPrimary),
-        _menuItem(_MsgAction.edit, Icons.edit_outlined, 'Edit', const Color(0xFF0EA5E9)),
-        _menuItem(_MsgAction.delete, Icons.delete_outline_rounded, 'Delete', const Color(0xFFEF4444)),
-        _menuItem(_MsgAction.unsend, Icons.remove_circle_outline_rounded, 'Unsend', const Color(0xFFF59E0B)),
+        if (canEdit)
+          _menuItem(_MsgAction.edit, Icons.edit_outlined, 'Edit', const Color(0xFF0EA5E9)),
+        if (canDelete)
+          _menuItem(_MsgAction.delete, Icons.delete_outline_rounded, 'Delete', const Color(0xFFEF4444)),
+        if (canUnsend)
+          _menuItem(_MsgAction.unsend, Icons.remove_circle_outline_rounded, 'Unsend', const Color(0xFFF59E0B)),
       ],
     );
   }
@@ -2870,90 +3201,3 @@ class _MessageActionMenu extends StatelessWidget {
 }
 
 enum _MsgAction { reply, edit, delete, unsend }
-
-/// WhatsApp-web-style hoverable wrapper for received message bubbles.
-/// On hover, shows a Reply icon to the right of the bubble.
-class _HoverableReceivedBubble extends StatefulWidget {
-  const _HoverableReceivedBubble({
-    required this.bubble,
-    required this.onReply,
-  });
-
-  final Widget bubble;
-  final VoidCallback onReply;
-
-  @override
-  State<_HoverableReceivedBubble> createState() => _HoverableReceivedBubbleState();
-}
-
-class _HoverableReceivedBubbleState extends State<_HoverableReceivedBubble>
-    with SingleTickerProviderStateMixin {
-  bool _isHovered = false;
-  late AnimationController _fadeController;
-  late Animation<double> _fadeAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _fadeController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 150),
-    );
-    _fadeAnimation = CurvedAnimation(parent: _fadeController, curve: Curves.easeIn);
-  }
-
-  @override
-  void dispose() {
-    _fadeController.dispose();
-    super.dispose();
-  }
-
-  void _onEnter(_) {
-    setState(() => _isHovered = true);
-    _fadeController.forward();
-  }
-
-  void _onExit(_) {
-    setState(() => _isHovered = false);
-    _fadeController.reverse();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      onEnter: _onEnter,
-      onExit: _onExit,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // The received bubble
-          widget.bubble,
-          // Reply icon – visible on hover only
-          FadeTransition(
-            opacity: _fadeAnimation,
-            child: IgnorePointer(
-              ignoring: !_isHovered,
-              child: Tooltip(
-                message: 'Reply',
-                child: InkWell(
-                  onTap: widget.onReply,
-                  borderRadius: BorderRadius.circular(14),
-                  child: Padding(
-                    padding: const EdgeInsets.all(4),
-                    child: Icon(
-                      Icons.reply_rounded,
-                      size: 17,
-                      color: const Color(0xFF94A3B8),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
