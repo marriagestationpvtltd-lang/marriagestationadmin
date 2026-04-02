@@ -1350,9 +1350,13 @@ class _ChatWindowState extends State<ChatWindow> {
                       (index) => MapEntry(messages[index].id, index),
                     ),
                   );
-                // Extra slot at the end of the reversed list (= visual top) for the
-                // load-more indicator.
-                final listItemCount = itemCount + (_hasMoreMessages || _isLoadingMore ? 1 : 0);
+                final messageGroups = _groupMessagesByDate(messages);
+                final shouldAutoScroll = _shouldAutoScrollToBottom(
+                  hasSnapshotData: snapshot.hasData,
+                  isSearching: isActiveSearch,
+                  previousCount: previousCount,
+                  currentCount: itemCount,
+                );
 
                 if (shouldAutoScroll) {
                   WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -1432,99 +1436,38 @@ class _ChatWindowState extends State<ChatWindow> {
                                     canMutate: canMutate,
                                   );
                                 },
-                                child: _buildChatBubble(
-                                  data['message'],
-                                  isSentByMe,
-                                  timestamp,
-                                  data['type'],
-                                  data.containsKey('profileData')
-                                      ? data['profileData']
-                                      : null,
-                                  data.containsKey('imageUrl') ? data['imageUrl'] : null,
-                                  data['seen'] == true,
-                                  data['callType']?.toString(),
-                                  data['callStatus']?.toString(),
-                                  (data['callDuration'] as num?)?.toInt() ?? 0,
-                                  doc.id,
-                                  data['replyto'] is Map<String, dynamic>
-                                      ? data['replyto'] as Map<String, dynamic>
-                                      : null,
-                                  data['edited'] == true,
-                                  data['deleted'] == true,
-                                  data['unsent'] == true,
-                                  canEdit,
-                                  canMutate,
-                                  replyPayload,
+                                child: _HighlightableMessageContainer(
+                                  key: _messageKeyFor(doc.id),
+                                  isHighlighted: _highlightedMessageId == doc.id,
+                                  child: _buildChatBubble(
+                                    data['message'],
+                                    isSentByMe,
+                                    timestamp,
+                                    data['type'],
+                                    data.containsKey('profileData')
+                                        ? data['profileData']
+                                        : null,
+                                    data.containsKey('imageUrl') ? data['imageUrl'] : null,
+                                    data['seen'] == true,
+                                    data['callType']?.toString(),
+                                    data['callStatus']?.toString(),
+                                    (data['callDuration'] as num?)?.toInt() ?? 0,
+                                    doc.id,
+                                    data['replyto'] is Map<String, dynamic>
+                                        ? data['replyto'] as Map<String, dynamic>
+                                        : null,
+                                    data['edited'] == true,
+                                    data['deleted'] == true,
+                                    data['unsent'] == true,
+                                    canEdit,
+                                    canMutate,
+                                    replyPayload,
+                                  ),
                                 ),
                               );
                             },
                             childCount: group.messages.length,
                           ),
-                        ),
-                      );
-                    }
-
-                    var doc = messages[index];
-                    var data = doc.data() as Map<String, dynamic>;
-                    bool isSentByMe = data['senderid'] == senderId.toString();
-                    DateTime timestamp = (data['timestamp'] != null)
-                        ? (data['timestamp'] as Timestamp).toDate()
-                        : DateTime.now();
-                    final replyPayload = _buildReplyPayload(
-                      docId: doc.id,
-                      data: data,
-                      senderId: isSentByMe
-                          ? senderId.toString()
-                          : (chatProvider.id?.toString() ?? ''),
-                      senderName: isSentByMe ? 'You' : (chatProvider.namee ?? 'User'),
-                    );
-                    final canEdit = _canEditMessage(data, isSentByMe);
-                    final canMutate = _canMutateMessage(data, isSentByMe);
-
-                    if (index == 0 && !_isSearching) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (_scrollController.hasClients &&
-                            (_scrollController.offset <= 100 || _lastSnapshot?.docs.length != itemCount)) {
-                          _scrollToBottom();
-                        }
-                      });
-                    }
-
-                    return GestureDetector(
-                      onLongPress: () {
-                        _showMessageOptions(
-                          context,
-                          doc.id,
-                          replyPayload,
-                          isSentByMe,
-                          canEdit: canEdit,
-                          canMutate: canMutate,
-                        );
-                      },
-                      child: _HighlightableMessageContainer(
-                        key: _messageKeyFor(doc.id),
-                        isHighlighted: _highlightedMessageId == doc.id,
-                        child: _buildChatBubble(
-                          data['message'],
-                          isSentByMe,
-                          timestamp,
-                          data['type'],
-                          data.containsKey('profileData') ? data['profileData'] : null,
-                          data.containsKey('imageUrl') ? data['imageUrl'] : null,
-                          data['seen'] == true,
-                          data['callType']?.toString(),
-                          data['callStatus']?.toString(),
-                          (data['callDuration'] as num?)?.toInt() ?? 0,
-                          doc.id,
-                          data['replyto'] is Map<String, dynamic>
-                              ? data['replyto'] as Map<String, dynamic>
-                              : null,
-                          data['edited'] == true,
-                          data['deleted'] == true,
-                          data['unsent'] == true,
-                          canEdit,
-                          canMutate,
-                          replyPayload,
                         ),
                       ),
                     ],
