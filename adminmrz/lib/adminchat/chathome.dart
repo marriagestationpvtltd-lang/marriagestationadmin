@@ -81,7 +81,7 @@ class _ChatWindowState extends State<ChatWindow> {
   int? _prevUserId;
 
   // Floating date indicator (WhatsApp-style)
-  String? _floatingDateLabel;
+  final ValueNotifier<String?> _floatingDateNotifier = ValueNotifier(null);
   Timer? _floatingDateTimer;
   List<_ChatMessageDateGroup> _currentMessageGroups = [];
 
@@ -1360,9 +1360,9 @@ class _ChatWindowState extends State<ChatWindow> {
                   );
                 final messageGroups = _groupMessagesByDate(messages);
                 // Keep a reference so the floating date overlay can use it.
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  if (mounted) setState(() => _currentMessageGroups = messageGroups);
-                });
+                // Direct assignment — no setState needed since the overlay
+                // is driven by _floatingDateNotifier (ValueListenableBuilder).
+                _currentMessageGroups = messageGroups;
                 final shouldAutoScroll = _shouldAutoScrollToBottom(
                   hasSnapshotData: snapshot.hasData,
                   isSearching: isActiveSearch,
@@ -1500,41 +1500,46 @@ class _ChatWindowState extends State<ChatWindow> {
               },
             ),
             // WhatsApp-style floating date indicator
-            if (_floatingDateLabel != null)
-              Positioned(
-                top: 8,
-                left: 0,
-                right: 0,
-                child: Center(
-                  child: IgnorePointer(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: c.primaryLight,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: c.border, width: 0.5),
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.08),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
+            Positioned(
+              top: 8,
+              left: 0,
+              right: 0,
+              child: ValueListenableBuilder<String?>(
+                valueListenable: _floatingDateNotifier,
+                builder: (context, label, _) {
+                  if (label == null) return const SizedBox.shrink();
+                  return Center(
+                    child: IgnorePointer(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: c.primaryLight,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: c.border, width: 0.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.08),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Text(
+                          label,
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            color: c.text,
+                            letterSpacing: 0.3,
                           ),
-                        ],
-                      ),
-                      child: Text(
-                        _floatingDateLabel!,
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w600,
-                          color: c.text,
-                          letterSpacing: 0.3,
                         ),
                       ),
                     ),
-                  ),
-                ),
+                  );
+                },
               ),
+            ),
           ],
         ),
           ),
@@ -1880,10 +1885,9 @@ class _ChatWindowState extends State<ChatWindow> {
 
   void _showFloatingDateLabel(String label) {
     _floatingDateTimer?.cancel();
-    if (!mounted) return;
-    setState(() => _floatingDateLabel = label);
+    _floatingDateNotifier.value = label;
     _floatingDateTimer = Timer(const Duration(seconds: 2), () {
-      if (mounted) setState(() => _floatingDateLabel = null);
+      _floatingDateNotifier.value = null;
     });
   }
 
@@ -2634,19 +2638,18 @@ class _ChatWindowState extends State<ChatWindow> {
     );
   }
 
-  /// Single tick (sent) or double tick (seen) indicator for admin-sent messages.
+  /// WhatsApp-style read receipt tick for admin-sent messages.
+  /// Double grey ticks = delivered (not yet read by user).
+  /// Double blue ticks = read by user.
   Widget _buildSeenTick(bool seen) {
-    const kPrimary = Color(0xFFD81B60);
-    const kMuted = Color(0xFF94A3B8);
-    if (seen) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: const [
-          Icon(Icons.done_all, size: 13, color: kPrimary),
-        ],
-      );
-    }
-    return const Icon(Icons.done, size: 13, color: kMuted);
+    // WhatsApp blue (#34B7F1) for read, slate-grey for delivered-not-read.
+    const kReadBlue = Color(0xFF34B7F1);
+    const kDelivered = Color(0xFF94A3B8);
+    return Icon(
+      Icons.done_all,
+      size: 14,
+      color: seen ? kReadBlue : kDelivered,
+    );
   }
 
   /// Call history message bubble.
@@ -3459,6 +3462,7 @@ class _ChatWindowState extends State<ChatWindow> {
     _typingTimer?.cancel();
     _replyHighlightTimer?.cancel();
     _floatingDateTimer?.cancel();
+    _floatingDateNotifier.dispose();
     _typingSubscription?.cancel();
     _clearAdminTypingStatus();
     _scrollController.dispose();
