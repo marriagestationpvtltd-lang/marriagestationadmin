@@ -39,6 +39,12 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
   final  TextEditingController _searchController = TextEditingController();
   String _searchQuery  = "";
 
+  // ── profile view filter: 'all' | 'matched' | 'shared' ─────────────────────
+  String _profileFilter = 'matched';
+
+  // ── search debounce ───────────────────────────────────────────────────────
+  Timer? _searchDebounce;
+
   // ── Firestore shared-profile tracking ─────────────────────────────────────
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   Map<int, Map<String, dynamic>> _sharedProfilesData = {};
@@ -59,9 +65,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
   @override
   void initState() {
     super.initState();
-    _searchController.addListener(() {
-      setState(() => _searchQuery = _searchController.text.toLowerCase());
-    });
+    _searchController.addListener(_onSearchChanged);
     _scrollController.addListener(_onScroll);
     // Poll online status for matched profiles every 10 seconds
     _onlineStatusTimer = Timer.periodic(
@@ -72,6 +76,17 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
             .refreshOnlineStatuses();
       },
     );
+  }
+
+  void _onSearchChanged() {
+    final query = _searchController.text;
+    setState(() => _searchQuery = query);
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      Provider.of<MatchedProfileProvider>(context, listen: false)
+          .updateSearch(query);
+    });
   }
 
   void _onScroll() {
@@ -90,7 +105,12 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
     final userId = chatProvider.id;
     if (userId != null && userId != _lastFetchedUserId) {
       _lastFetchedUserId = userId;
-      setState(() => _matchesLoaded = true);
+      setState(() {
+        _matchesLoaded = true;
+        _profileFilter = 'matched';
+        _searchQuery = '';
+        _searchController.clear();
+      });
       final matchProvider =
           Provider.of<MatchedProfileProvider>(context, listen: false);
       matchProvider.clearData();
@@ -104,7 +124,9 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
 
   @override
   void dispose() {
+    _searchController.removeListener(_onSearchChanged);
     _searchController.dispose();
+    _searchDebounce?.cancel();
     _onlineStatusTimer?.cancel();
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
@@ -118,6 +140,17 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
     setState(() => _matchesLoaded = true);
     Provider.of<MatchedProfileProvider>(context, listen: false)
         .fetchMatchedProfiles(userId);
+  }
+
+  void _setProfileFilter(String filter) {
+    if (filter == _profileFilter) return;
+    setState(() => _profileFilter = filter);
+    final provider =
+        Provider.of<MatchedProfileProvider>(context, listen: false);
+    // 'shared' is client-side – no API change needed
+    if (filter != 'shared') {
+      provider.updateFilterType(filter);
+    }
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -198,18 +231,14 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
     final safeLen = _safeProfileLength(p);
     if (safeLen == 0) return out;
     for (int i = 0; i < safeLen; i++) {
+      // Member status filter (client-side – based on loaded data)
       if (_memberStatus == "Paid"   && !p.isPaidList[i])  continue;
       if (_memberStatus == "Free"   &&  p.isPaidList[i])  continue;
       if (_onlineStatus == "Online" && !p.isOnlineList[i]) continue;
       if (_onlineStatus == "Offline" &&  p.isOnlineList[i]) continue;
-      if (_searchQuery.isNotEmpty) {
-        final fullName = "${p.firstNames[i]} ${p.lastNames[i]}".toLowerCase();
-        final occ      = p.occupation[i].toLowerCase();
-        final mid      = p.memberiddd[i].toLowerCase();
-        if (!fullName.contains(_searchQuery) &&
-            !occ.contains(_searchQuery) &&
-            !mid.contains(_searchQuery)) continue;
-      }
+      // "Share Profile Count" view: only profiles that have been shared
+      if (_profileFilter == 'shared' &&
+          !_sharedProfileIds.contains(p.ids[i])) continue;
       out.add(i);
     }
     return out;
@@ -368,7 +397,7 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
       child: Column(
         children: [
           _buildHeader(chatProvider),
-          _buildTabs(),
+          _buildProfileFilterButtons(),
           _buildSearchBar(),
           _buildFilterRow(),
           if (_showFilters) _buildFilterPanel(),
@@ -470,41 +499,112 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
     );
   }
 
-  // ── Tabs ────────────────────────────────────────────────────────────────
-  Widget _buildTabs() {
-    return Row(
-      children: [
-        _tabBtn('Matched', 0),
-        _tabBtn('All Profiles', 1),
-      ],
+  // ── Profile view filter buttons: All / Match / Share Profile Count ─────────
+  Widget _buildProfileFilterButtons() {
+    final c = ChatColors.of(context);
+    return Container(
+      decoration: BoxDecoration(
+        color: c.cardBg,
+        border: Border(bottom: BorderSide(color: c.border)),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+      child: Consumer<MatchedProfileProvider>(
+        builder: (_, provider, __) {
+          final sharedCount = _sharedProfileIds.length;
+          return Row(
+            children: [
+              _profileFilterBtn(
+                label: 'All',
+                icon: Icons.grid_view_rounded,
+                filter: 'all',
+                badgeCount: null,
+                c: c,
+              ),
+              const SizedBox(width: 5),
+              _profileFilterBtn(
+                label: 'Match',
+                icon: Icons.favorite_rounded,
+                filter: 'matched',
+                badgeCount: _profileFilter == 'matched' && provider.totalCount > 0
+                    ? provider.totalCount
+                    : null,
+                c: c,
+              ),
+              const SizedBox(width: 5),
+              _profileFilterBtn(
+                label: 'Shared',
+                icon: Icons.send_rounded,
+                filter: 'shared',
+                badgeCount: sharedCount > 0 ? sharedCount : null,
+                c: c,
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 
-  Widget _tabBtn(String label, int index) {
-    final active = widget.selectedTab == index;
-    final c = ChatColors.of(context);
+  Widget _profileFilterBtn({
+    required String label,
+    required IconData icon,
+    required String filter,
+    required int? badgeCount,
+    required ChatColors c,
+  }) {
+    final active = _profileFilter == filter;
     return Expanded(
       child: GestureDetector(
-        onTap: () => widget.onTabChange(index),
-        child: Container(
-          height: 40,
+        onTap: () => _setProfileFilter(filter),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          height: 34,
           alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: c.cardBg,
-            border: Border(
-              bottom: BorderSide(
-                color: active ? _kPrimary : c.border,
-                width: active ? 2 : 1,
-              ),
+            color: active ? _kPrimary : c.searchFill,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: active ? _kPrimary : c.border,
+              width: active ? 1.5 : 1,
             ),
           ),
-          child: Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: active ? FontWeight.w700 : FontWeight.w500,
-              color: active ? _kPrimary : c.muted,
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 11,
+                  color: active ? Colors.white : c.muted),
+              const SizedBox(width: 3),
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: active ? Colors.white : c.muted,
+                ),
+              ),
+              if (badgeCount != null) ...[
+                const SizedBox(width: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: active
+                        ? Colors.white.withOpacity(0.25)
+                        : c.primaryLight,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '$badgeCount',
+                    style: TextStyle(
+                      fontSize: 9,
+                      fontWeight: FontWeight.w800,
+                      color: active ? Colors.white : _kPrimary,
+                    ),
+                  ),
+                ),
+              ],
+            ],
           ),
         ),
       ),
@@ -523,14 +623,18 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
           style: TextStyle(fontSize: 12, color: c.text),
           cursorColor: _kPrimary,
           decoration: InputDecoration(
-            hintText: 'Search name, occupation, ID…',
+            hintText: 'Search name, ID, phone…',
             hintStyle: TextStyle(fontSize: 11, color: c.muted),
             prefixIcon: Icon(Icons.search, size: 16, color: c.muted),
             suffixIcon: _searchQuery.isNotEmpty
                 ? IconButton(
                     icon: Icon(Icons.clear, size: 14, color: c.muted),
                     padding: EdgeInsets.zero,
-                    onPressed: () => _searchController.clear(),
+                    onPressed: () {
+                      _searchController.clear();
+                      Provider.of<MatchedProfileProvider>(context, listen: false)
+                          .updateSearch('');
+                    },
                   )
                 : null,
             border: OutlineInputBorder(
@@ -969,7 +1073,11 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Center(
         child: Text(
-          'सबै ${provider.ids.length} म्याच देखाइयो',
+          provider.totalCount > 0
+              ? 'Showing ${provider.ids.length} of ${provider.totalCount}'
+              : provider.ids.isEmpty
+                  ? 'No profiles found'
+                  : 'All ${provider.ids.length} profiles shown',
           style: TextStyle(fontSize: 10, color: c.muted),
         ),
       ),
@@ -1024,12 +1132,17 @@ class _ProfileSidebarState extends State<ProfileSidebar> {
             if (showClear) ...[
               const SizedBox(height: 12),
               TextButton(
-                onPressed: () => setState(() {
-                  _memberStatus = 'All';
-                  _onlineStatus = 'All';
-                  _sortBy       = 'Match %';
+                onPressed: () {
+                  setState(() {
+                    _memberStatus  = 'All';
+                    _onlineStatus  = 'All';
+                    _sortBy        = 'Match %';
+                    _profileFilter = 'matched';
+                  });
                   _searchController.clear();
-                }),
+                  Provider.of<MatchedProfileProvider>(context, listen: false)
+                      .updateSearch('');
+                },
                 style: TextButton.styleFrom(foregroundColor: _kPrimary),
                 child: const Text('Clear filters',
                     style: TextStyle(fontSize: 11)),
