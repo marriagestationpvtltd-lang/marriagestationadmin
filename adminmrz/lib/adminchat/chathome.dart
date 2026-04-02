@@ -3605,3 +3605,79 @@ class _MessageActionMenu extends StatelessWidget {
 }
 
 enum _MsgAction { reply, edit, delete, unsend }
+
+// ---------------------------------------------------------------------------
+// Data class grouping chat messages by calendar date.
+// ---------------------------------------------------------------------------
+class _ChatMessageDateGroup {
+  final DateTime date;
+  final String headerLabel;
+  final List<QueryDocumentSnapshot> messages;
+
+  _ChatMessageDateGroup({
+    required this.date,
+    required this.headerLabel,
+    required List<QueryDocumentSnapshot> messages,
+  }) : messages = List<QueryDocumentSnapshot>.from(messages);
+}
+
+// ---------------------------------------------------------------------------
+// Pinned sliver header that shows the date chip between message groups.
+// ---------------------------------------------------------------------------
+class _ChatDateHeaderDelegate extends SliverPersistentHeaderDelegate {
+  final String label;
+  final Color backgroundColor;
+  final Color chipColor;
+  final Color textColor;
+  final Color borderColor;
+
+  const _ChatDateHeaderDelegate({
+    required this.label,
+    required this.backgroundColor,
+    required this.chipColor,
+    required this.textColor,
+    required this.borderColor,
+  });
+
+  @override
+  double get minExtent => 36;
+
+  @override
+  double get maxExtent => 36;
+
+  @override
+  Widget build(
+      BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return Container(
+      color: backgroundColor,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        decoration: BoxDecoration(
+          color: chipColor,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: borderColor, width: 0.5),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: textColor,
+            letterSpacing: 0.3,
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(_ChatDateHeaderDelegate oldDelegate) {
+    return oldDelegate.label != label ||
+        oldDelegate.backgroundColor != backgroundColor ||
+        oldDelegate.chipColor != chipColor ||
+        oldDelegate.textColor != textColor ||
+        oldDelegate.borderColor != borderColor;
+  }
+}
