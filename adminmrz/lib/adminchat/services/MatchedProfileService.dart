@@ -16,6 +16,10 @@ class MatchedProfileProvider with ChangeNotifier {
   int? _currentUserId;
   String _memberid = '';
 
+  // Search & filter state
+  String _searchQuery = '';
+  String _filterType = 'matched'; // 'matched' | 'all'
+
   // Firestore presence listener for matched profiles
   StreamSubscription<QuerySnapshot>? _presenceSub;
 
@@ -26,6 +30,8 @@ class MatchedProfileProvider with ChangeNotifier {
   bool get hasMore => _hasMore;
   int get totalCount => _totalCount;
   int get currentPage => _currentPage;
+  String get searchQuery => _searchQuery;
+  String get filterType => _filterType;
 
   List<MatchedProfile> _matchedProfiles = [];
 
@@ -60,9 +66,15 @@ class MatchedProfileProvider with ChangeNotifier {
   List<String> get profilePictures =>
       _matchedProfiles.map((profile) => profile.profilePicture).toList();
 
-  // Fetch ALL pages so the displayed list count always matches the total count
-  Future<void> fetchMatchedProfiles(int userId) async {
+  // Fetch only page 1 – subsequent pages are loaded lazily via fetchMoreProfiles().
+  Future<void> fetchMatchedProfiles(
+    int userId, {
+    String? filterType,
+    String? searchQuery,
+  }) async {
     _currentUserId = userId;
+    if (filterType != null) _filterType = filterType;
+    if (searchQuery != null) _searchQuery = searchQuery;
     _currentPage = 1;
     _hasMore = false;
     _isloading = true;
@@ -70,40 +82,35 @@ class MatchedProfileProvider with ChangeNotifier {
     notifyListeners();
 
     try {
-      // Fetch pages sequentially until all profiles are loaded
-      while (true) {
-        final response = await http.post(
-          Uri.parse('https://digitallami.com/match_admin.php'),
-          headers: {'Content-Type': 'application/json'},
-          body: json.encode({
-            'user_id': userId,
-            'page': _currentPage,
-            'per_page': _perPage,
-          }),
-        );
+      final response = await http.post(
+        Uri.parse('https://digitallami.com/match_admin.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'user_id': userId,
+          'page': 1,
+          'per_page': _perPage,
+          if (_searchQuery.isNotEmpty) 'search': _searchQuery,
+          'filter_type': _filterType,
+        }),
+      );
 
-        if (response.statusCode != 200) {
-          throw Exception('Failed to load matched profiles: ${response.statusCode}');
-        }
-
-        final data = json.decode(response.body);
-        final list = data['data'] as List? ?? [];
-        final pageProfiles = list.map((p) => MatchedProfile.fromJson(p)).toList();
-
-        _matchedProfiles.addAll(pageProfiles);
-
-        _totalCount = data['total'] is int
-            ? data['total'] as int
-            : int.tryParse(data['total']?.toString() ?? '') ?? _matchedProfiles.length;
-
-        // Stop if this page had fewer items than per_page (last page) or all loaded
-        if (pageProfiles.length < _perPage || _matchedProfiles.length >= _totalCount) {
-          break;
-        }
-        _currentPage++;
+      if (response.statusCode != 200) {
+        throw Exception('Failed to load matched profiles: ${response.statusCode}');
       }
 
-      _hasMore = false;
+      final data = json.decode(response.body);
+      final list = data['data'] as List? ?? [];
+      final pageProfiles = list.map((p) => MatchedProfile.fromJson(p)).toList();
+
+      _matchedProfiles = pageProfiles;
+
+      _totalCount = data['total'] is int
+          ? data['total'] as int
+          : int.tryParse(data['total']?.toString() ?? '') ?? pageProfiles.length;
+
+      _hasMore = pageProfiles.length >= _perPage &&
+          _matchedProfiles.length < _totalCount;
+      _currentPage = 2;
 
       if (_matchedProfiles.isNotEmpty) {
         _name = _matchedProfiles.first.firstName;
@@ -120,8 +127,71 @@ class MatchedProfileProvider with ChangeNotifier {
     }
   }
 
-  // No-op: all profiles are loaded upfront by fetchMatchedProfiles
-  Future<void> fetchMoreProfiles() async {}
+  // Lazy-load the next page and append results.
+  Future<void> fetchMoreProfiles() async {
+    if (_isLoadingMore || !_hasMore || _currentUserId == null) return;
+    _isLoadingMore = true;
+    notifyListeners();
+
+    try {
+      final response = await http.post(
+        Uri.parse('https://digitallami.com/match_admin.php'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({
+          'user_id': _currentUserId,
+          'page': _currentPage,
+          'per_page': _perPage,
+          if (_searchQuery.isNotEmpty) 'search': _searchQuery,
+          'filter_type': _filterType,
+        }),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final list = data['data'] as List? ?? [];
+        final pageProfiles = list.map((p) => MatchedProfile.fromJson(p)).toList();
+
+        // Deduplicate by id before appending
+        final existingIds = _matchedProfiles.map((p) => p.id).toSet();
+        final newProfiles =
+            pageProfiles.where((p) => !existingIds.contains(p.id)).toList();
+
+        _matchedProfiles.addAll(newProfiles);
+        _currentPage++;
+
+        _totalCount = data['total'] is int
+            ? data['total'] as int
+            : int.tryParse(data['total']?.toString() ?? '') ?? _matchedProfiles.length;
+
+        _hasMore = pageProfiles.length >= _perPage &&
+            _matchedProfiles.length < _totalCount;
+      }
+    } catch (e) {
+      debugPrint('Error fetching more profiles: $e');
+    } finally {
+      _isLoadingMore = false;
+      notifyListeners();
+    }
+  }
+
+  // Update search query and reset pagination (server-side search).
+  Future<void> updateSearch(String query) async {
+    final trimmed = query.trim();
+    if (trimmed == _searchQuery) return;
+    _searchQuery = trimmed;
+    if (_currentUserId != null) {
+      await fetchMatchedProfiles(_currentUserId!);
+    }
+  }
+
+  // Change filter type ('matched' | 'all') and reset pagination.
+  Future<void> updateFilterType(String type) async {
+    if (type == _filterType) return;
+    _filterType = type;
+    if (_currentUserId != null) {
+      await fetchMatchedProfiles(_currentUserId!);
+    }
+  }
 
   // Helper methods
   String getProfilePicture(int index) {
@@ -199,6 +269,9 @@ class MatchedProfileProvider with ChangeNotifier {
     _totalCount = 0;
     _currentUserId = null;
     _isloading = false;
+    _isLoadingMore = false;
+    _searchQuery = '';
+    _filterType = 'matched';
     stopPresenceListener();
     notifyListeners();
   }
