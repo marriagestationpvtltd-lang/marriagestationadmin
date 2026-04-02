@@ -57,7 +57,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
 
   // Pagination
   int _page = 1;
-  static const int _pageSize = 20;
+  static const int _pageSize = 30;
   int _totalUsers = 0;
   bool _isLoadingMore = false;
   bool _hasMore = true;
