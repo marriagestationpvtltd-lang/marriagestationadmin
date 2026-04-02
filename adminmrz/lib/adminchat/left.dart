@@ -262,11 +262,15 @@ class _ChatSidebarState extends State<ChatSidebar> {
             (u) => u['id']?.toString() == userId);
         if (idx != -1) {
           final prev = _users[idx]['is_online'];
-          if (prev != isOnline) {
+          final prevLastSeen = _users[idx]['last_seen_text']?.toString() ?? '';
+          final newLastSeenText = isOnline ? 'Online' : lastSeenText;
+
+          // Update if either online status OR last seen text has changed
+          if (prev != isOnline || prevLastSeen != newLastSeenText) {
             _users[idx] = {
               ..._users[idx] as Map<String, dynamic>,
               'is_online': isOnline,
-              'last_seen_text': isOnline ? 'Online' : lastSeenText,
+              'last_seen_text': newLastSeenText,
             };
             changed = true;
             if (_selectedChat?['id']?.toString() == userId) {
