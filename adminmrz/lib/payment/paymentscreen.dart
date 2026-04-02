@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+import 'package:adminmrz/core/app_theme.dart';
 import 'package:adminmrz/payment/paymentmodel.dart';
 import 'package:adminmrz/payment/paymentprovider.dart';
 import 'package:adminmrz/payment/pdfsevice.dart';
@@ -185,8 +186,8 @@ class _PaymentsPageState extends State<PaymentsPage> {
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide(
-                            color: Colors.blue.shade300, width: 1.5),
+                        borderSide: const BorderSide(
+                            color: kPrimary, width: 1.5),
                       ),
                       filled: true,
                       fillColor: Colors.grey.shade50,
@@ -219,16 +220,16 @@ class _PaymentsPageState extends State<PaymentsPage> {
                 _iconBtn(
                   Icons.picture_as_pdf_outlined,
                   'Export PDF Report',
-                  Colors.red.shade600,
-                  Colors.red.shade50,
+                  kRose,
+                  kRose.withOpacity(0.08),
                   _isExporting ? null : () => _generateFullReport(provider),
                 ),
                 const SizedBox(width: 6),
                 _iconBtn(
                   Icons.table_chart_outlined,
                   'Export CSV',
-                  Colors.green.shade700,
-                  Colors.green.shade50,
+                  kEmerald,
+                  kEmerald.withOpacity(0.08),
                   _isExporting ? null : () => _exportToCSV(provider),
                 ),
                 if (_isExporting) ...[
@@ -238,7 +239,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
                     height: 18,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
-                      color: Colors.blue.shade400,
+                      color: kPrimary,
                     ),
                   ),
                 ],
@@ -252,11 +253,11 @@ class _PaymentsPageState extends State<PaymentsPage> {
             padding: const EdgeInsets.fromLTRB(16, 0, 12, 10),
             child: Row(
               children: [
-                _statPill(provider.allPayments.length, 'Total', Colors.blue),
+                _statPill(provider.allPayments.length, 'Total', kPrimary),
                 const SizedBox(width: 6),
-                _statPill(provider.payments.length, 'Shown', Colors.teal),
+                _statPill(provider.payments.length, 'Shown', kSky),
                 const SizedBox(width: 6),
-                _amountPill(provider.filteredTotalAmount, Colors.green),
+                _amountPill(provider.filteredTotalAmount, kEmerald),
                 const SizedBox(width: 12),
                 Container(
                     width: 1, height: 22, color: Colors.grey.shade200),
@@ -295,14 +296,14 @@ class _PaymentsPageState extends State<PaymentsPage> {
                     _filterChip(
                       label,
                       provider.paymentMethodFilter == key,
-                      Colors.purple,
+                      kViolet,
                       () => provider.setPaymentMethodFilter(key),
                     ),
                     const SizedBox(width: 6),
                   ];
                 }),
                 if (hasFilters)
-                  _filterChip('✕ Clear', true, Colors.red, () {
+                  _filterChip('✕ Clear', true, kRose, () {
                     provider.clearFilters();
                     provider.fetchPayments();
                   }),
@@ -327,12 +328,12 @@ class _PaymentsPageState extends State<PaymentsPage> {
             const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: hasDate
-              ? Colors.blue.withOpacity(0.12)
+              ? kPrimary.withOpacity(0.12)
               : Colors.grey.shade100,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: hasDate
-                ? Colors.blue.withOpacity(0.4)
+                ? kPrimary.withOpacity(0.4)
                 : Colors.grey.shade300,
           ),
         ),
@@ -340,7 +341,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
           label,
           style: TextStyle(
             fontSize: 12,
-            color: hasDate ? Colors.blue : Colors.grey.shade700,
+            color: hasDate ? kPrimary : Colors.grey.shade700,
             fontWeight:
                 hasDate ? FontWeight.w600 : FontWeight.w400,
           ),
@@ -458,13 +459,13 @@ class _PaymentsPageState extends State<PaymentsPage> {
   Color _statusColor(String status) {
     switch (status.toLowerCase()) {
       case 'active':
-        return Colors.green;
+        return kEmerald;
       case 'expired':
-        return Colors.red;
+        return kRose;
       case 'pending':
-        return Colors.orange;
+        return kAmber;
       default:
-        return Colors.blueGrey;
+        return kSlate500;
     }
   }
 
@@ -548,9 +549,9 @@ class _PaymentsPageState extends State<PaymentsPage> {
                         children: [
                           Text(
                             '#${payment.userId}',
-                            style: TextStyle(
+                            style: const TextStyle(
                                 fontSize: 11,
-                                color: Colors.blue.shade400,
+                                color: kPrimary,
                                 fontWeight: FontWeight.w600),
                           ),
                           Text(
@@ -599,7 +600,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
                       style: const TextStyle(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF2E7D32),
+                        color: kEmerald,
                         letterSpacing: -0.2,
                       ),
                     ),
@@ -618,15 +619,15 @@ class _PaymentsPageState extends State<PaymentsPage> {
               runSpacing: 5,
               children: [
                 _infoChip(Icons.card_giftcard_outlined,
-                    payment.packageName, Colors.indigo),
+                    payment.packageName, kPrimary),
                 _infoChip(
-                    Icons.payment_outlined, payment.paidBy, Colors.purple),
+                    Icons.payment_outlined, payment.paidBy, kViolet),
                 _infoChip(Icons.calendar_today_outlined,
-                    payment.formattedPurchaseDate, Colors.teal),
+                    payment.formattedPurchaseDate, kSky),
                 _infoChip(
                   Icons.event_outlined,
                   'Exp: ${payment.formattedExpireDate}',
-                  payment.isExpired ? Colors.red : Colors.deepOrange,
+                  payment.isExpired ? kRose : kAmber,
                 ),
               ],
             ),
@@ -641,14 +642,14 @@ class _PaymentsPageState extends State<PaymentsPage> {
                 _actionIconBtn(
                   Icons.email_outlined,
                   'Send Email',
-                  Colors.orange,
+                  kAmber,
                   () => _sendEmailToCustomer(payment.email, payment),
                 ),
                 const SizedBox(width: 5),
                 _actionIconBtn(
                   Icons.receipt_long_outlined,
                   'Generate Invoice PDF',
-                  Colors.green,
+                  kEmerald,
                   () => _generateInvoicePDF(payment),
                 ),
               ],
@@ -780,7 +781,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Could not launch email client'),
-          backgroundColor: Colors.red,
+          backgroundColor: kRose,
         ),
       );
     }
@@ -801,7 +802,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Invoice PDF generated successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: kEmerald,
           ),
         );
       }
@@ -810,7 +811,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error generating PDF: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: kRose,
           ),
         );
       }
@@ -840,7 +841,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Full report PDF generated successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: kEmerald,
           ),
         );
       }
@@ -849,7 +850,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error generating report: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: kRose,
           ),
         );
       }
@@ -873,7 +874,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('CSV report exported successfully'),
-            backgroundColor: Colors.green,
+            backgroundColor: kEmerald,
           ),
         );
       }
@@ -882,7 +883,7 @@ class _PaymentsPageState extends State<PaymentsPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Error exporting CSV: $e'),
-            backgroundColor: Colors.red,
+            backgroundColor: kRose,
           ),
         );
       }
@@ -915,10 +916,10 @@ class _PaymentsPageState extends State<PaymentsPage> {
             children: [
               Text(
                 'Payment Records',
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: Colors.grey.shade700,
+                  color: kSlate700,
                   letterSpacing: 0.3,
                 ),
               ),
@@ -928,16 +929,16 @@ class _PaymentsPageState extends State<PaymentsPage> {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.green.shade50,
+                    color: kEmerald.withOpacity(0.08),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.green.shade200),
+                    border: Border.all(color: kEmerald.withOpacity(0.25)),
                   ),
                   child: Text(
                     'Total: Rs ${provider.filteredTotalAmount.toStringAsFixed(2)}',
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: Colors.green.shade700,
+                      color: kEmerald,
                     ),
                   ),
                 ),
@@ -954,13 +955,12 @@ class _PaymentsPageState extends State<PaymentsPage> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.error_outline,
-                              size: 48, color: Colors.red.shade300),
+                          const Icon(Icons.error_outline,
+                              size: 48, color: kRose),
                           const SizedBox(height: 12),
                           Text(
                             'Failed to load payments',
-                            style:
-                                TextStyle(color: Colors.grey.shade600),
+                            style: TextStyle(color: Colors.grey.shade600),
                           ),
                           const SizedBox(height: 12),
                           ElevatedButton.icon(

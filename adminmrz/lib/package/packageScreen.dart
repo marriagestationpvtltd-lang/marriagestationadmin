@@ -1,5 +1,6 @@
 import 'package:adminmrz/package/packageProvider.dart';
 import 'package:adminmrz/package/packagemodel.dart';
+import 'package:adminmrz/core/app_theme.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -174,9 +175,9 @@ class _PackagesPageState extends State<PackagesPage>
     if (success) {
       await _closePanel();
       _showSnack(isEdit ? 'Package updated successfully' : 'Package created successfully',
-          Colors.green);
+          kEmerald);
     } else {
-      _showSnack('Error: ${provider.error}', Colors.red);
+      _showSnack('Error: ${provider.error}', kRose);
     }
   }
 
@@ -188,7 +189,7 @@ class _PackagesPageState extends State<PackagesPage>
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Row(children: [
-          Icon(Icons.warning_amber_rounded, color: Colors.red, size: 22),
+          Icon(Icons.warning_amber_rounded, color: kRose, size: 22),
           SizedBox(width: 8),
           Text('Delete Package', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
         ]),
@@ -210,7 +211,7 @@ class _PackagesPageState extends State<PackagesPage>
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
+              backgroundColor: kRose,
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
@@ -224,7 +225,7 @@ class _PackagesPageState extends State<PackagesPage>
     final success = await context.read<PackageProvider>().deletePackage(pkg.id);
     if (!mounted) return;
     _showSnack(success ? 'Package deleted' : 'Error: ${context.read<PackageProvider>().error}',
-        success ? Colors.green : Colors.red);
+        success ? kEmerald : kRose);
   }
 
   void _showSnack(String msg, Color color) {
@@ -660,7 +661,7 @@ class _PackagesPageState extends State<PackagesPage>
                     _actionBtn(
                         icon: Icons.delete_outline_rounded,
                         tooltip: 'Delete',
-                        color: Colors.red,
+                        color: kRose,
                         onTap: () => _confirmDelete(pkg)),
                   ],
                 ),
@@ -767,7 +768,7 @@ class _PackagesPageState extends State<PackagesPage>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 52, color: Colors.red),
+            const Icon(Icons.error_outline_rounded, size: 52, color: kRose),
             const SizedBox(height: 16),
             const Text('Failed to load packages',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
@@ -1047,7 +1048,7 @@ class _PackagesPageState extends State<PackagesPage>
                 borderSide: const BorderSide(color: Color(0xFF6366F1), width: 1.5)),
             errorBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(10),
-                borderSide: const BorderSide(color: Colors.red)),
+                borderSide: const BorderSide(color: kRose)),
           ),
         ),
       ],

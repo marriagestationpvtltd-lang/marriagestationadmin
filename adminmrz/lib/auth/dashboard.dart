@@ -838,8 +838,21 @@ class _DashboardPageState extends State<DashboardPage> {
               ? _pages[_selectedIndex]
               : Container(
                   color: Theme.of(context).scaffoldBackgroundColor,
-                  padding: const EdgeInsets.all(24),
-                  child: _pages[_selectedIndex],
+                  child: LayoutBuilder(
+                    builder: (ctx, constraints) {
+                      // Cap content to 1200 px; add symmetrical side padding on
+                      // very wide screens so the layout remains comfortable.
+                      const double maxContentWidth = 1200;
+                      const double defaultPad = 24;
+                      final double sidePad = constraints.maxWidth > maxContentWidth
+                          ? (constraints.maxWidth - maxContentWidth) / 2
+                          : defaultPad;
+                      return Padding(
+                        padding: EdgeInsets.fromLTRB(sidePad, 24, sidePad, 24),
+                        child: _pages[_selectedIndex],
+                      );
+                    },
+                  ),
                 ),
         ),
       ],
