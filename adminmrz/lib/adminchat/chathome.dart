@@ -90,6 +90,13 @@ class _ChatWindowState extends State<ChatWindow> {
   StreamSubscription<DocumentSnapshot>? _typingSubscription;
   bool _userIsTyping = false;
 
+  // Inline reply / edit state
+  Map<String, dynamic>? _replyingTo; // {docId, message, senderid, senderName}
+  String? _editingDocId;
+  String _editingOriginalText = ''; // original message text before user edits it
+
+  static const int _kMaxQuoteLength = 80; // max chars shown in reply/edit preview
+
   @override
   void initState() {
     super.initState();
@@ -1079,8 +1086,9 @@ class _ChatWindowState extends State<ChatWindow> {
                     return GestureDetector(
                       key: ValueKey(doc.id),
                       onLongPress: () {
-                        if (isSentByMe) {
-                          _showMessageOptions(context, doc.id, data['message']);
+                        final String msgText = data['message']?.toString() ?? '';
+                        if (data['type'] == 'text' || data['type'] == null) {
+                          _showMessageOptions(context, doc.id, msgText, isSentByMe);
                         }
                       },
                       child: _buildChatBubble(
@@ -1095,6 +1103,9 @@ class _ChatWindowState extends State<ChatWindow> {
                         data['callStatus']?.toString(),
                         (data['callDuration'] as num?)?.toInt() ?? 0,
                         doc.id,
+                        data['replyto'] is Map<String, dynamic>
+                            ? data['replyto'] as Map<String, dynamic>
+                            : null,
                       ),
                     );
                   },
@@ -1359,7 +1370,8 @@ class _ChatWindowState extends State<ChatWindow> {
       String? callType,
       String? callStatus,
       int callDuration = 0,
-      String? docId]) {
+      String? docId,
+      Map<String, dynamic>? replyTo]) {
     const kPrimary = Color(0xFFD81B60);
     const kText = Color(0xFF1E293B);
     const kMuted = Color(0xFF64748B);
@@ -1782,6 +1794,52 @@ class _ChatWindowState extends State<ChatWindow> {
     }
 
     // Text message bubble
+    // ── Reply quote block ────────────────────────────────────────────────
+    Widget? replyQuote;
+    if (replyTo != null && replyTo['message'] != null) {
+      final String quotedMsg = replyTo['message'] as String;
+      final String quotedSender = replyTo['senderName'] as String? ?? 'User';
+      replyQuote = Container(
+        margin: const EdgeInsets.only(bottom: 4, left: 6, right: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSentByMe
+              ? Colors.white.withOpacity(0.2)
+              : kPrimary.withOpacity(0.07),
+          borderRadius: BorderRadius.circular(10),
+          border: Border(
+            left: BorderSide(
+              color: isSentByMe ? Colors.white.withOpacity(0.7) : kPrimary,
+              width: 3,
+            ),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              quotedSender,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+                color: isSentByMe ? Colors.white : kPrimary,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              quotedMsg.length > _kMaxQuoteLength ? '${quotedMsg.substring(0, _kMaxQuoteLength)}…' : quotedMsg,
+              style: TextStyle(
+                fontSize: 11,
+                color: isSentByMe ? Colors.white.withOpacity(0.85) : kMuted,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
+      );
+    }
+
     final bubbleContent = Align(
       alignment: isSentByMe ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
@@ -1811,12 +1869,18 @@ class _ChatWindowState extends State<ChatWindow> {
                     ? null
                     : [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 4, offset: const Offset(0, 1))],
               ),
-              child: Text(
-                message,
-                style: TextStyle(
-                  color: isSentByMe ? Colors.white : kText,
-                  fontSize: 13,
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (replyQuote != null) replyQuote,
+                  Text(
+                    message,
+                    style: TextStyle(
+                      color: isSentByMe ? Colors.white : kText,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
               ),
             ),
             Padding(
@@ -1840,14 +1904,29 @@ class _ChatWindowState extends State<ChatWindow> {
       ),
     );
 
-    if (!isSentByMe || docId == null) return bubbleContent;
+    if (docId == null) return bubbleContent;
 
-    return _HoverableTextBubble(
+    final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+
+    if (isSentByMe) {
+      return _HoverableTextBubble(
+        bubble: bubbleContent,
+        onReply: () => _startReply(docId, message, senderId.toString(), 'You'),
+        onEdit: () => _startEdit(docId, message),
+        onDelete: () => _firestore.collection('adminchat').doc(docId).delete(),
+        onUnsend: () => _unsendMessage(docId),
+      );
+    }
+
+    // Received message – show hover with Reply action
+    return _HoverableReceivedBubble(
       bubble: bubbleContent,
-      onReply: () => _replyToMessage(message),
-      onEdit: () => _editMessage(docId, message),
-      onDelete: () => _firestore.collection('adminchat').doc(docId).delete(),
-      onUnsend: () => _unsendMessage(docId),
+      onReply: () => _startReply(
+        docId,
+        message,
+        chatProvider.id?.toString() ?? '',
+        chatProvider.namee ?? 'User',
+      ),
     );
   }
 
@@ -1970,6 +2049,73 @@ class _ChatWindowState extends State<ChatWindow> {
     }
   }
 
+  /// Inline reply/edit banner shown above the message input.
+  Widget _buildActionBanner(ChatColors colors) {
+    const kPrimary = Color(0xFFD81B60);
+    final bool isEditing = _editingDocId != null;
+    final String label = isEditing ? 'Editing' : 'Replying to ${_replyingTo?['senderName'] ?? 'User'}';
+    final String preview = isEditing
+        ? (_editingOriginalText.length > _kMaxQuoteLength
+            ? '${_editingOriginalText.substring(0, _kMaxQuoteLength)}…'
+            : _editingOriginalText)
+        : (() {
+            final String msg = (_replyingTo?['message'] as String?) ?? '';
+            return msg.length > _kMaxQuoteLength ? '${msg.substring(0, _kMaxQuoteLength)}…' : msg;
+          }());
+    final IconData leadIcon = isEditing ? Icons.edit_outlined : Icons.reply_rounded;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: kPrimary.withOpacity(0.07),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: kPrimary.withOpacity(0.25), width: 1),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 3,
+            height: 36,
+            margin: const EdgeInsets.only(right: 10),
+            decoration: BoxDecoration(
+              color: kPrimary,
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Icon(leadIcon, size: 15, color: kPrimary),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: kPrimary,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  preview,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: colors.muted),
+                ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: _cancelAction,
+            child: Icon(Icons.close, size: 16, color: colors.muted),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildMessageInput(ChatProvider chatProvider) {
     const kPrimary = Color(0xFFD81B60);
     // Dark-mode tints for the language-selector chip
@@ -1989,6 +2135,9 @@ class _ChatWindowState extends State<ChatWindow> {
       ),
       child: Column(
         children: [
+          // ── Inline reply / edit banner ──────────────────────────────────
+          if (_replyingTo != null || _editingDocId != null)
+            _buildActionBanner(colors),
           if (_selectedImage != null || _selectedImageBytes != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 8),
@@ -2299,9 +2448,36 @@ class _ChatWindowState extends State<ChatWindow> {
 
     String messageText = _messageController.text.trim();
 
+    // --- Inline Edit Mode ---
+    if (_editingDocId != null) {
+      final docId = _editingDocId!;
+      _messageController.clear();
+      _textBeforeVoice = '';
+      setState(() {
+        _editingDocId = null;
+        _editingOriginalText = '';
+      });
+      FocusScope.of(context).requestFocus(_messageFocusNode);
+      _clearAdminTypingStatus();
+      try {
+        await _firestore
+            .collection('adminchat')
+            .doc(docId)
+            .update({'message': messageText, 'edited': true});
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context)
+              .showSnackBar(SnackBar(content: Text("Failed to edit message: $e")));
+        }
+      }
+      return;
+    }
+
     // Clear immediately so the UI feels instant
     _messageController.clear();
     _textBeforeVoice = '';
+    final replySnapshot = _replyingTo;
+    setState(() => _replyingTo = null);
     FocusScope.of(context).requestFocus(_messageFocusNode);
 
     // Clear typing indicator immediately on send.
@@ -2311,7 +2487,14 @@ class _ChatWindowState extends State<ChatWindow> {
       await _firestore.collection('adminchat').add({
         'message': messageText,
         'liked': false,
-        'replyto': '',
+        'replyto': replySnapshot != null
+            ? {
+                'docId': replySnapshot['docId'],
+                'message': replySnapshot['message'],
+                'senderid': replySnapshot['senderid'],
+                'senderName': replySnapshot['senderName'],
+              }
+            : null,
         'senderid': senderId.toString(),
         'receiverid': chatProvider.id.toString(),
         'timestamp': FieldValue.serverTimestamp(),
@@ -2364,28 +2547,52 @@ class _ChatWindowState extends State<ChatWindow> {
     return (a.compareTo(b) < 0) ? '${a}_$b' : '${b}_$a';
   }
 
-  void _showMessageOptions(BuildContext context, String docId, String currentMessage) {
+  void _showMessageOptions(BuildContext context, String docId, String currentMessage, bool isSentByMe) {
     showModalBottomSheet(
       context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (context) {
         return Wrap(
           children: [
             ListTile(
-              leading: Icon(Icons.edit, size: 20),
-              title: Text("Edit", style: TextStyle(fontSize: 14)),
+              leading: const Icon(Icons.reply_rounded, size: 20, color: Color(0xFFD81B60)),
+              title: const Text("Reply", style: TextStyle(fontSize: 14)),
               onTap: () {
                 Navigator.pop(context);
-                _editMessage(docId, currentMessage);
+                final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+                final senderName = isSentByMe ? 'You' : (chatProvider.namee ?? 'User');
+                final senderid = isSentByMe ? senderId.toString() : (chatProvider.id?.toString() ?? '');
+                _startReply(docId, currentMessage, senderid, senderName);
               },
             ),
-            ListTile(
-              leading: Icon(Icons.delete, size: 20),
-              title: Text("Delete", style: TextStyle(fontSize: 14)),
-              onTap: () {
-                _firestore.collection('adminchat').doc(docId).delete();
-                Navigator.pop(context);
-              },
-            ),
+            if (isSentByMe) ...[
+              ListTile(
+                leading: const Icon(Icons.edit, size: 20, color: Color(0xFF0EA5E9)),
+                title: const Text("Edit", style: TextStyle(fontSize: 14)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _startEdit(docId, currentMessage);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.delete, size: 20, color: Color(0xFFEF4444)),
+                title: const Text("Delete", style: TextStyle(fontSize: 14)),
+                onTap: () {
+                  _firestore.collection('adminchat').doc(docId).delete();
+                  Navigator.pop(context);
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.remove_circle_outline_rounded, size: 20, color: Color(0xFFF59E0B)),
+                title: const Text("Unsend", style: TextStyle(fontSize: 14)),
+                onTap: () {
+                  _unsendMessage(docId);
+                  Navigator.pop(context);
+                },
+              ),
+            ],
           ],
         );
       },
@@ -2393,39 +2600,11 @@ class _ChatWindowState extends State<ChatWindow> {
   }
 
   void _editMessage(String docId, String currentMessage) {
-    TextEditingController editController = TextEditingController(text: currentMessage);
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text("Edit Message", style: TextStyle(fontSize: 16)),
-          content: TextField(
-            controller: editController,
-            style: TextStyle(fontSize: 14),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text("Cancel", style: TextStyle(fontSize: 12)),
-            ),
-            TextButton(
-              onPressed: () {
-                _firestore
-                    .collection('adminchat')
-                    .doc(docId)
-                    .update({'message': editController.text.trim()});
-                Navigator.pop(context);
-              },
-              child: Text("Save", style: TextStyle(fontSize: 12)),
-            ),
-          ],
-        );
-      },
-    );
+    _startEdit(docId, currentMessage);
   }
 
-  void _replyToMessage(String originalMessage) {
-    // TODO: implement reply threading
+  void _replyToMessage(String originalMessage, String docId, String senderid, String senderName) {
+    _startReply(docId, originalMessage, senderid, senderName);
   }
 
   void _unsendMessage(String docId) {
@@ -2434,6 +2613,45 @@ class _ChatWindowState extends State<ChatWindow> {
         .doc(docId)
         .update({'message': 'This message was unsent.', 'unsent': true})
         .catchError((_) {});
+  }
+
+  // ── INLINE REPLY / EDIT ─────────────────────────────────────────────────
+
+  void _startReply(String docId, String message, String senderid, String senderName) {
+    setState(() {
+      _replyingTo = {
+        'docId': docId,
+        'message': message,
+        'senderid': senderid,
+        'senderName': senderName,
+      };
+      _editingDocId = null;
+    });
+    FocusScope.of(context).requestFocus(_messageFocusNode);
+  }
+
+  void _startEdit(String docId, String message) {
+    setState(() {
+      _editingDocId = docId;
+      _editingOriginalText = message;
+      _replyingTo = null;
+      _messageController.text = message;
+      _messageController.selection =
+          TextSelection.fromPosition(TextPosition(offset: message.length));
+    });
+    FocusScope.of(context).requestFocus(_messageFocusNode);
+  }
+
+  void _cancelAction() {
+    setState(() {
+      _replyingTo = null;
+      if (_editingDocId != null) {
+        _editingDocId = null;
+        _editingOriginalText = '';
+        _messageController.clear();
+      }
+    });
+    FocusScope.of(context).requestFocus(_messageFocusNode);
   }
 
   void _showEmojiPicker() {
@@ -2652,3 +2870,90 @@ class _MessageActionMenu extends StatelessWidget {
 }
 
 enum _MsgAction { reply, edit, delete, unsend }
+
+/// WhatsApp-web-style hoverable wrapper for received message bubbles.
+/// On hover, shows a Reply icon to the right of the bubble.
+class _HoverableReceivedBubble extends StatefulWidget {
+  const _HoverableReceivedBubble({
+    required this.bubble,
+    required this.onReply,
+  });
+
+  final Widget bubble;
+  final VoidCallback onReply;
+
+  @override
+  State<_HoverableReceivedBubble> createState() => _HoverableReceivedBubbleState();
+}
+
+class _HoverableReceivedBubbleState extends State<_HoverableReceivedBubble>
+    with SingleTickerProviderStateMixin {
+  bool _isHovered = false;
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 150),
+    );
+    _fadeAnimation = CurvedAnimation(parent: _fadeController, curve: Curves.easeIn);
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    super.dispose();
+  }
+
+  void _onEnter(_) {
+    setState(() => _isHovered = true);
+    _fadeController.forward();
+  }
+
+  void _onExit(_) {
+    setState(() => _isHovered = false);
+    _fadeController.reverse();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: _onEnter,
+      onExit: _onExit,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // The received bubble
+          widget.bubble,
+          // Reply icon – visible on hover only
+          FadeTransition(
+            opacity: _fadeAnimation,
+            child: IgnorePointer(
+              ignoring: !_isHovered,
+              child: Tooltip(
+                message: 'Reply',
+                child: InkWell(
+                  onTap: widget.onReply,
+                  borderRadius: BorderRadius.circular(14),
+                  child: Padding(
+                    padding: const EdgeInsets.all(4),
+                    child: Icon(
+                      Icons.reply_rounded,
+                      size: 17,
+                      color: const Color(0xFF94A3B8),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
