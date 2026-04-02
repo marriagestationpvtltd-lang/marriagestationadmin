@@ -583,7 +583,7 @@ class _ChatWindowState extends State<ChatWindow> {
 
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
-      _scrollController.jumpTo(0);
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
     } else {
       Future.delayed(Duration(milliseconds: 100), _scrollToBottom);
     }
@@ -592,7 +592,7 @@ class _ChatWindowState extends State<ChatWindow> {
   void _onScrollForPagination() {
     if (!_scrollController.hasClients) return;
     final pos = _scrollController.position;
-    if (pos.pixels >= pos.maxScrollExtent - 200 && !_isLoadingMore && _hasMoreMessages) {
+    if (pos.pixels <= 200 && !_isLoadingMore && _hasMoreMessages) {
       _loadMoreMessages();
     }
   }
@@ -1149,9 +1149,12 @@ class _ChatWindowState extends State<ChatWindow> {
                   return Center(child: CircularProgressIndicator(color: c.primary));
                 }
 
-                final messages = _isSearching && _filteredMessages.isNotEmpty
-                    ? _filteredMessages
-                    : (snapshot.hasData ? snapshot.data!.docs : _lastSnapshot?.docs ?? []);
+                final rawMessages = snapshot.hasData
+                    ? snapshot.data!.docs
+                    : _lastSnapshot?.docs ?? <QueryDocumentSnapshot>[];
+                final isActiveSearch = _isSearching && _searchController.text.isNotEmpty;
+                final messages = isActiveSearch ? _filteredMessages : rawMessages;
+                final previousCount = _lastSnapshot?.docs.length ?? 0;
 
                 if (snapshot.hasData) {
                   _lastSnapshot = snapshot.data;
@@ -1179,12 +1182,12 @@ class _ChatWindowState extends State<ChatWindow> {
                         Icon(Icons.chat_bubble_outline, size: 40, color: Colors.grey[300]),
                         const SizedBox(height: 12),
                         Text(
-                          "No messages yet",
+                          isActiveSearch ? "No matching messages" : "No messages yet",
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: c.muted),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          "Start a conversation!",
+                          isActiveSearch ? "Try a different keyword" : "Start a conversation!",
                           style: TextStyle(fontSize: 11, color: c.muted),
                         ),
                       ],
@@ -1192,105 +1195,128 @@ class _ChatWindowState extends State<ChatWindow> {
                   );
                 }
 
-                final itemCount = messages.length;
-                // Extra slot at the end of the reversed list (= visual top) for the
-                // load-more indicator.
-                final listItemCount = itemCount + (_hasMoreMessages || _isLoadingMore ? 1 : 0);
+                final messageGroups = _groupMessagesByDate(messages);
+                final shouldAutoScroll = !_isSearching &&
+                    !_isLoadingMore &&
+                    snapshot.hasData &&
+                    (previousCount != rawMessages.length ||
+                        !_scrollController.hasClients ||
+                        (_scrollController.position.maxScrollExtent -
+                                _scrollController.offset) <=
+                            120);
 
-                return ListView.builder(
+                if (shouldAutoScroll) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) _scrollToBottom();
+                  });
+                }
+
+                return CustomScrollView(
                   controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                  reverse: true,
-                  itemCount: listItemCount,
-                  itemBuilder: (context, index) {
-                    // The last item in the reversed list is the oldest-message indicator.
-                    if (index == itemCount) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Center(
-                          child: _isLoadingMore
-                              ? SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: c.primary,
+                  slivers: [
+                    if (_hasMoreMessages || _isLoadingMore)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                          child: Center(
+                            child: _isLoadingMore
+                                ? SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: c.primary,
+                                    ),
+                                  )
+                                : TextButton.icon(
+                                    onPressed: _loadMoreMessages,
+                                    icon: Icon(Icons.history, size: 14, color: c.primary),
+                                    label: Text(
+                                      'Load older messages',
+                                      style: TextStyle(fontSize: 12, color: c.primary),
+                                    ),
                                   ),
-                                )
-                              : TextButton.icon(
-                                  onPressed: _loadMoreMessages,
-                                  icon: Icon(Icons.history, size: 14, color: c.primary),
-                                  label: Text(
-                                    'Load older messages',
-                                    style: TextStyle(fontSize: 12, color: c.primary),
-                                  ),
-                                ),
+                          ),
                         ),
-                      );
-                    }
-
-                    var doc = messages[index];
-                    var data = doc.data() as Map<String, dynamic>;
-                    bool isSentByMe = data['senderid'] == senderId.toString();
-                    DateTime timestamp = (data['timestamp'] != null)
-                        ? (data['timestamp'] as Timestamp).toDate()
-                        : DateTime.now();
-                    final replyPayload = _buildReplyPayload(
-                      docId: doc.id,
-                      data: data,
-                      senderId: isSentByMe
-                          ? senderId.toString()
-                          : (chatProvider.id?.toString() ?? ''),
-                      senderName: isSentByMe ? 'You' : (chatProvider.namee ?? 'User'),
-                    );
-                    final canEdit = _canEditMessage(data, isSentByMe);
-                    final canMutate = _canMutateMessage(data, isSentByMe);
-
-                    if (index == 0 && !_isSearching) {
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        if (_scrollController.hasClients &&
-                            (_scrollController.offset <= 100 || _lastSnapshot?.docs.length != itemCount)) {
-                          _scrollToBottom();
-                        }
-                      });
-                    }
-
-                    return GestureDetector(
-                      key: ValueKey(doc.id),
-                      onLongPress: () {
-                        _showMessageOptions(
-                          context,
-                          doc.id,
-                          replyPayload,
-                          isSentByMe,
-                          canEdit: canEdit,
-                          canMutate: canMutate,
-                        );
-                      },
-                      child: _buildChatBubble(
-                        data['message'],
-                        isSentByMe,
-                        timestamp,
-                        data['type'],
-                        data.containsKey('profileData') ? data['profileData'] : null,
-                        data.containsKey('imageUrl') ? data['imageUrl'] : null,
-                        data['seen'] == true,
-                        data['callType']?.toString(),
-                        data['callStatus']?.toString(),
-                        (data['callDuration'] as num?)?.toInt() ?? 0,
-                        doc.id,
-                        data['replyto'] is Map<String, dynamic>
-                            ? data['replyto'] as Map<String, dynamic>
-                            : null,
-                        data['edited'] == true,
-                        data['deleted'] == true,
-                        data['unsent'] == true,
-                        canEdit,
-                        canMutate,
-                        replyPayload,
                       ),
-                    );
-                  },
+                    for (final group in messageGroups) ...[
+                      SliverPersistentHeader(
+                        pinned: true,
+                        delegate: _ChatDateHeaderDelegate(
+                          label: group.headerLabel,
+                          backgroundColor: c.bg,
+                          chipColor: c.primaryLight,
+                          textColor: c.text,
+                          borderColor: c.border,
+                        ),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final doc = group.messages[index];
+                              final data = doc.data() as Map<String, dynamic>;
+                              final isSentByMe = data['senderid'] == senderId.toString();
+                              final timestamp = (data['timestamp'] as Timestamp?)?.toDate() ??
+                                  DateTime.now();
+                              final replyPayload = _buildReplyPayload(
+                                docId: doc.id,
+                                data: data,
+                                senderId: isSentByMe
+                                    ? senderId.toString()
+                                    : (chatProvider.id?.toString() ?? ''),
+                                senderName:
+                                    isSentByMe ? 'You' : (chatProvider.namee ?? 'User'),
+                              );
+                              final canEdit = _canEditMessage(data, isSentByMe);
+                              final canMutate = _canMutateMessage(data, isSentByMe);
+
+                              return GestureDetector(
+                                key: ValueKey(doc.id),
+                                onLongPress: () {
+                                  _showMessageOptions(
+                                    context,
+                                    doc.id,
+                                    replyPayload,
+                                    isSentByMe,
+                                    canEdit: canEdit,
+                                    canMutate: canMutate,
+                                  );
+                                },
+                                child: _buildChatBubble(
+                                  data['message'],
+                                  isSentByMe,
+                                  timestamp,
+                                  data['type'],
+                                  data.containsKey('profileData')
+                                      ? data['profileData']
+                                      : null,
+                                  data.containsKey('imageUrl') ? data['imageUrl'] : null,
+                                  data['seen'] == true,
+                                  data['callType']?.toString(),
+                                  data['callStatus']?.toString(),
+                                  (data['callDuration'] as num?)?.toInt() ?? 0,
+                                  doc.id,
+                                  data['replyto'] is Map<String, dynamic>
+                                      ? data['replyto'] as Map<String, dynamic>
+                                      : null,
+                                  data['edited'] == true,
+                                  data['deleted'] == true,
+                                  data['unsent'] == true,
+                                  canEdit,
+                                  canMutate,
+                                  replyPayload,
+                                ),
+                              );
+                            },
+                            childCount: group.messages.length,
+                          ),
+                        ),
+                      ),
+                    ],
+                    const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                  ],
                 );
               },
             ),
@@ -1542,6 +1568,65 @@ class _ChatWindowState extends State<ChatWindow> {
 
   void openUrl(String url) {
     html.window.open(url, '_blank');
+  }
+
+  DateTime _dateOnly(DateTime dateTime) =>
+      DateTime(dateTime.year, dateTime.month, dateTime.day);
+
+  bool _isToday(DateTime dateTime) {
+    final now = DateTime.now();
+    return _dateOnly(dateTime) == _dateOnly(now);
+  }
+
+  bool _isYesterday(DateTime dateTime) {
+    final yesterday = _dateOnly(DateTime.now()).subtract(const Duration(days: 1));
+    return _dateOnly(dateTime) == yesterday;
+  }
+
+  String _formatDateHeader(DateTime dateTime) {
+    if (_isToday(dateTime)) return 'Today';
+    if (_isYesterday(dateTime)) return 'Yesterday';
+    return DateFormat('MMM d, y').format(dateTime);
+  }
+
+  List<QueryDocumentSnapshot> _sortMessagesChronologically(
+    List<QueryDocumentSnapshot> messages,
+  ) {
+    final sorted = List<QueryDocumentSnapshot>.from(messages);
+    sorted.sort((a, b) {
+      final aData = a.data() as Map<String, dynamic>;
+      final bData = b.data() as Map<String, dynamic>;
+      final aTimestamp = (aData['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
+      final bTimestamp = (bData['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
+      return aTimestamp.compareTo(bTimestamp);
+    });
+    return sorted;
+  }
+
+  List<_ChatMessageDateGroup> _groupMessagesByDate(
+    List<QueryDocumentSnapshot> messages,
+  ) {
+    final groups = <_ChatMessageDateGroup>[];
+
+    for (final doc in _sortMessagesChronologically(messages)) {
+      final data = doc.data() as Map<String, dynamic>;
+      final timestamp = (data['timestamp'] as Timestamp?)?.toDate() ?? DateTime.now();
+      final date = _dateOnly(timestamp);
+
+      if (groups.isEmpty || groups.last.date != date) {
+        groups.add(
+          _ChatMessageDateGroup(
+            date: date,
+            headerLabel: _formatDateHeader(timestamp),
+            messages: [doc],
+          ),
+        );
+      } else {
+        groups.last.messages.add(doc);
+      }
+    }
+
+    return groups;
   }
 
   Widget _buildChatBubble(String message, bool isSentByMe, DateTime timestamp,
@@ -3032,6 +3117,87 @@ class _ChatWindowState extends State<ChatWindow> {
     _searchController.dispose();
     _recorder.closeRecorder();
     super.dispose();
+  }
+}
+
+class _ChatMessageDateGroup {
+  _ChatMessageDateGroup({
+    required this.date,
+    required this.headerLabel,
+    required this.messages,
+  });
+
+  final DateTime date;
+  final String headerLabel;
+  final List<QueryDocumentSnapshot> messages;
+}
+
+class _ChatDateHeaderDelegate extends SliverPersistentHeaderDelegate {
+  _ChatDateHeaderDelegate({
+    required this.label,
+    required this.backgroundColor,
+    required this.chipColor,
+    required this.textColor,
+    required this.borderColor,
+  });
+
+  final String label;
+  final Color backgroundColor;
+  final Color chipColor;
+  final Color textColor;
+  final Color borderColor;
+
+  @override
+  double get minExtent => 44;
+
+  @override
+  double get maxExtent => 44;
+
+  @override
+  Widget build(
+    BuildContext context,
+    double shrinkOffset,
+    bool overlapsContent,
+  ) {
+    return Container(
+      color: backgroundColor,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: chipColor,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: borderColor),
+          boxShadow: overlapsContent
+              ? [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: FontWeight.w600,
+            color: textColor,
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  bool shouldRebuild(covariant _ChatDateHeaderDelegate oldDelegate) {
+    return label != oldDelegate.label ||
+        backgroundColor != oldDelegate.backgroundColor ||
+        chipColor != oldDelegate.chipColor ||
+        textColor != oldDelegate.textColor ||
+        borderColor != oldDelegate.borderColor;
   }
 }
 
