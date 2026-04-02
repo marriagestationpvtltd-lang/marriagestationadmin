@@ -692,13 +692,12 @@ class _ChatSidebarState extends State<ChatSidebar> {
 
   @override
   Widget build(BuildContext context) {
-    final chatProvider = Provider.of<ChatProvider>(context);
     final c = ChatColors.of(context);
     // On mobile (when onUserTap is provided), take full available width;
     // on desktop keep the fixed sidebar width.
     final double? sidebarWidth = widget.onUserTap != null ? null : 280;
-    final int totalUnread =
-        _unreadCounts.values.fold(0, (a, b) => a + b);
+    final int unreadUsersCount =
+        _unreadCounts.values.where((count) => count > 0).length;
 
     return Container(
       width: sidebarWidth,
@@ -720,49 +719,6 @@ class _ChatSidebarState extends State<ChatSidebar> {
                     color: c.text,
                   ),
                 ),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: c.primaryLight,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text(
-                    '${_filteredUsers.length}',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: c.primary,
-                    ),
-                  ),
-                ),
-                // Total unread badge in header
-                if (totalUnread > 0) ...[
-                  const SizedBox(width: 6),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF25D366),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.mark_chat_unread,
-                            size: 10, color: Colors.white),
-                        const SizedBox(width: 3),
-                        Text(
-                          '$totalUnread',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
@@ -881,7 +837,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             const Text('Unread', style: TextStyle(fontSize: 10)),
-                            if (totalUnread > 0) ...[
+                            if (unreadUsersCount > 0) ...[
                               const SizedBox(width: 4),
                               Container(
                                 padding: const EdgeInsets.symmetric(
@@ -893,7 +849,7 @@ class _ChatSidebarState extends State<ChatSidebar> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  '$totalUnread',
+                                  '$unreadUsersCount',
                                   style: const TextStyle(
                                     fontSize: 9,
                                     fontWeight: FontWeight.w700,
