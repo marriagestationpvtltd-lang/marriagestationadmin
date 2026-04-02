@@ -2862,7 +2862,10 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
                   _chipButton(
                     label: 'Chat with User',
                     icon: Icons.chat_bubble_outline,
-                    onTap: () => widget.onOpenChat!(widget.userId),
+                    onTap: () {
+                      widget.onOpenChat!(widget.userId);
+                      Navigator.of(context).pop();
+                    },
                     color: _kSky,
                   ),
                   const SizedBox(height: 8),
