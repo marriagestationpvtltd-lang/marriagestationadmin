@@ -43,6 +43,9 @@ class UserProvider with ChangeNotifier {
   ActivityStats? activityFor(int userId) => _activityByUser[userId];
   bool isActivityLoading(int userId) => _activityLoading.contains(userId);
 
+  final Set<int> _photoActioning = {};
+  bool isPhotoActioning(int userId) => _photoActioning.contains(userId);
+
   // Check if all filtered users are selected
   bool get areAllFilteredSelected {
     if (_filteredUsers.isEmpty) return false;
@@ -163,6 +166,34 @@ class UserProvider with ChangeNotifier {
 
   bool isUserSelected(int userId) {
     return _selectedUserIds.contains(userId);
+  }
+
+  /// Approve or reject a user's profile photo from the member list card.
+  Future<bool> approvePhoto(int userId, String action, {String? reason}) async {
+    _photoActioning.add(userId);
+    notifyListeners();
+    try {
+      final ok = await _userDetailsService.handleProfilePhotoRequest(
+        userId: userId,
+        action: action,
+        reason: reason,
+      );
+      if (ok) {
+        for (final u in _allUsers) {
+          if (u.id == userId) {
+            u.status = action == 'approve' ? 'approved' : 'rejected';
+            break;
+          }
+        }
+        _applyFilters();
+      }
+      return ok;
+    } catch (_) {
+      return false;
+    } finally {
+      _photoActioning.remove(userId);
+      notifyListeners();
+    }
   }
 
   // Action methods
