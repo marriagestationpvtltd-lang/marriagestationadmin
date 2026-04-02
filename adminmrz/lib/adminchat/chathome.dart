@@ -1094,6 +1094,7 @@ class _ChatWindowState extends State<ChatWindow> {
                         data['callType']?.toString(),
                         data['callStatus']?.toString(),
                         (data['callDuration'] as num?)?.toInt() ?? 0,
+                        doc.id,
                       ),
                     );
                   },
@@ -1357,7 +1358,8 @@ class _ChatWindowState extends State<ChatWindow> {
       bool seen = false,
       String? callType,
       String? callStatus,
-      int callDuration = 0]) {
+      int callDuration = 0,
+      String? docId]) {
     const kPrimary = Color(0xFFD81B60);
     const kText = Color(0xFF1E293B);
     const kMuted = Color(0xFF64748B);
@@ -1780,7 +1782,7 @@ class _ChatWindowState extends State<ChatWindow> {
     }
 
     // Text message bubble
-    return Align(
+    final bubbleContent = Align(
       alignment: isSentByMe ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.24),
@@ -1836,6 +1838,16 @@ class _ChatWindowState extends State<ChatWindow> {
           ],
         ),
       ),
+    );
+
+    if (!isSentByMe || docId == null) return bubbleContent;
+
+    return _HoverableTextBubble(
+      bubble: bubbleContent,
+      onReply: () => _replyToMessage(message),
+      onEdit: () => _editMessage(docId, message),
+      onDelete: () => _firestore.collection('adminchat').doc(docId).delete(),
+      onUnsend: () => _unsendMessage(docId),
     );
   }
 
@@ -2412,6 +2424,18 @@ class _ChatWindowState extends State<ChatWindow> {
     );
   }
 
+  void _replyToMessage(String originalMessage) {
+    // TODO: implement reply threading
+  }
+
+  void _unsendMessage(String docId) {
+    _firestore
+        .collection('adminchat')
+        .doc(docId)
+        .update({'message': 'This message was unsent.', 'unsent': true})
+        .catchError((_) {});
+  }
+
   void _showEmojiPicker() {
     showDialog(
       context: context,
@@ -2464,3 +2488,167 @@ class _ChatWindowState extends State<ChatWindow> {
     super.dispose();
   }
 }
+
+/// A WhatsApp-web-style hoverable wrapper for sent text message bubbles.
+/// On hover, shows a small action icon (chevron/dots) to the left of the bubble.
+/// Clicking the icon opens a popup menu with Reply, Edit, Delete, Unsend.
+class _HoverableTextBubble extends StatefulWidget {
+  const _HoverableTextBubble({
+    required this.bubble,
+    required this.onReply,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onUnsend,
+  });
+
+  final Widget bubble;
+  final VoidCallback onReply;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final VoidCallback onUnsend;
+
+  @override
+  State<_HoverableTextBubble> createState() => _HoverableTextBubbleState();
+}
+
+class _HoverableTextBubbleState extends State<_HoverableTextBubble>
+    with SingleTickerProviderStateMixin {
+  bool _isHovered = false;
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _fadeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 150),
+    );
+    _fadeAnimation = CurvedAnimation(parent: _fadeController, curve: Curves.easeIn);
+  }
+
+  @override
+  void dispose() {
+    _fadeController.dispose();
+    super.dispose();
+  }
+
+  void _onEnter(_) {
+    setState(() => _isHovered = true);
+    _fadeController.forward();
+  }
+
+  void _onExit(_) {
+    setState(() => _isHovered = false);
+    _fadeController.reverse();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      onEnter: _onEnter,
+      onExit: _onExit,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Action icon – only visible on hover
+          FadeTransition(
+            opacity: _fadeAnimation,
+            child: IgnorePointer(
+              ignoring: !_isHovered,
+              child: _MessageActionMenu(
+                onReply: widget.onReply,
+                onEdit: widget.onEdit,
+                onDelete: widget.onDelete,
+                onUnsend: widget.onUnsend,
+              ),
+            ),
+          ),
+          // The actual bubble (stays in place)
+          widget.bubble,
+        ],
+      ),
+    );
+  }
+}
+
+/// Small dropdown icon button that opens the WhatsApp-style popup menu.
+class _MessageActionMenu extends StatelessWidget {
+  const _MessageActionMenu({
+    required this.onReply,
+    required this.onEdit,
+    required this.onDelete,
+    required this.onUnsend,
+  });
+
+  final VoidCallback onReply;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+  final VoidCallback onUnsend;
+
+  @override
+  Widget build(BuildContext context) {
+    const kPrimary = Color(0xFFD81B60);
+
+    return PopupMenuButton<_MsgAction>(
+      padding: EdgeInsets.zero,
+      icon: const Icon(
+        Icons.keyboard_arrow_down_rounded,
+        size: 17,
+        color: Color(0xFF94A3B8),
+      ),
+      iconSize: 17,
+      splashRadius: 14,
+      tooltip: '',
+      offset: const Offset(0, 24),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+      elevation: 6,
+      color: Colors.white,
+      onSelected: (action) {
+        switch (action) {
+          case _MsgAction.reply:
+            onReply();
+            break;
+          case _MsgAction.edit:
+            onEdit();
+            break;
+          case _MsgAction.delete:
+            onDelete();
+            break;
+          case _MsgAction.unsend:
+            onUnsend();
+            break;
+        }
+      },
+      itemBuilder: (context) => [
+        _menuItem(_MsgAction.reply, Icons.reply_rounded, 'Reply', kPrimary),
+        _menuItem(_MsgAction.edit, Icons.edit_outlined, 'Edit', const Color(0xFF0EA5E9)),
+        _menuItem(_MsgAction.delete, Icons.delete_outline_rounded, 'Delete', const Color(0xFFEF4444)),
+        _menuItem(_MsgAction.unsend, Icons.remove_circle_outline_rounded, 'Unsend', const Color(0xFFF59E0B)),
+      ],
+    );
+  }
+
+  PopupMenuItem<_MsgAction> _menuItem(
+      _MsgAction value, IconData icon, String label, Color color) {
+    return PopupMenuItem<_MsgAction>(
+      value: value,
+      height: 38,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 15, color: color),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(fontSize: 12, color: color, fontWeight: FontWeight.w500),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+enum _MsgAction { reply, edit, delete, unsend }
