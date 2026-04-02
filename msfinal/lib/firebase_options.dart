@@ -17,10 +17,7 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      throw UnsupportedError(
-        'DefaultFirebaseOptions have not been configured for web - '
-        'you can reconfigure this by running the FlutterFire CLI again.',
-      );
+      return web;
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -67,6 +64,16 @@ class DefaultFirebaseOptions {
     storageBucket: 'digitallami1.firebasestorage.app',
     iosClientId: '257951661233-tvlkpb5g89j3grbl9n2ocu1refuffvij.apps.googleusercontent.com',
     iosBundleId: 'com.digitallami.appz',
+  );
+
+  static const FirebaseOptions web = FirebaseOptions(
+    apiKey: 'AIzaSyAtajZVIzbj6hPmHI75FQnpLV2AoAkDVIA',
+    appId: '1:257951661233:web:d2224f58389ceacc407690',
+    messagingSenderId: '257951661233',
+    projectId: 'digitallami1',
+    databaseURL: 'https://digitallami1-default-rtdb.firebaseio.com',
+    storageBucket: 'digitallami1.firebasestorage.app',
+    authDomain: 'digitallami1.firebaseapp.com',
   );
 
 }
