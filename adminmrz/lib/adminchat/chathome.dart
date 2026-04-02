@@ -72,10 +72,12 @@ class _ChatWindowState extends State<ChatWindow> {
 
   // Pagination
   static const int _pageSize = 20;
+  static const double _autoScrollThreshold = 120;
   int _currentLimit = 20;
   int? _cachedLimit;
   bool _isLoadingMore = false;
   bool _hasMoreMessages = true;
+  bool _suppressNextAutoScroll = false;
   int? _prevUserId;
 
   // Match-related data
@@ -606,7 +608,14 @@ class _ChatWindowState extends State<ChatWindow> {
 
   void _scrollToBottom() {
     if (_scrollController.hasClients) {
-      _scrollController.jumpTo(0);
+      final maxScrollExtent = _scrollController.position.maxScrollExtent;
+      if (maxScrollExtent > 0) {
+        _scrollController.jumpTo(maxScrollExtent);
+      } else {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _scrollToBottom();
+        });
+      }
     } else {
       Future.delayed(Duration(milliseconds: 100), _scrollToBottom);
     }
@@ -615,7 +624,7 @@ class _ChatWindowState extends State<ChatWindow> {
   void _onScrollForPagination() {
     if (!_scrollController.hasClients) return;
     final pos = _scrollController.position;
-    if (pos.pixels >= pos.maxScrollExtent - 200 && !_isLoadingMore && _hasMoreMessages) {
+    if (pos.pixels <= 200 && !_isLoadingMore && _hasMoreMessages) {
       _loadMoreMessages();
     }
   }
@@ -624,6 +633,7 @@ class _ChatWindowState extends State<ChatWindow> {
     if (_isLoadingMore || !_hasMoreMessages) return;
     setState(() {
       _isLoadingMore = true;
+      _suppressNextAutoScroll = true;
       _currentLimit += _pageSize;
     });
     // _isLoadingMore is cleared in the StreamBuilder once the new snapshot arrives
@@ -969,6 +979,7 @@ class _ChatWindowState extends State<ChatWindow> {
       _cachedReceiverId = chatProvider.id;
       _currentLimit = _pageSize;
       _hasMoreMessages = true;
+      _suppressNextAutoScroll = false;
       _lastSnapshot = null; // clear stale messages from the previous user
       _messageKeys.clear();
       _messageIndexMap.clear();
@@ -1276,9 +1287,13 @@ class _ChatWindowState extends State<ChatWindow> {
                   return Center(child: CircularProgressIndicator(color: c.primary));
                 }
 
-                final messages = _isSearching && _filteredMessages.isNotEmpty
-                    ? _filteredMessages
-                    : (snapshot.hasData ? snapshot.data!.docs : _lastSnapshot?.docs ?? []);
+                final rawMessages = snapshot.hasData
+                    ? snapshot.data!.docs
+                    : _lastSnapshot?.docs ?? <QueryDocumentSnapshot>[];
+                final isActiveSearch = _isSearching && _searchController.text.isNotEmpty;
+                final messages = isActiveSearch ? _filteredMessages : rawMessages;
+                final previousSnapshot = _lastSnapshot;
+                final previousCount = previousSnapshot?.docs.length ?? 0;
 
                 if (snapshot.hasData) {
                   _lastSnapshot = snapshot.data;
@@ -1289,6 +1304,7 @@ class _ChatWindowState extends State<ChatWindow> {
                       if (mounted) setState(() {
                         _hasMoreMessages = !noMore;
                         _isLoadingMore = false;
+                        _suppressNextAutoScroll = false;
                       });
                     });
                   }
@@ -1306,12 +1322,12 @@ class _ChatWindowState extends State<ChatWindow> {
                         Icon(Icons.chat_bubble_outline, size: 40, color: Colors.grey[300]),
                         const SizedBox(height: 12),
                         Text(
-                          "No messages yet",
+                          isActiveSearch ? "No matching messages" : "No messages yet",
                           style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500, color: c.muted),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          "Start a conversation!",
+                          isActiveSearch ? "Try a different keyword" : "Start a conversation!",
                           style: TextStyle(fontSize: 11, color: c.muted),
                         ),
                       ],
@@ -1338,34 +1354,112 @@ class _ChatWindowState extends State<ChatWindow> {
                 // load-more indicator.
                 final listItemCount = itemCount + (_hasMoreMessages || _isLoadingMore ? 1 : 0);
 
-                return ListView.builder(
+                if (shouldAutoScroll) {
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (mounted) _scrollToBottom();
+                  });
+                }
+
+                return CustomScrollView(
                   controller: _scrollController,
-                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-                  reverse: true,
-                  itemCount: listItemCount,
-                  itemBuilder: (context, index) {
-                    // The last item in the reversed list is the oldest-message indicator.
-                    if (index == itemCount) {
-                      return Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        child: Center(
-                          child: _isLoadingMore
-                              ? SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: c.primary,
+                  slivers: [
+                    if (_hasMoreMessages || _isLoadingMore)
+                      SliverToBoxAdapter(
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+                          child: Center(
+                            child: _isLoadingMore
+                                ? SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: c.primary,
+                                    ),
+                                  )
+                                : TextButton.icon(
+                                    onPressed: _loadMoreMessages,
+                                    icon: Icon(Icons.history, size: 14, color: c.primary),
+                                    label: Text(
+                                      'Load older messages',
+                                      style: TextStyle(fontSize: 12, color: c.primary),
+                                    ),
                                   ),
-                                )
-                              : TextButton.icon(
-                                  onPressed: _loadMoreMessages,
-                                  icon: Icon(Icons.history, size: 14, color: c.primary),
-                                  label: Text(
-                                    'Load older messages',
-                                    style: TextStyle(fontSize: 12, color: c.primary),
-                                  ),
+                          ),
+                        ),
+                      ),
+                    for (final group in messageGroups) ...[
+                      SliverPersistentHeader(
+                        pinned: true,
+                        delegate: _ChatDateHeaderDelegate(
+                          label: group.headerLabel,
+                          backgroundColor: c.bg,
+                          chipColor: c.primaryLight,
+                          textColor: c.text,
+                          borderColor: c.border,
+                        ),
+                      ),
+                      SliverPadding(
+                        padding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
+                        sliver: SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final doc = group.messages[index];
+                              final data = doc.data() as Map<String, dynamic>;
+                              final isSentByMe = data['senderid'] == senderId.toString();
+                              final timestamp = _messageTimestampFromData(data);
+                              final replyPayload = _buildReplyPayload(
+                                docId: doc.id,
+                                data: data,
+                                senderId: isSentByMe
+                                    ? senderId.toString()
+                                    : (chatProvider.id?.toString() ?? ''),
+                                senderName:
+                                    isSentByMe ? 'You' : (chatProvider.namee ?? 'User'),
+                              );
+                              final canEdit = _canEditMessage(data, isSentByMe);
+                              final canMutate = _canMutateMessage(data, isSentByMe);
+
+                              return GestureDetector(
+                                key: ValueKey(doc.id),
+                                onLongPress: () {
+                                  _showMessageOptions(
+                                    context,
+                                    doc.id,
+                                    replyPayload,
+                                    isSentByMe,
+                                    canEdit: canEdit,
+                                    canMutate: canMutate,
+                                  );
+                                },
+                                child: _buildChatBubble(
+                                  data['message'],
+                                  isSentByMe,
+                                  timestamp,
+                                  data['type'],
+                                  data.containsKey('profileData')
+                                      ? data['profileData']
+                                      : null,
+                                  data.containsKey('imageUrl') ? data['imageUrl'] : null,
+                                  data['seen'] == true,
+                                  data['callType']?.toString(),
+                                  data['callStatus']?.toString(),
+                                  (data['callDuration'] as num?)?.toInt() ?? 0,
+                                  doc.id,
+                                  data['replyto'] is Map<String, dynamic>
+                                      ? data['replyto'] as Map<String, dynamic>
+                                      : null,
+                                  data['edited'] == true,
+                                  data['deleted'] == true,
+                                  data['unsent'] == true,
+                                  canEdit,
+                                  canMutate,
+                                  replyPayload,
                                 ),
+                              );
+                            },
+                            childCount: group.messages.length,
+                          ),
                         ),
                       );
                     }
@@ -1433,8 +1527,9 @@ class _ChatWindowState extends State<ChatWindow> {
                           replyPayload,
                         ),
                       ),
-                    );
-                  },
+                    ],
+                    const SliverToBoxAdapter(child: SizedBox(height: 12)),
+                  ],
                 );
               },
             ),
@@ -1686,6 +1781,111 @@ class _ChatWindowState extends State<ChatWindow> {
 
   void openUrl(String url) {
     html.window.open(url, '_blank');
+  }
+
+  DateTime _dateOnly(DateTime dateTime) =>
+      DateTime(dateTime.year, dateTime.month, dateTime.day);
+
+  DateTime _messageTimestampFromData(
+    Map<String, dynamic> data, {
+    DateTime? fallback,
+  }) {
+    return (data['timestamp'] as Timestamp?)?.toDate() ??
+        fallback ??
+        DateTime.now();
+  }
+
+  bool _isToday(DateTime dateTime, [DateTime? reference]) {
+    final now = reference ?? DateTime.now();
+    return _dateOnly(dateTime) == _dateOnly(now);
+  }
+
+  bool _isYesterday(DateTime dateTime, [DateTime? reference]) {
+    final yesterday =
+        _dateOnly(reference ?? DateTime.now()).subtract(const Duration(days: 1));
+    return _dateOnly(dateTime) == yesterday;
+  }
+
+  String _formatDateHeader(DateTime dateTime, [DateTime? reference]) {
+    final now = reference ?? DateTime.now();
+    if (_isToday(dateTime, now)) return 'Today';
+    if (_isYesterday(dateTime, now)) return 'Yesterday';
+    return DateFormat('MMM d, y').format(dateTime);
+  }
+
+  List<QueryDocumentSnapshot> _sortMessagesChronologically(
+    List<QueryDocumentSnapshot> messages,
+  ) {
+    final sorted = List<QueryDocumentSnapshot>.from(messages);
+    final fallbackTimestamp = DateTime.now();
+    sorted.sort((a, b) {
+      final aData = a.data() as Map<String, dynamic>;
+      final bData = b.data() as Map<String, dynamic>;
+      final aTimestamp =
+          _messageTimestampFromData(aData, fallback: fallbackTimestamp);
+      final bTimestamp =
+          _messageTimestampFromData(bData, fallback: fallbackTimestamp);
+      return aTimestamp.compareTo(bTimestamp);
+    });
+    return sorted;
+  }
+
+  List<_ChatMessageDateGroup> _groupMessagesByDate(
+    List<QueryDocumentSnapshot> messages,
+  ) {
+    final groups = <_ChatMessageDateGroup>[];
+    final fallbackTimestamp = DateTime.now();
+    final referenceNow = DateTime.now();
+
+    for (final doc in _sortMessagesChronologically(messages)) {
+      final data = doc.data() as Map<String, dynamic>;
+      final timestamp =
+          _messageTimestampFromData(data, fallback: fallbackTimestamp);
+      final date = _dateOnly(timestamp);
+
+      if (groups.isEmpty || groups.last.date != date) {
+        groups.add(
+          _ChatMessageDateGroup(
+            date: date,
+            headerLabel: _formatDateHeader(timestamp, referenceNow),
+            messages: [doc],
+          ),
+        );
+      } else {
+        groups.last.messages.add(doc);
+      }
+    }
+
+    return groups;
+  }
+
+  bool _shouldAutoScrollToBottom({
+    required bool hasSnapshotData,
+    required bool isSearching,
+    required int previousCount,
+    required int currentCount,
+  }) {
+    if (isSearching || _isLoadingMore || !hasSnapshotData) {
+      return false;
+    }
+
+    if (_suppressNextAutoScroll) {
+      return false;
+    }
+
+    if (!_scrollController.hasClients) {
+      // The first layout pass has not attached the controller yet; schedule a
+      // deferred scroll so the view still lands on the latest messages.
+      return true;
+    }
+
+    if (previousCount != currentCount) {
+      return true;
+    }
+
+    final distanceFromBottom =
+        _scrollController.position.maxScrollExtent - _scrollController.offset;
+    return distanceFromBottom <= _autoScrollThreshold;
   }
 
   Widget _buildChatBubble(String message, bool isSentByMe, DateTime timestamp,
