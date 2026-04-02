@@ -830,15 +830,20 @@ class _DashboardPageState extends State<DashboardPage> {
   // ─── Main content area ──────────────────────────────────────────────────────
   Widget _buildMainContent() {
     final bool isChatPage = _selectedIndex == 5;
+    // Members page (index 1) has its own "Member Directory" header, so the
+    // top bar and outer padding are redundant and waste vertical space.
+    final bool isMembersPage = _selectedIndex == 1;
     return Column(
       children: [
-        if (!isChatPage) _buildTopBar(),
+        if (!isChatPage && !isMembersPage) _buildTopBar(),
         Expanded(
           child: isChatPage
               ? _pages[_selectedIndex]
               : Container(
                   color: Theme.of(context).scaffoldBackgroundColor,
-                  padding: const EdgeInsets.all(24),
+                  padding: isMembersPage
+                      ? EdgeInsets.zero
+                      : const EdgeInsets.all(24),
                   child: _pages[_selectedIndex],
                 ),
         ),
