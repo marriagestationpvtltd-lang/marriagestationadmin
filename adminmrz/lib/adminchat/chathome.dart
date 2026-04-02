@@ -26,6 +26,7 @@ import 'left.dart';
 import 'dart:html' as html;
 import 'dart:js' as js;
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 
 class ChatWindow extends StatefulWidget {
@@ -99,7 +100,23 @@ class _ChatWindowState extends State<ChatWindow> {
   static const String _kDeletedMessageText = 'This message was deleted.';
   static const String _kUnsentMessageText = 'This message was unsent.';
   static const String _kDefaultMessageText = 'Message';
+  // Approximate chat row height used for the initial jump before ensureVisible
+  // performs the precise final alignment on the mounted target widget.
   static const double _kEstimatedMessageExtent = 112;
+  static const int _kMaxLoadAttempts = 20;
+  static const int _kMaxContextFindAttempts = 6;
+  static const Duration _kLoadRetryDelay = Duration(milliseconds: 250);
+  static const Duration _kLoadMoreDelay = Duration(milliseconds: 450);
+  static const Duration _kContextFindDelay = Duration(milliseconds: 80);
+  static const Duration _kEnsureVisibleDuration = Duration(milliseconds: 420);
+  static const int _kMinScrollDurationMs = 320;
+  static const int _kMaxScrollDurationMs = 950;
+  static const double _kScrollDurationMultiplier = 0.35;
+  static const double _kMessageScrollAlignment = 0.45;
+  static const double _kReplyPreviewSentBackgroundOpacity = 0.18;
+  static const double _kReplyPreviewSentBorderOpacity = 0.78;
+  static const double _kReplyPreviewSentTextOpacity = 0.85;
+  static const double _kReplyPreviewSentIconOpacity = 0.88;
 
   final Map<String, GlobalKey> _messageKeys = <String, GlobalKey>{};
   final Map<String, int> _messageIndexMap = <String, int>{};
@@ -638,16 +655,16 @@ class _ChatWindowState extends State<ChatWindow> {
   }
 
   Future<bool> _ensureMessageLoaded(String messageId) async {
-    for (int attempt = 0; attempt < 20; attempt++) {
+    for (int attempt = 0; attempt < _kMaxLoadAttempts; attempt++) {
       final docs = _lastSnapshot?.docs ?? const <QueryDocumentSnapshot>[];
       final bool found = docs.any((doc) => doc.id == messageId);
       if (found) return true;
       if (!_hasMoreMessages || _isLoadingMore) {
-        await Future.delayed(const Duration(milliseconds: 250));
+        await Future.delayed(_kLoadRetryDelay);
         continue;
       }
       _loadMoreMessages();
-      await Future.delayed(const Duration(milliseconds: 450));
+      await Future.delayed(_kLoadMoreDelay);
     }
 
     final docs = _lastSnapshot?.docs ?? const <QueryDocumentSnapshot>[];
@@ -655,7 +672,9 @@ class _ChatWindowState extends State<ChatWindow> {
   }
 
   Duration _navigationDurationForDistance(double distance) {
-    final int millis = (320 + (distance * 0.35)).round().clamp(320, 950);
+    final int millis = (_kMinScrollDurationMs + (distance * _kScrollDurationMultiplier))
+        .round()
+        .clamp(_kMinScrollDurationMs, _kMaxScrollDurationMs);
     return Duration(milliseconds: millis);
   }
 
@@ -687,19 +706,20 @@ class _ChatWindowState extends State<ChatWindow> {
       }
     }
 
-    for (int attempt = 0; attempt < 6; attempt++) {
-      await WidgetsBinding.instance.endOfFrame;
+    for (int attempt = 0; attempt < _kMaxContextFindAttempts; attempt++) {
+      // Wait for the post-scroll frame so the lazily built target row can mount.
+      await SchedulerBinding.instance.endOfFrame;
       final BuildContext? targetContext = _messageKeys[messageId]?.currentContext;
       if (targetContext == null) {
-        await Future.delayed(const Duration(milliseconds: 80));
+        await Future.delayed(_kContextFindDelay);
         continue;
       }
 
       await Scrollable.ensureVisible(
         targetContext,
-        duration: const Duration(milliseconds: 420),
+        duration: _kEnsureVisibleDuration,
         curve: Curves.easeInOutCubic,
-        alignment: 0.45,
+        alignment: _kMessageScrollAlignment,
       );
       _highlightMessage(messageId);
       return;
@@ -1300,6 +1320,12 @@ class _ChatWindowState extends State<ChatWindow> {
                 }
 
                 final itemCount = messages.length;
+                final activeMessageIds = messages.map((doc) => doc.id).toSet();
+                for (final messageId in _messageKeys.keys.toList()) {
+                  if (!activeMessageIds.contains(messageId)) {
+                    _messageKeys.remove(messageId);
+                  }
+                }
                 _messageIndexMap
                   ..clear()
                   ..addEntries(
@@ -2296,17 +2322,21 @@ class _ChatWindowState extends State<ChatWindow> {
         color: Colors.transparent,
         child: InkWell(
           onTap: canNavigate ? () => _handleReplyPreviewTap(replyTo) : null,
+          splashColor: canNavigate ? null : Colors.transparent,
+          highlightColor: canNavigate ? null : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
           child: Ink(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: isSentByMe
-                  ? Colors.white.withOpacity(0.18)
+                  ? Colors.white.withOpacity(_kReplyPreviewSentBackgroundOpacity)
                   : primaryColor.withOpacity(0.07),
               borderRadius: BorderRadius.circular(10),
               border: Border(
                 left: BorderSide(
-                  color: isSentByMe ? Colors.white.withOpacity(0.78) : primaryColor,
+                  color: isSentByMe
+                      ? Colors.white.withOpacity(_kReplyPreviewSentBorderOpacity)
+                      : primaryColor,
                   width: 3,
                 ),
               ),
@@ -2335,7 +2365,9 @@ class _ChatWindowState extends State<ChatWindow> {
                           style: TextStyle(
                             fontSize: 10,
                             fontStyle: FontStyle.italic,
-                            color: isSentByMe ? Colors.white.withOpacity(0.85) : mutedColor,
+                            color: isSentByMe
+                                ? Colors.white.withOpacity(_kReplyPreviewSentTextOpacity)
+                                : mutedColor,
                           ),
                         ),
                       ],
@@ -2346,7 +2378,9 @@ class _ChatWindowState extends State<ChatWindow> {
                             : quotedMsg,
                         style: TextStyle(
                           fontSize: 11,
-                          color: isSentByMe ? Colors.white.withOpacity(0.85) : mutedColor,
+                          color: isSentByMe
+                              ? Colors.white.withOpacity(_kReplyPreviewSentTextOpacity)
+                              : mutedColor,
                         ),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
@@ -2359,7 +2393,9 @@ class _ChatWindowState extends State<ChatWindow> {
                   Icon(
                     Icons.subdirectory_arrow_left_rounded,
                     size: 16,
-                    color: isSentByMe ? Colors.white.withOpacity(0.88) : primaryColor,
+                    color: isSentByMe
+                        ? Colors.white.withOpacity(_kReplyPreviewSentIconOpacity)
+                        : primaryColor,
                   ),
                 ],
               ],
@@ -3206,6 +3242,8 @@ class _ChatWindowState extends State<ChatWindow> {
 }
 
 class _HighlightableMessageContainer extends StatelessWidget {
+  static const double _kHighlightOpacity = 0.9;
+
   const _HighlightableMessageContainer({
     super.key,
     required this.child,
@@ -3225,7 +3263,9 @@ class _HighlightableMessageContainer extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 2),
       padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 3),
       decoration: BoxDecoration(
-        color: isHighlighted ? colors.primaryLight.withOpacity(0.9) : Colors.transparent,
+        color: isHighlighted
+            ? colors.primaryLight.withOpacity(_kHighlightOpacity)
+            : Colors.transparent,
         borderRadius: BorderRadius.circular(16),
       ),
       child: child,
