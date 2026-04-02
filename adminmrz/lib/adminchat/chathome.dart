@@ -23,6 +23,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart' show Uint8List, kIsWeb;
 import 'chat_theme.dart';
 import 'left.dart';
+import 'package:adminmrz/users/userdetails/detailscreen.dart';
+import 'package:adminmrz/users/userdetails/userdetailprovider.dart';
 import 'dart:html' as html;
 import 'dart:js' as js;
 import 'package:firebase_storage/firebase_storage.dart';
@@ -1045,37 +1047,55 @@ class _ChatWindowState extends State<ChatWindow> {
                 ),
                 const SizedBox(width: 8),
               ],
-              // Avatar + paid badge
-              Stack(
-                children: [
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: const Color(0xFFF1F5F9),
-                    backgroundImage: chatProvider.profilePicture != null &&
-                            chatProvider.profilePicture!.isNotEmpty
-                        ? NetworkImage(chatProvider.profilePicture!)
-                        : null,
-                    child: chatProvider.profilePicture == null ||
-                            chatProvider.profilePicture!.isEmpty
-                        ? Icon(Icons.person, size: 18, color: Colors.grey[400])
-                        : null,
-                  ),
-                  if (chatProvider.ispaid)
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: Container(
-                        width: 14,
-                        height: 14,
-                        decoration: BoxDecoration(
-                          color: Colors.amber,
-                          shape: BoxShape.circle,
-                          border: Border.all(color: Colors.white, width: 1.5),
+              // Avatar + paid badge (tappable → opens profile)
+              GestureDetector(
+                onTap: () {
+                  final uid = chatProvider.id;
+                  if (uid == null) return;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ChangeNotifierProvider(
+                        create: (_) => UserDetailsProvider(),
+                        child: UserDetailsScreen(
+                          userId: uid,
+                          myId: uid,
                         ),
-                        child: const Icon(Icons.star, size: 8, color: Colors.white),
                       ),
                     ),
-                ],
+                  );
+                },
+                child: Stack(
+                  children: [
+                    CircleAvatar(
+                      radius: 18,
+                      backgroundColor: const Color(0xFFF1F5F9),
+                      backgroundImage: chatProvider.profilePicture != null &&
+                              chatProvider.profilePicture!.isNotEmpty
+                          ? NetworkImage(chatProvider.profilePicture!)
+                          : null,
+                      child: chatProvider.profilePicture == null ||
+                              chatProvider.profilePicture!.isEmpty
+                          ? Icon(Icons.person, size: 18, color: Colors.grey[400])
+                          : null,
+                    ),
+                    if (chatProvider.ispaid)
+                      Positioned(
+                        right: 0,
+                        bottom: 0,
+                        child: Container(
+                          width: 14,
+                          height: 14,
+                          decoration: BoxDecoration(
+                            color: Colors.amber,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 1.5),
+                          ),
+                          child: const Icon(Icons.star, size: 8, color: Colors.white),
+                        ),
+                      ),
+                  ],
+                ),
               ),
               const SizedBox(width: 10),
 
