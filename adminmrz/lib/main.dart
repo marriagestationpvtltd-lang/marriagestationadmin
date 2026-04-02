@@ -1,3 +1,4 @@
+import 'package:adminmrz/core/app_theme.dart';
 import 'package:adminmrz/payment/paymentprovider.dart';
 import 'package:adminmrz/users/userprovider.dart';
 import 'package:flutter/material.dart';
@@ -63,40 +64,8 @@ class MyApp extends StatelessWidget {
         builder: (context, themeProvider, _) => MaterialApp(
           title: 'Admin Panel',
           themeMode: themeProvider.themeMode,
-          theme: ThemeData(
-            brightness: Brightness.light,
-            primarySwatch: Colors.indigo,
-            scaffoldBackgroundColor: const Color(0xFFF1F5F9),
-            colorScheme: const ColorScheme.light(
-              primary: Color(0xFF6366F1),
-              surface: Colors.white,
-              onSurface: Color(0xFF334155),
-              outlineVariant: Color(0xFFE2E8F0),
-            ),
-            appBarTheme: const AppBarTheme(
-              backgroundColor: Colors.white,
-              foregroundColor: Colors.black,
-              elevation: 0,
-              centerTitle: true,
-            ),
-          ),
-          darkTheme: ThemeData(
-            brightness: Brightness.dark,
-            primarySwatch: Colors.indigo,
-            scaffoldBackgroundColor: const Color(0xFF0D1117),
-            colorScheme: const ColorScheme.dark(
-              primary: Color(0xFF6366F1),
-              surface: Color(0xFF1E293B),
-              onSurface: Color(0xFFCBD5E1),
-              outlineVariant: Color(0xFF334155),
-            ),
-            appBarTheme: const AppBarTheme(
-              backgroundColor: Color(0xFF1E293B),
-              foregroundColor: Color(0xFFCBD5E1),
-              elevation: 0,
-              centerTitle: true,
-            ),
-          ),
+          theme: buildLightTheme(),
+          darkTheme: buildDarkTheme(),
           debugShowCheckedModeBanner: false,
           home: Consumer<AuthProvider>(
             builder: (context, authProvider, _) {
