@@ -2821,7 +2821,7 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
                                 ),
                                 const SizedBox(width: 8),
                                 Text(
-                                  opt[0].toUpperCase() + opt.substring(1),
+                                  opt.isEmpty ? opt : opt[0].toUpperCase() + opt.substring(1),
                                   style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
