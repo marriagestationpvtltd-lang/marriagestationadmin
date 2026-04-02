@@ -152,7 +152,12 @@ class UserProvider with ChangeNotifier {
       return;
     }
     _activityLoading.add(userId);
-    notifyListeners();
+    // Schedule the loading-state notification for after the current build frame
+    // so that notifyListeners() is never called synchronously during a build,
+    // which can cause a "Cannot read properties of undefined" error in Flutter web.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_activityLoading.contains(userId)) notifyListeners();
+    });
     try {
       final stats = await _userDetailsService.getUserActivity(userId);
       _activityByUser[userId] = stats;
@@ -313,11 +318,14 @@ class UserProvider with ChangeNotifier {
     // Apply search filter
     if (_searchQuery.isNotEmpty) {
       filtered = filtered.where((user) {
-        return user.fullName.toLowerCase().contains(_searchQuery) ||
-            user.email.toLowerCase().contains(_searchQuery) ||
-            user.id.toString().contains(_searchQuery) ||
-            (user.phone != null &&
-                user.phone!.toLowerCase().contains(_searchQuery));
+        final name = user.fullName.toLowerCase();
+        final email = user.email.toLowerCase();
+        final id = user.id.toString();
+        final phone = (user.phone ?? '').toLowerCase();
+        return name.contains(_searchQuery) ||
+            email.contains(_searchQuery) ||
+            id.contains(_searchQuery) ||
+            phone.contains(_searchQuery);
       }).toList();
     }
 
