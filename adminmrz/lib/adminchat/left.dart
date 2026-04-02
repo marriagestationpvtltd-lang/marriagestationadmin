@@ -162,7 +162,16 @@ class _ChatSidebarState extends State<ChatSidebar> {
           _users = newUsers;
           _totalUsers = serverTotal ?? newUsers.length;
         } else {
-          _users = [..._users, ...newUsers];
+          // Deduplicate by userId to prevent the same user appearing twice when
+          // pages overlap or are re-fetched.
+          final existingIds = _users
+              .map((u) => u['id']?.toString())
+              .whereType<String>()
+              .toSet();
+          final dedupedNew = newUsers
+              .where((u) => !existingIds.contains(u['id']?.toString()))
+              .toList();
+          _users = [..._users, ...dedupedNew];
           if (serverTotal != null) _totalUsers = serverTotal;
         }
 
@@ -454,58 +463,80 @@ class _ChatSidebarState extends State<ChatSidebar> {
       // ── Update sidebar UI ───────────────────────────────────────────────
       Map<String, Map<String, dynamic>> tempMap = {};
       List<dynamic> sortedUsers = [];
+      // Track added user IDs to prevent any duplicates.
+      final Set<String> addedIds = {};
 
+      // First pass: users with conversations, already ordered by lastTimestamp
+      // (Firestore query uses orderBy('lastTimestamp', descending: true)).
       for (var doc in snapshot.docs) {
-        List participants = doc['participants'];
-        String otherUserId =
-        participants.firstWhere((id) => id != senderId.toString());
+        final List participants =
+            List<String>.from(doc['participants'] ?? []);
+        final String otherUserId = participants.firstWhere(
+          (id) => id != senderId.toString(),
+          orElse: () => '',
+        );
+        if (otherUserId.isEmpty) continue;
 
         tempMap[otherUserId] = {
           'lastMessage': doc['lastMessage'] ?? '',
           'lastTimestamp': doc['lastTimestamp'],
         };
 
-        var user = _users.firstWhere(
-              (u) => u['id'].toString() == otherUserId,
-          orElse: () => null,
-        );
-
-        if (user != null) {
-          sortedUsers.add(user); // 🔥 already in correct order
+        if (!addedIds.contains(otherUserId)) {
+          final user = _users.firstWhere(
+            (u) => u['id'].toString() == otherUserId,
+            orElse: () => null,
+          );
+          if (user != null) {
+            sortedUsers.add(user);
+            addedIds.add(otherUserId);
+          }
         }
       }
 
-      // Add remaining users (no chats yet)
+      // Second pass: users who have no conversation yet (append to bottom).
       for (var user in _users) {
-        if (!sortedUsers.contains(user)) {
+        final uid = user['id']?.toString() ?? '';
+        if (uid.isNotEmpty && !addedIds.contains(uid)) {
           sortedUsers.add(user);
+          addedIds.add(uid);
         }
       }
 
       setState(() {
         conversationMap = tempMap;
-
-        // 🔥 IMPORTANT: assign directly (no further sort override)
         _users = List.from(sortedUsers);
 
-        // 🔥 Apply filters WITHOUT breaking order
+        // Apply filters and deduplication in the same setState call to
+        // avoid a second rebuild from a subsequent _applyFilters() call.
+        final Set<String> seenIds = {};
         _filteredUsers = _users.where((user) {
+          final uid = user["id"]?.toString() ?? '';
+          if (uid.isEmpty || seenIds.contains(uid)) return false;
+          seenIds.add(uid);
+
           bool matchesSearch = user["name"]
               .toLowerCase()
               .contains(_searchQuery.toLowerCase());
-
           bool matchesPaid = !_showOnlyPaid || (user["is_paid"] == true);
           bool matchesOnline = !_showOnlyOnline || (user["is_online"] == true);
-
           int matchesCount = int.tryParse(user["matches"].toString()) ?? 0;
           bool matchesWithMatches = !_showWithMatches || (matchesCount > 0);
-
-          final uid = user["id"]?.toString() ?? '';
-          bool matchesUnread = !_showOnlyUnread || (_unreadCounts[uid] ?? 0) > 0;
+          bool matchesUnread =
+              !_showOnlyUnread || (_unreadCounts[uid] ?? 0) > 0;
 
           return matchesSearch && matchesPaid && matchesOnline &&
               matchesWithMatches && matchesUnread;
         }).toList();
+
+        if (_sortBy != 'recent') _sortUsers();
+
+        if (_selectedChat != null &&
+            !_filteredUsers.contains(_selectedChat)) {
+          _selectedChat =
+              _filteredUsers.isNotEmpty ? _filteredUsers[0] : null;
+          if (_selectedChat != null) _updateSelectedChat();
+        }
       });
     });
   }
@@ -542,7 +573,13 @@ class _ChatSidebarState extends State<ChatSidebar> {
   }
   void _applyFilters() {
     setState(() {
+      // Build filtered list, deduplicating by userId as a safety net.
+      final Set<String> seenIds = {};
       _filteredUsers = _users.where((user) {
+        final uid = user["id"]?.toString() ?? '';
+        if (uid.isEmpty || seenIds.contains(uid)) return false;
+        seenIds.add(uid);
+
         // Search filter
         bool matchesSearch = user["name"]
             .toLowerCase()
@@ -559,7 +596,6 @@ class _ChatSidebarState extends State<ChatSidebar> {
         bool matchesWithMatches = !_showWithMatches || (matchesCount > 0);
 
         // Unread filter
-        final uid = user["id"]?.toString() ?? '';
         bool matchesUnread =
             !_showOnlyUnread || (_unreadCounts[uid] ?? 0) > 0;
 
