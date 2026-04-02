@@ -98,6 +98,7 @@ class _ChatWindowState extends State<ChatWindow> {
   static const int _kMaxQuoteLength = 80; // max chars shown in reply/edit preview
   static const String _kDeletedMessageText = 'This message was deleted.';
   static const String _kUnsentMessageText = 'This message was unsent.';
+  static const String _kDefaultMessageText = 'Message';
 
   @override
   void initState() {
@@ -292,9 +293,9 @@ class _ChatWindowState extends State<ChatWindow> {
       case 'text':
       case null:
         final text = data['message']?.toString().trim() ?? '';
-        return text.isEmpty ? 'Message' : text;
+        return text.isEmpty ? _kDefaultMessageText : text;
       default:
-        return data['message']?.toString() ?? 'Message';
+        return data['message']?.toString() ?? _kDefaultMessageText;
     }
   }
 
@@ -314,6 +315,26 @@ class _ChatWindowState extends State<ChatWindow> {
       'deleted': data['deleted'] == true,
       'unsent': data['unsent'] == true,
     };
+  }
+
+  Map<String, dynamic> _buildFallbackReplyPayload({
+    required String docId,
+    required String message,
+    required String senderId,
+    required String senderName,
+  }) {
+    return _buildReplyPayload(
+      docId: docId,
+      data: {
+        'message': message,
+        'type': 'text',
+        'edited': false,
+        'deleted': false,
+        'unsent': false,
+      },
+      senderId: senderId,
+      senderName: senderName,
+    );
   }
 
   bool _canEditMessage(Map<String, dynamic> data, bool isSentByMe) {
@@ -382,9 +403,11 @@ class _ChatWindowState extends State<ChatWindow> {
 
     final docRef = _firestore.collection('adminchat').doc(docId);
     await docRef.update(updates);
+    final latestSnapshot = await docRef.get();
+    if (!latestSnapshot.exists) return;
 
     final latestData = {
-      ...(await docRef.get()).data() ?? <String, dynamic>{},
+      ...latestSnapshot.data() ?? <String, dynamic>{},
       ...updates,
     };
 
@@ -1555,7 +1578,7 @@ class _ChatWindowState extends State<ChatWindow> {
           children: [
             if (showEditedLabel) ...[
               const Text(
-                'edited',
+                'Edited',
                 style: TextStyle(fontSize: 10, color: kMuted, fontStyle: FontStyle.italic),
               ),
               const SizedBox(width: 4),
@@ -2886,7 +2909,13 @@ class _ChatWindowState extends State<ChatWindow> {
         'unsent': false,
         'edited': false,
       },
-    ).catchError((_) {});
+    ).catchError((error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to delete message: $error')),
+        );
+      }
+    });
   }
 
   void _unsendMessage(String docId) {
@@ -2898,7 +2927,13 @@ class _ChatWindowState extends State<ChatWindow> {
         'deleted': false,
         'edited': false,
       },
-    ).catchError((_) {});
+    ).catchError((error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to unsend message: $error')),
+        );
+      }
+    });
   }
 
   // ── INLINE REPLY / EDIT ─────────────────────────────────────────────────
@@ -2912,16 +2947,12 @@ class _ChatWindowState extends State<ChatWindow> {
   ]) {
     setState(() {
       _replyingTo = payload ??
-          {
-            'docId': docId,
-            'message': message,
-            'senderid': senderid,
-            'senderName': senderName,
-            'type': 'text',
-            'edited': false,
-            'deleted': false,
-            'unsent': false,
-          };
+          _buildFallbackReplyPayload(
+            docId: docId,
+            message: message,
+            senderId: senderid,
+            senderName: senderName,
+          );
       _editingDocId = null;
     });
     FocusScope.of(context).requestFocus(_messageFocusNode);
@@ -3065,6 +3096,16 @@ class _HoverableMessageBubbleState extends State<_HoverableMessageBubble>
 
   @override
   Widget build(BuildContext context) {
+    final actionMenu = _MessageActionMenu(
+      onReply: widget.onReply,
+      onEdit: widget.onEdit,
+      onDelete: widget.onDelete,
+      onUnsend: widget.onUnsend,
+      canEdit: widget.canEdit,
+      canDelete: widget.canDelete,
+      canUnsend: widget.canUnsend,
+    );
+
     return MouseRegion(
       onEnter: _onEnter,
       onExit: _onExit,
@@ -3079,15 +3120,7 @@ class _HoverableMessageBubbleState extends State<_HoverableMessageBubble>
               opacity: _fadeAnimation,
               child: IgnorePointer(
                 ignoring: !_isHovered,
-                child: _MessageActionMenu(
-                  onReply: widget.onReply,
-                  onEdit: widget.onEdit,
-                  onDelete: widget.onDelete,
-                  onUnsend: widget.onUnsend,
-                  canEdit: widget.canEdit,
-                  canDelete: widget.canDelete,
-                  canUnsend: widget.canUnsend,
-                ),
+                child: actionMenu,
               ),
             ),
           widget.bubble,
@@ -3095,17 +3128,7 @@ class _HoverableMessageBubbleState extends State<_HoverableMessageBubble>
             opacity: _fadeAnimation,
             child: IgnorePointer(
               ignoring: !_isHovered,
-              child: widget.isSentByMe
-                  ? const SizedBox.shrink()
-                  : _MessageActionMenu(
-                      onReply: widget.onReply,
-                      onEdit: widget.onEdit,
-                      onDelete: widget.onDelete,
-                      onUnsend: widget.onUnsend,
-                      canEdit: widget.canEdit,
-                      canDelete: widget.canDelete,
-                      canUnsend: widget.canUnsend,
-                    ),
+              child: widget.isSentByMe ? const SizedBox.shrink() : actionMenu,
             ),
           ),
         ],
