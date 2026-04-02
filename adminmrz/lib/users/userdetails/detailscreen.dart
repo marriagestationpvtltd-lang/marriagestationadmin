@@ -456,31 +456,35 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
   Widget _chipButton({
     required String label,
     required IconData icon,
-    required VoidCallback onTap,
+    VoidCallback? onTap,
     Color color = _kPrimary,
     Color? bg,
   }) {
+    final disabled = onTap == null;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: bg ?? color.withOpacity(0.12),
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: color.withOpacity(0.25)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: TextStyle(
-                  fontSize: 12.5, fontWeight: FontWeight.w700, color: color),
-            ),
-          ],
+      child: Opacity(
+        opacity: disabled ? 0.45 : 1.0,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: bg ?? color.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: color.withOpacity(0.25)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: color),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: TextStyle(
+                    fontSize: 12.5, fontWeight: FontWeight.w700, color: color),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -677,88 +681,95 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
               border: Border.all(color: _kPrimary.withOpacity(0.18)),
             ),
             clipBehavior: Clip.antiAlias,
-            child: p.hasProfilePicture
-                ? Stack(
-                    children: [
-                      Positioned.fill(
-                        child: Image.network(
-                          p.profilePicture,
-                          fit: BoxFit.cover,
-                          loadingBuilder: (_, child, prog) =>
-                              prog == null ? child : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                          errorBuilder: (_, __, ___) => const Center(
-                            child: Icon(Icons.broken_image, size: 48, color: Colors.grey),
+            child: GestureDetector(
+              onTap: p.hasProfilePicture
+                  ? () => _showDocPreview(p.profilePicture)
+                  : null,
+              child: p.hasProfilePicture
+                  ? Stack(
+                      children: [
+                        Positioned.fill(
+                          child: Image.network(
+                            p.profilePicture,
+                            fit: BoxFit.cover,
+                            loadingBuilder: (_, child, prog) =>
+                                prog == null ? child : const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                            errorBuilder: (_, __, ___) => const Center(
+                              child: Icon(Icons.broken_image, size: 48, color: Colors.grey),
+                            ),
                           ),
                         ),
-                      ),
-                      Positioned(
-                        top: 12,
-                        right: 12,
-                        child: _statusPill(photoStatus, _kPrimaryDark, icon: Icons.verified_user),
-                      ),
-                    ],
-                  )
-                : Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(Icons.photo_camera_outlined, size: 42, color: _kPrimaryDark),
-                        SizedBox(height: 8),
-                        Text(
-                          'No profile photo yet',
-                          style: TextStyle(fontSize: 13, color: Color(0xFF475569), fontWeight: FontWeight.w600),
+                        Positioned(
+                          top: 12,
+                          right: 12,
+                          child: _statusPill(photoStatus, _kPrimaryDark, icon: Icons.verified_user),
+                        ),
+                        const Positioned(
+                          bottom: 10,
+                          right: 10,
+                          child: Tooltip(
+                            message: 'Tap to view full image',
+                            child: Icon(Icons.zoom_in_rounded,
+                                size: 20, color: Colors.white70),
+                          ),
                         ),
                       ],
+                    )
+                  : Center(
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Icon(Icons.photo_camera_outlined, size: 42, color: _kPrimaryDark),
+                          SizedBox(height: 8),
+                          Text(
+                            'No profile photo yet',
+                            style: TextStyle(fontSize: 13, color: Color(0xFF475569), fontWeight: FontWeight.w600),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
+            ),
           ),
-          const SizedBox(height: 12),
-          if (isPhotoMissing)
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                icon: const Icon(Icons.send_outlined, size: 16),
-                label: const Text('Request profile photo'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _kPrimary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                  elevation: 0,
-                ),
-                onPressed: prov.isSendingNotification ? null : () => _requestPhotoUpload(p),
+          const SizedBox(height: 10),
+          if (prov.isPhotoActioning)
+            const Center(
+              child: SizedBox(
+                height: 20, width: 20,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            )
+          else if (isPhotoMissing)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: _chipButton(
+                label: 'Request Photo',
+                icon: Icons.send_outlined,
+                onTap: prov.isSendingNotification
+                    ? null
+                    : () => _requestPhotoUpload(p),
+                color: _kPrimary,
               ),
             )
           else
             Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    icon: const Icon(Icons.verified_outlined, size: 16),
-                    label: const Text('Approve'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: _kEmerald,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 13),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      elevation: 0,
-                    ),
-                    onPressed: prov.isPhotoActioning ? null : () => _handlePhotoAction('approve'),
-                  ),
+                _chipButton(
+                  label: 'Approve',
+                  icon: Icons.verified_outlined,
+                  onTap: prov.isPhotoActioning
+                      ? null
+                      : () => _handlePhotoAction('approve'),
+                  color: _kEmerald,
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    icon: const Icon(Icons.cancel_outlined, size: 16),
-                    label: const Text('Reject'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: _kRose,
-                      side: const BorderSide(color: _kRose),
-                      padding: const EdgeInsets.symmetric(vertical: 13),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                    onPressed: prov.isPhotoActioning ? null : () => _handlePhotoAction('reject'),
-                  ),
+                const SizedBox(width: 8),
+                _chipButton(
+                  label: 'Reject',
+                  icon: Icons.cancel_outlined,
+                  onTap: prov.isPhotoActioning
+                      ? null
+                      : () => _handlePhotoAction('reject'),
+                  color: _kRose,
                 ),
               ],
             ),
@@ -903,53 +914,34 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
 
   Widget _buildAdminActions(PersonalDetail p, UserDetailsProvider prov) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      child: Row(
         children: [
-          Row(
-            children: [
-              Text('Admin Actions',
-                  style: TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w700, color: Colors.grey.shade800)),
-              const SizedBox(width: 8),
-              if (prov.isSendingNotification || prov.isPhotoActioning)
-                const SizedBox(
-                  height: 16,
-                  width: 16,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
-            ],
+          Icon(Icons.admin_panel_settings_outlined,
+              size: 15, color: Colors.grey.shade500),
+          const SizedBox(width: 6),
+          Text('Quick Actions',
+              style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey.shade600)),
+          const SizedBox(width: 12),
+          _chipButton(
+            label: 'Send Notification',
+            icon: Icons.notifications_active_outlined,
+            onTap: prov.isSendingNotification
+                ? null
+                : _showSendNotificationDialog,
+            color: _kPrimary,
           ),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: [
-              ElevatedButton.icon(
-                icon: const Icon(Icons.notifications_active_outlined, size: 16),
-                label: const Text('Send Notification'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: _kPrimary,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                ),
-                onPressed: prov.isSendingNotification ? null : _showSendNotificationDialog,
-              ),
-              OutlinedButton.icon(
-                icon: const Icon(Icons.chat_bubble_outline, size: 16),
-                label: const Text('Open Chat'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: _kPrimary,
-                  side: const BorderSide(color: _kPrimary),
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                ),
-                onPressed: widget.onOpenChat != null
-                    ? () => widget.onOpenChat!(widget.userId)
-                    : null,
-              ),
-            ],
-          ),
+          if (prov.isSendingNotification) ...[
+            const SizedBox(width: 10),
+            const SizedBox(
+              height: 14,
+              width: 14,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ],
         ],
       ),
     );
@@ -967,34 +959,59 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 92,
-                height: 92,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(color: _kPrimary.withOpacity(0.25), width: 3),
-                  color: _kPrimary.withOpacity(0.08),
-                ),
-                child: ClipOval(
-                  child: p.hasProfilePicture
-                      ? Image.network(
-                          p.profilePicture,
-                          fit: BoxFit.cover,
-                          loadingBuilder: (_, child, prog) => prog == null
-                              ? child
-                              : Center(
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    value: prog.expectedTotalBytes != null
-                                        ? prog.cumulativeBytesLoaded /
-                                            prog.expectedTotalBytes!
-                                        : null,
-                                  ),
-                                ),
-                          errorBuilder: (_, __, ___) => Icon(Icons.person,
-                              size: 40, color: Colors.blue.shade300),
-                        )
-                      : Icon(Icons.person, size: 40, color: Colors.blue.shade300),
+              GestureDetector(
+                onTap: p.hasProfilePicture
+                    ? () => _showDocPreview(p.profilePicture)
+                    : null,
+                child: Container(
+                  width: 92,
+                  height: 92,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: _kPrimary.withOpacity(0.25), width: 3),
+                    color: _kPrimary.withOpacity(0.08),
+                  ),
+                  child: Stack(
+                    children: [
+                      ClipOval(
+                        child: p.hasProfilePicture
+                            ? Image.network(
+                                p.profilePicture,
+                                fit: BoxFit.cover,
+                                width: 92,
+                                height: 92,
+                                loadingBuilder: (_, child, prog) => prog == null
+                                    ? child
+                                    : Center(
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          value: prog.expectedTotalBytes != null
+                                              ? prog.cumulativeBytesLoaded /
+                                                  prog.expectedTotalBytes!
+                                              : null,
+                                        ),
+                                      ),
+                                errorBuilder: (_, __, ___) => Icon(Icons.person,
+                                    size: 40, color: Colors.blue.shade300),
+                              )
+                            : Icon(Icons.person, size: 40, color: Colors.blue.shade300),
+                      ),
+                      if (p.hasProfilePicture)
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            padding: const EdgeInsets.all(3),
+                            decoration: const BoxDecoration(
+                              color: Colors.black54,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(Icons.zoom_in,
+                                size: 11, color: Colors.white),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(width: 22),
@@ -1180,6 +1197,23 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
                 icon: Icons.phone_outlined,
                 label: 'Phone',
                 value: c.hasPhone ? c.preferredPhone : 'Not available',
+                onTap: widget.onOpenChat != null
+                    ? () => widget.onOpenChat!(widget.userId)
+                    : null,
+                trailingAction: widget.onOpenChat != null
+                    ? Tooltip(
+                        message: 'Open Chat',
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: _kSky.withOpacity(0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: const Icon(Icons.chat_bubble_outline,
+                              size: 13, color: _kSky),
+                        ),
+                      )
+                    : null,
               ),
             ],
           ),
@@ -1192,9 +1226,11 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
     required IconData icon,
     required String label,
     required String value,
+    VoidCallback? onTap,
+    Widget? trailingAction,
   }) {
     final missing = value.isEmpty || value == 'Not available' || value == 'null';
-    return Container(
+    final tile = Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: missing ? Colors.grey.shade50 : Colors.blue.shade50,
@@ -1226,9 +1262,21 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
               ),
             ],
           ),
+          if (!missing && trailingAction != null) ...[
+            const SizedBox(width: 8),
+            trailingAction,
+          ],
         ],
       ),
     );
+    if (onTap != null && !missing) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: tile,
+      );
+    }
+    return tile;
   }
 
   // ── section builders ─────────────────────────────────────────────────────────
@@ -2473,6 +2521,21 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
+          Consumer<UserDetailsProvider>(
+            builder: (_, prov, __) => IconButton(
+              icon: prov.isSendingNotification
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.notifications_active_outlined),
+              tooltip: 'Send Notification',
+              onPressed: prov.isSendingNotification
+                  ? null
+                  : _showSendNotificationDialog,
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh',
