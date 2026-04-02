@@ -80,6 +80,11 @@ class _ChatWindowState extends State<ChatWindow> {
   bool _suppressNextAutoScroll = false;
   int? _prevUserId;
 
+  // Floating date indicator (WhatsApp-style)
+  String? _floatingDateLabel;
+  Timer? _floatingDateTimer;
+  List<_ChatMessageDateGroup> _currentMessageGroups = [];
+
   // Match-related data
   Map<String, dynamic>? _matchDetails;
   bool _isLoadingMatchDetails = false;
@@ -105,6 +110,7 @@ class _ChatWindowState extends State<ChatWindow> {
   // Approximate chat row height used for the initial jump before ensureVisible
   // performs the precise final alignment on the mounted target widget.
   static const double _kEstimatedMessageExtent = 112;
+  static const double _kDateHeaderExtent = _ChatDateHeaderDelegate.kExtent;
   static const int _kMaxLoadAttempts = 20;
   static const int _kMaxContextFindAttempts = 6;
   static const Duration _kLoadRetryDelay = Duration(milliseconds: 250);
@@ -1245,7 +1251,9 @@ class _ChatWindowState extends State<ChatWindow> {
             _buildMatchInfoPanel(chatProvider),
 
           Expanded(
-            child: StreamBuilder<QuerySnapshot>(
+            child: Stack(
+              children: [
+                StreamBuilder<QuerySnapshot>(
               stream: _messagesStream,
               builder: (context, snapshot) {
                 if (snapshot.hasError) {
@@ -1351,6 +1359,10 @@ class _ChatWindowState extends State<ChatWindow> {
                     ),
                   );
                 final messageGroups = _groupMessagesByDate(messages);
+                // Keep a reference so the floating date overlay can use it.
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (mounted) setState(() => _currentMessageGroups = messageGroups);
+                });
                 final shouldAutoScroll = _shouldAutoScrollToBottom(
                   hasSnapshotData: snapshot.hasData,
                   isSearching: isActiveSearch,
@@ -1364,7 +1376,17 @@ class _ChatWindowState extends State<ChatWindow> {
                   });
                 }
 
-                return CustomScrollView(
+                return NotificationListener<ScrollUpdateNotification>(
+                  onNotification: (notification) {
+                    final offset = _scrollController.hasClients
+                        ? _scrollController.offset
+                        : 0.0;
+                    final label = _dateGroupAtScrollOffset(
+                        offset, _currentMessageGroups);
+                    if (label != null) _showFloatingDateLabel(label);
+                    return false;
+                  },
+                  child: CustomScrollView(
                   controller: _scrollController,
                   slivers: [
                     if (_hasMoreMessages || _isLoadingMore)
@@ -1394,7 +1416,7 @@ class _ChatWindowState extends State<ChatWindow> {
                       ),
                     for (final group in messageGroups) ...[
                       SliverPersistentHeader(
-                        pinned: true,
+                        pinned: false,
                         delegate: _ChatDateHeaderDelegate(
                           label: group.headerLabel,
                           backgroundColor: c.bg,
@@ -1473,9 +1495,48 @@ class _ChatWindowState extends State<ChatWindow> {
                     ],
                     const SliverToBoxAdapter(child: SizedBox(height: 12)),
                   ],
+                  ),
                 );
               },
             ),
+            // WhatsApp-style floating date indicator
+            if (_floatingDateLabel != null)
+              Positioned(
+                top: 8,
+                left: 0,
+                right: 0,
+                child: Center(
+                  child: IgnorePointer(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: c.primaryLight,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: c.border, width: 0.5),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.08),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        _floatingDateLabel!,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: c.text,
+                          letterSpacing: 0.3,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
           ),
           _buildMessageInput(chatProvider),
         ],
@@ -1800,6 +1861,30 @@ class _ChatWindowState extends State<ChatWindow> {
     }
 
     return groups;
+  }
+
+  /// Returns the headerLabel of the date group that is visible near the top of
+  /// the viewport given the current [offset] and the rendered [groups].
+  String? _dateGroupAtScrollOffset(
+      double offset, List<_ChatMessageDateGroup> groups) {
+    if (groups.isEmpty) return null;
+    const double msgH = _kEstimatedMessageExtent;
+    double pos = 0;
+    for (final group in groups) {
+      final groupH = _kDateHeaderExtent + group.messages.length * msgH;
+      if (offset < pos + groupH) return group.headerLabel;
+      pos += groupH;
+    }
+    return groups.last.headerLabel;
+  }
+
+  void _showFloatingDateLabel(String label) {
+    _floatingDateTimer?.cancel();
+    if (!mounted) return;
+    setState(() => _floatingDateLabel = label);
+    _floatingDateTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) setState(() => _floatingDateLabel = null);
+    });
   }
 
   bool _shouldAutoScrollToBottom({
@@ -3373,6 +3458,7 @@ class _ChatWindowState extends State<ChatWindow> {
     _removeCallOverlay();
     _typingTimer?.cancel();
     _replyHighlightTimer?.cancel();
+    _floatingDateTimer?.cancel();
     _typingSubscription?.cancel();
     _clearAdminTypingStatus();
     _scrollController.dispose();
@@ -3622,9 +3708,11 @@ class _ChatMessageDateGroup {
 }
 
 // ---------------------------------------------------------------------------
-// Pinned sliver header that shows the date chip between message groups.
+// Inline (non-pinned) sliver header that shows the date chip between message groups.
 // ---------------------------------------------------------------------------
 class _ChatDateHeaderDelegate extends SliverPersistentHeaderDelegate {
+  static const double kExtent = 36.0;
+
   final String label;
   final Color backgroundColor;
   final Color chipColor;
@@ -3640,10 +3728,10 @@ class _ChatDateHeaderDelegate extends SliverPersistentHeaderDelegate {
   });
 
   @override
-  double get minExtent => 36;
+  double get minExtent => kExtent;
 
   @override
-  double get maxExtent => 36;
+  double get maxExtent => kExtent;
 
   @override
   Widget build(
