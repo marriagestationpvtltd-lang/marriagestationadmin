@@ -1972,7 +1972,23 @@ class _UserDetailsScreenState extends State<UserDetailsScreen> {
               ),
             ),
           ),
-          if (isExpanded || !collapsible)
+          if (!collapsible)
+            Consumer<DocumentsProvider>(
+              builder: (_, dp, __) => dp.isLoading
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : IconButton(
+                      icon: const Icon(Icons.refresh, size: 16),
+                      color: _kDocs,
+                      tooltip: 'Refresh documents',
+                      onPressed: () => dp.fetchDocuments(),
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(),
+                    ),
+            )
+          else if (isExpanded)
             Consumer<DocumentsProvider>(
               builder: (_, dp, __) => dp.isLoading
                   ? const SizedBox(
