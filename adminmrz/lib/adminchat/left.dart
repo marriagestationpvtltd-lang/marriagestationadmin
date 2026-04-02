@@ -1031,7 +1031,6 @@ class _ChatSidebarState extends State<ChatSidebar> {
                                     ?['lastMessage'] ??
                                 user["chat_message"] ??
                                 "",
-                            int.tryParse(user["matches"].toString()) ?? 0,
                             user["last_seen_text"] ?? "",
                             user["is_paid"] ?? false,
                             user["is_online"] ?? false,
@@ -1062,7 +1061,6 @@ class _ChatSidebarState extends State<ChatSidebar> {
     String name,
     String userId,
     String chatMessage,
-    int matches,
     String lastSeen,
     bool isPaid,
     bool isOnline,
@@ -1082,14 +1080,12 @@ class _ChatSidebarState extends State<ChatSidebar> {
           color: isSelected
               ? c.selectedRow
               : hasUnread
-                  ? const Color(0xFF25D366).withOpacity(0.06)
+                  ? c.primaryLight
                   : c.sidebar,
           border: isSelected
               ? Border(left: BorderSide(color: c.primary, width: 3))
               : hasUnread
-                  ? Border(
-                      left: const BorderSide(
-                          color: Color(0xFF25D366), width: 3))
+                  ? Border(left: BorderSide(color: c.primary, width: 3))
                   : null,
         ),
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 12),
@@ -1195,56 +1191,31 @@ class _ChatSidebarState extends State<ChatSidebar> {
               ),
             ),
 
-            // Right column: unread badge + matches badge
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                // WhatsApp-style unread count badge
-                if (hasUnread)
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 4),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF25D366),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
+            // Right column: unread message count badge
+            if (hasUnread)
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: c.primaryLight,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.favorite, color: c.primary, size: 10),
+                    const SizedBox(width: 2),
+                    Text(
                       unreadCount > _maxUnreadBadge ? '$_maxUnreadBadge+' : '$unreadCount',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 10,
-                        fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                        fontWeight: FontWeight.w600,
+                        color: c.primary,
                       ),
                     ),
-                  ),
-                if (matches > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: c.primaryLight,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(Icons.favorite, color: c.primary, size: 10),
-                        const SizedBox(width: 2),
-                        Text(
-                          '$matches',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: c.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
