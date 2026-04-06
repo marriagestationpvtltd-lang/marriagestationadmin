@@ -17,8 +17,16 @@ define('SOCKET_SERVER_URL', 'http://localhost:3001/internal/emit');
 /**
  * Internal shared secret — must match INTERNAL_SECRET in the Node.js .env file.
  * Store this in a config file or environment variable in production.
+ * The function will throw if the variable is not set.
  */
-define('SOCKET_INTERNAL_SECRET', getenv('SOCKET_INTERNAL_SECRET') ?: 'change_me_to_a_strong_secret');
+function getInternalSecret(): string
+{
+    $secret = getenv('SOCKET_INTERNAL_SECRET');
+    if ($secret === false || $secret === '') {
+        throw new \RuntimeException('SOCKET_INTERNAL_SECRET env variable is not set.');
+    }
+    return $secret;
+}
 
 /**
  * Emit a Socket.IO event from PHP.
@@ -41,10 +49,10 @@ function socketEmit(string $event, array $data, ?string $room = null): bool
         CURLOPT_POST           => true,
         CURLOPT_POSTFIELDS     => $payload,
         CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT        => 3,          // Fast fire-and-forget
+        CURLOPT_TIMEOUT_MS     => 1000,       // 1 second max to avoid blocking the PHP thread
         CURLOPT_HTTPHEADER     => [
             'Content-Type: application/json',
-            'X-Internal-Secret: ' . SOCKET_INTERNAL_SECRET,
+            'X-Internal-Secret: ' . getInternalSecret(),
         ],
     ]);
 

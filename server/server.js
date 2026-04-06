@@ -14,7 +14,13 @@ const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
   .split(',')
   .map((o) => o.trim())
   .filter(Boolean);
-const INTERNAL_SECRET = process.env.INTERNAL_SECRET || 'change_me';
+
+// Require INTERNAL_SECRET to be explicitly configured — no insecure default.
+const INTERNAL_SECRET = process.env.INTERNAL_SECRET;
+if (!INTERNAL_SECRET) {
+  console.error('[Config] INTERNAL_SECRET env variable is not set. Exiting.');
+  process.exit(1);
+}
 
 // ── MySQL connection pool ─────────────────────────────────────────────────────
 const db = mysql.createPool({
@@ -30,12 +36,18 @@ const db = mysql.createPool({
 // ── Express + Socket.IO ───────────────────────────────────────────────────────
 const app = express();
 app.use(express.json());
-app.use(cors({ origin: ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS : '*' }));
+
+// Require explicit ALLOWED_ORIGINS in production to avoid broad CORS access.
+if (!ALLOWED_ORIGINS.length) {
+  console.warn('[Config] ALLOWED_ORIGINS is not set — allowing all origins (development only).');
+}
+const corsOrigin = ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS : false;
+app.use(cors({ origin: corsOrigin }));
 
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: ALLOWED_ORIGINS.length ? ALLOWED_ORIGINS : '*',
+    origin: corsOrigin,
     methods: ['GET', 'POST'],
   },
   transports: ['websocket', 'polling'],
@@ -107,8 +119,7 @@ io.on('connection', (socket) => {
     try {
       await db.execute(
         `INSERT INTO socket_messages (room_id, sender_id, receiver_id, message, message_type, created_at)
-         VALUES (?, ?, ?, ?, ?, NOW())
-         ON DUPLICATE KEY UPDATE message = VALUES(message)`,
+         VALUES (?, ?, ?, ?, ?, NOW())`,
         [roomId, senderId, receiverId, message, msgData.messageType]
       );
     } catch (err) {
@@ -166,7 +177,8 @@ app.post('/internal/emit', (req, res) => {
     io.emit(event, data);
   }
 
-  console.log(`[Internal] Emitted "${event}"`, room ? `→ room ${room}` : '(broadcast)');
+  const target = room ? `room ${room}` : '(broadcast)';
+  console.log('[Internal] Emitted event to', target);
   return res.json({ ok: true });
 });
 

@@ -41,9 +41,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
     _loadUserData();
     OnlineStatusService().start();
 
-    // Listen for incoming messages to trigger a UI refresh (badge update etc.)
+    // Listen for incoming messages directed at this user to refresh unread badges.
     _newMessageSub = SocketService.instance.onNewMessage.listen((data) {
-      if (mounted) setState(() {});
+      final receiverId = data['receiverId']?.toString();
+      if (mounted && receiverId != null && receiverId == userId) {
+        setState(() {});
+      }
     });
   }
 

@@ -29,6 +29,8 @@ class SocketService {
 
   // Per-room typing debounce timers
   final Map<String, Timer?> _typingTimers = {};
+  // Per-room last emit timestamp for local emit debounce
+  final Map<String, DateTime> _lastTypingEmit = {};
 
   // ── Stream controllers ────────────────────────────────────────────────────
   final StreamController<Map<String, dynamic>> _newMessageCtrl =
@@ -81,7 +83,7 @@ class SocketService {
           .setTransports(['websocket', 'polling'])
           .enableAutoConnect()
           .enableReconnection()
-          .setReconnectionAttempts(double.infinity)
+          .setReconnectionAttempts(15)
           .setReconnectionDelay(2000)
           .setExtraHeaders({'Authorization': token})
           .setQuery({'userId': _currentUserId})
@@ -96,6 +98,7 @@ class SocketService {
   void disconnect() {
     _typingTimers.forEach((_, t) => t?.cancel());
     _typingTimers.clear();
+    _lastTypingEmit.clear();
     _socket?.disconnect();
     _socket?.dispose();
     _socket = null;
@@ -141,11 +144,21 @@ class SocketService {
   // ── Typing helpers ────────────────────────────────────────────────────────
 
   /// Call on every keystroke; automatically sends a stop event after [debounce].
-  void sendTypingStart(String roomId, {Duration debounce = const Duration(seconds: 2)}) {
-    _emit(SocketEvents.typingStart, {
-      'roomId': roomId,
-      'userId': _currentUserId,
-    });
+  /// Emits at most once per [emitInterval] to avoid excessive traffic.
+  void sendTypingStart(
+    String roomId, {
+    Duration debounce = const Duration(seconds: 2),
+    Duration emitInterval = const Duration(milliseconds: 300),
+  }) {
+    final now = DateTime.now();
+    final last = _lastTypingEmit[roomId];
+    if (last == null || now.difference(last) >= emitInterval) {
+      _lastTypingEmit[roomId] = now;
+      _emit(SocketEvents.typingStart, {
+        'roomId': roomId,
+        'userId': _currentUserId,
+      });
+    }
     _typingTimers[roomId]?.cancel();
     _typingTimers[roomId] = Timer(debounce, () {
       sendTypingStop(roomId);
