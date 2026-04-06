@@ -21,6 +21,8 @@ import '../otherenew/othernew.dart';
 import '../otherenew/service.dart';
 import '../pushnotification/pushservice.dart';
 import '../webrtc/webrtc.dart';
+import '../service/socket_service.dart';
+import '../service/socket_events.dart';
 
 class ChatDetailScreen extends StatefulWidget {
   final String chatRoomId;
@@ -93,6 +95,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
   List<Map<String, dynamic>> _cachedMessages = [];
   bool _isFirstLoad = true;
 
+  // Socket.IO — typing indicator & message notifications
+  bool _isOtherTyping = false;
+  StreamSubscription<Map<String, dynamic>>? _typingSubscription;
+  StreamSubscription<Map<String, dynamic>>? _newMessageSubscription;
+
   @override
   void initState() {
     super.initState();
@@ -125,6 +132,27 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
 
     _checkBlockStatus(); // Add this line
 
+    // Socket.IO: join this chat room and subscribe to typing/message events
+    final socketSvc = SocketService.instance;
+    socketSvc.joinRoom(widget.chatRoomId);
+
+    _typingSubscription = socketSvc.onTypingStatus.listen((data) {
+      if (data['roomId'] == widget.chatRoomId &&
+          data['userId']?.toString() == widget.receiverId) {
+        if (mounted) {
+          setState(() {
+            _isOtherTyping = data['isTyping'] == true;
+          });
+        }
+      }
+    });
+
+    // When a new real-time message arrives for this room, scroll to bottom.
+    _newMessageSubscription = socketSvc.onNewMessage.listen((data) {
+      if (data['roomId'] == widget.chatRoomId && mounted) {
+        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
+      }
+    });
   }
   Future<void> _checkBlockStatus() async {
     final prefs = await SharedPreferences.getInstance();
@@ -148,6 +176,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
   }
   @override
   void dispose() {
+    // Socket.IO: leave room and cancel subscriptions
+    SocketService.instance.leaveRoom(widget.chatRoomId);
+    SocketService.instance.sendTypingStop(widget.chatRoomId);
+    _typingSubscription?.cancel();
+    _newMessageSubscription?.cancel();
+
     // Clear chat active state when screen closes
     ScreenStateManager().onChatScreenClosed();
     WidgetsBinding.instance.removeObserver(this);
@@ -1306,6 +1340,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
                             if (mounted) {
                               setState(() {});
                             }
+                            // Emit typing indicator via Socket.IO
+                            if (!isEditing) {
+                              SocketService.instance
+                                  .sendTypingStart(widget.chatRoomId);
+                            }
                           },
                           onSubmitted: (_) => isEditing ? _editMessage() : _sendMessage(),
                         ),
@@ -1662,12 +1701,27 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
           ),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              "${widget.receiverName}",
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 17),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  "${widget.receiverName}",
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 17),
+                ),
+                if (_isOtherTyping)
+                  const Text(
+                    'typing...',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+              ],
             ),
           ),
           GestureDetector(

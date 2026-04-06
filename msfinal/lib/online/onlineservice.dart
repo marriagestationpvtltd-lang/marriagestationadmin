@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../service/socket_service.dart';
 
 class OnlineStatusService {
   static final OnlineStatusService _instance = OnlineStatusService._internal();
@@ -21,6 +22,11 @@ class OnlineStatusService {
     _timer = Timer.periodic(const Duration(seconds: 30), (timer) {
       _updateNow();
     });
+
+    // Ensure Socket.IO is connected so real-time presence events are received.
+    if (!SocketService.instance.isConnected) {
+      SocketService.instance.connect();
+    }
   }
 
   /// 🛑 Stop tracking (optional)

@@ -22,6 +22,7 @@ import 'otherenew/othernew.dart';
 import 'otherenew/service.dart';
 import 'theme/app_theme.dart';
 import 'firebase_options.dart';
+import 'service/socket_service.dart';
 
 final navigatorKey = GlobalKey<NavigatorState>();
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
@@ -478,6 +479,10 @@ void main() async {
   if (!kIsWeb) {
     await initLocalNotifications();
   }
+
+  // Connect Socket.IO (auto-reads token + userId from SharedPreferences).
+  // Safe to call here — it is a no-op when no user session exists yet.
+  SocketService.instance.connect();
 
   runApp(
     MultiProvider(
