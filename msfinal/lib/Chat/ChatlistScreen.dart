@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
@@ -11,6 +12,7 @@ import '../Models/masterdata.dart';
 import '../Package/PackageScreen.dart';
 import '../online/onlineservice.dart';
 import '../service/Service_chat.dart';
+import '../service/socket_service.dart';
 import 'ChatdetailsScreen.dart';
 import 'adminchat.dart';
 
@@ -30,12 +32,28 @@ class _ChatListScreenState extends State<ChatListScreen> {
   bool isLoading = true;
   String docstatus = '';
 
+  // Socket.IO — badge bump when a new message arrives
+  StreamSubscription<Map<String, dynamic>>? _newMessageSub;
+
   @override
   void initState() {
     super.initState();
     _loadUserData();
     OnlineStatusService().start();
 
+    // Listen for incoming messages directed at this user to refresh unread badges.
+    _newMessageSub = SocketService.instance.onNewMessage.listen((data) {
+      final receiverId = data['receiverId']?.toString();
+      if (mounted && receiverId != null && receiverId == userId) {
+        setState(() {});
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _newMessageSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadUserData() async {
