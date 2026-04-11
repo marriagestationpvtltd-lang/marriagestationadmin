@@ -1361,11 +1361,9 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                   }
 
                   if (_isFirstLoad) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      setState(() {
-                        _isFirstLoad = false;
-                      });
-                    });
+                    // Mark first load complete without triggering an extra
+                    // rebuild — avoids the double-render flicker on open.
+                    _isFirstLoad = false;
                   }
 
                   return Container(

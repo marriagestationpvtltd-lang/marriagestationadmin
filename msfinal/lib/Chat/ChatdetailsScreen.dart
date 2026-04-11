@@ -99,6 +99,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
   bool _isOtherTyping = false;
   StreamSubscription<Map<String, dynamic>>? _typingSubscription;
 
+  // Presence / online-status
+  bool _isReceiverOnline = false;
+  String _receiverLastSeen = '';
+  StreamSubscription<DocumentSnapshot>? _presenceSubscription;
+
   // Emoji reactions
   static const List<String> _reactionEmojis = ['❤️', '😂', '😮', '😢', '👍', '🙏'];
 
@@ -152,6 +157,32 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
     // Incoming messages are reflected through the Firestore stream listener.
     // We do NOT subscribe to onNewMessage for scroll purposes so that the
     // user's scroll position is kept frozen after the initial load.
+
+    // Subscribe to receiver's Firestore presence document for online status.
+    _presenceSubscription = _firestore
+        .collection('users')
+        .doc(widget.receiverId)
+        .snapshots()
+        .listen((doc) {
+      if (!mounted) return;
+      final data = doc.data();
+      if (data == null) return;
+      final online = data['isOnline'] == true;
+      final lastSeen = data['lastSeen'];
+      String lastSeenText = '';
+      if (!online && lastSeen != null) {
+        final dt = lastSeen is Timestamp
+            ? lastSeen.toDate()
+            : DateTime.tryParse(lastSeen.toString());
+        if (dt != null) {
+          lastSeenText = 'Last seen ${DateFormat('hh:mm a').format(dt)}';
+        }
+      }
+      setState(() {
+        _isReceiverOnline = online;
+        _receiverLastSeen = lastSeenText;
+      });
+    });
   }
   Future<void> _checkBlockStatus() async {
     final prefs = await SharedPreferences.getInstance();
@@ -179,6 +210,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
     SocketService.instance.leaveRoom(widget.chatRoomId);
     SocketService.instance.sendTypingStop(widget.chatRoomId);
     _typingSubscription?.cancel();
+    _presenceSubscription?.cancel();
 
     // Clear chat active state when screen closes
     ScreenStateManager().onChatScreenClosed();
@@ -1695,13 +1727,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
         }
 
         if (snapshot.connectionState == ConnectionState.waiting) {
-          if (_isFirstLoad) {
-            return const Center(
-              child: CircularProgressIndicator(color: Color(0xFFE53935)),
-            );
-          } else {
-            return _buildMessagesFromCache();
-          }
+          // Always show cached messages (even if empty) to avoid the layout
+          // shift that a centred loading spinner causes when messages arrive.
+          return _buildMessagesFromCache();
         }
 
         final messages = snapshot.data!.docs;
@@ -1944,10 +1972,30 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
             onTap: (){
               Navigator.push(context, MaterialPageRoute(builder: (context) => ProfileScreen(userId: widget.receiverId,),));
             },
-            child: CircleAvatar(
-              radius: 22,
-              backgroundImage: NetworkImage(
-                  widget.receiverImage),
+            child: Stack(
+              clipBehavior: Clip.none,
+              children: [
+                CircleAvatar(
+                  radius: 22,
+                  backgroundImage: NetworkImage(
+                      widget.receiverImage),
+                ),
+                Positioned(
+                  bottom: 1,
+                  right: 1,
+                  child: Container(
+                    width: 12,
+                    height: 12,
+                    decoration: BoxDecoration(
+                      color: _isReceiverOnline
+                          ? const Color(0xFF4ADE80)
+                          : Colors.grey.shade400,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 2),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
           const SizedBox(width: 10),
@@ -1970,6 +2018,20 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
                       color: Colors.white70,
                       fontSize: 12,
                       fontStyle: FontStyle.italic,
+                    ),
+                  )
+                else
+                  Text(
+                    _isReceiverOnline
+                        ? 'Online'
+                        : _receiverLastSeen.isNotEmpty
+                            ? _receiverLastSeen
+                            : 'Offline',
+                    style: TextStyle(
+                      color: _isReceiverOnline
+                          ? const Color(0xFF86EFAC)
+                          : Colors.white60,
+                      fontSize: 12,
                     ),
                   ),
               ],
