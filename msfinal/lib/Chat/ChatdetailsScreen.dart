@@ -641,6 +641,62 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
     }
   }
 
+  /// Shows a bottom sheet emoji picker for a specific message (one-click, no long press needed).
+  void _showEmojiPickerSheet(
+      String messageId, Map<String, dynamic> reactions) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: _reactionEmojis.map((emoji) {
+                final myReaction = reactions[widget.currentUserId] as String?;
+                final isSelected = myReaction == emoji;
+                return GestureDetector(
+                  onTap: () {
+                    _addReaction(messageId, emoji);
+                    Navigator.pop(ctx);
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? Colors.white.withOpacity(0.2)
+                          : Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(emoji,
+                        style: TextStyle(fontSize: isSelected ? 32 : 28)),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildReactionChips(Map<String, dynamic> reactions, String messageId, bool isMine) {
     if (reactions.isEmpty) return const SizedBox.shrink();
 
@@ -1038,6 +1094,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
   }) {
     final time = _formatTime(timestamp);
     final userName = isMine ? widget.currentUserName : widget.receiverName;
+    final messageId = messageData['messageId'] as String? ?? '';
 
     final messageContent = GestureDetector(
       onLongPress: () {
@@ -1055,6 +1112,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
           crossAxisAlignment: CrossAxisAlignment.end,
           mainAxisAlignment: isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
           children: [
+            // One-click emoji button on the LEFT for my messages
+            if (isMine) ...[
+              _buildInlineEmojiButton(messageId, reactions ?? {}),
+              const SizedBox(width: 4),
+            ],
             Column(
               crossAxisAlignment: isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
               children: [
@@ -1185,11 +1247,16 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
                 if (reactions != null && reactions.isNotEmpty)
                   _buildReactionChips(
                     reactions,
-                    messageData['messageId'] as String,
+                    messageId,
                     isMine,
                   ),
               ],
             ),
+            // One-click emoji button on the RIGHT for received messages
+            if (!isMine) ...[
+              const SizedBox(width: 4),
+              _buildInlineEmojiButton(messageId, reactions ?? {}),
+            ],
             if (isMine) ...[
               const SizedBox(width: 10),
             ],
@@ -1202,6 +1269,39 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
       child: messageContent,
       messageData: messageData,
       isMine: isMine,
+    );
+  }
+
+  /// Small one-click emoji reaction button beside each bubble.
+  /// Single tap → opens emoji picker; shows current reaction emoji if set.
+  Widget _buildInlineEmojiButton(
+      String messageId, Map<String, dynamic> reactions) {
+    final myReaction = reactions[widget.currentUserId] as String?;
+    return GestureDetector(
+      onTap: () => _showEmojiPickerSheet(messageId, reactions),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          color: myReaction != null
+              ? const Color(0xFFE53935).withOpacity(0.10)
+              : Colors.grey.withOpacity(0.08),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: myReaction != null
+                ? const Color(0xFFE53935).withOpacity(0.30)
+                : Colors.grey.withOpacity(0.18),
+            width: 1,
+          ),
+        ),
+        child: Center(
+          child: myReaction != null
+              ? Text(myReaction, style: const TextStyle(fontSize: 15))
+              : Icon(Icons.add_reaction_outlined,
+                  size: 15, color: Colors.grey[500]),
+        ),
+      ),
     );
   }
 

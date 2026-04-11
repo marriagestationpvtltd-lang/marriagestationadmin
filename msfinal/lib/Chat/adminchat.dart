@@ -527,152 +527,192 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
     final bool legacyLiked =
         (data['liked'] ?? false) && reactions.isEmpty;
 
-    return GestureDetector(
-      onDoubleTap: () => _showReactionPicker(context, msgID, reactions),
-      onLongPress: () => _showReactionPicker(
-        context,
-        msgID,
-        reactions,
-        onReply: () => _setReplyTo(msgID, data),
-      ),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-        child: Row(
-          mainAxisAlignment:
-              isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            if (!isMe)
-              CircleAvatar(
-                backgroundColor: Colors.transparent,
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient:
-                        isFromAdmin ? _primaryGradient : _secondaryGradient,
-                  ),
-                  child: Icon(
-                    isFromAdmin ? Icons.support_agent : Icons.person,
-                    color: Colors.white,
-                  ),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+      child: Row(
+        mainAxisAlignment:
+            isMe ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!isMe)
+            CircleAvatar(
+              backgroundColor: Colors.transparent,
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient:
+                      isFromAdmin ? _primaryGradient : _secondaryGradient,
                 ),
-              ),
-            const SizedBox(width: 8),
-            Flexible(
-              child: Column(
-                crossAxisAlignment:
-                    isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                children: [
-                  if (!isMe)
-                    Padding(
-                      padding: const EdgeInsets.only(left: 12, bottom: 6),
-                      child: Text(
-                        senderName,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: _lightTextColor,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ),
-                  Container(
-                    constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.75),
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      gradient: isMe ? _primaryGradient : _secondaryGradient,
-                      borderRadius: BorderRadius.only(
-                        topLeft: const Radius.circular(20),
-                        topRight: const Radius.circular(20),
-                        bottomLeft: isMe
-                            ? const Radius.circular(20)
-                            : const Radius.circular(4),
-                        bottomRight: isMe
-                            ? const Radius.circular(4)
-                            : const Radius.circular(20),
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.15),
-                          blurRadius: 8,
-                          offset: const Offset(0, 3),
-                        )
-                      ],
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        if (data['replyto'] != null &&
-                            data['replyto'].toString().isNotEmpty) ...[
-                          _buildReplyPreview(data['replyto'], isMe),
-                          const SizedBox(height: 8),
-                        ],
-                        if (data['type'] == 'text')
-                          Text(
-                            data['message'],
-                            style: TextStyle(
-                              color: isMe ? Colors.white : _textColor,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w400,
-                            ),
-                          ),
-                        if (data['type'] == 'voice')
-                          _buildVoiceMessage(data['message'], isMe),
-                        if (data['type'] == 'doc')
-                          _buildDocumentMessage(data['message'], isMe),
-                        if (data['type'] == 'image')
-                          _buildImageMessage(data['imageUrl'], isMe),
-                        if (data['type'] == 'profile_card')
-                          _buildProfileCardMessage(data['profileData'], isMe),
-                        const SizedBox(height: 6),
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              formattedTime,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: isMe ? Colors.white70 : _lightTextColor,
-                              ),
-                            ),
-                            // Legacy liked indicator (when no reactions map yet)
-                            if (legacyLiked)
-                              Padding(
-                                padding: const EdgeInsets.only(left: 8),
-                                child: Icon(Icons.favorite,
-                                    size: 16,
-                                    color: isMe ? Colors.white : _accentColor),
-                              ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Reaction chips below bubble
-                  if (reactions.isNotEmpty)
-                    _buildReactionChips(reactions, msgID, isMe),
-                ],
+                child: Icon(
+                  isFromAdmin ? Icons.support_agent : Icons.person,
+                  color: Colors.white,
+                ),
               ),
             ),
-            if (isMe) const SizedBox(width: 8),
-            if (isMe)
-              CircleAvatar(
-                backgroundColor: Colors.transparent,
-                child: Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient:
-                        widget.isAdmin ? _primaryGradient : _secondaryGradient,
+          const SizedBox(width: 8),
+          // One-click emoji reaction button (left side for my messages)
+          if (isMe) ...[
+            _buildInlineEmojiButton(msgID, reactions,
+                onReply: () => _setReplyTo(msgID, data)),
+            const SizedBox(width: 4),
+          ],
+          Flexible(
+            child: Column(
+              crossAxisAlignment:
+                  isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                if (!isMe)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 12, bottom: 6),
+                    child: Text(
+                      senderName,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: _lightTextColor,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
-                  child: Icon(
-                    widget.isAdmin ? Icons.support_agent : Icons.person,
-                    color: Colors.white,
+                Container(
+                  constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.75),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: isMe ? _primaryGradient : _secondaryGradient,
+                    borderRadius: BorderRadius.only(
+                      topLeft: const Radius.circular(20),
+                      topRight: const Radius.circular(20),
+                      bottomLeft: isMe
+                          ? const Radius.circular(20)
+                          : const Radius.circular(4),
+                      bottomRight: isMe
+                          ? const Radius.circular(4)
+                          : const Radius.circular(20),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      )
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      if (data['replyto'] != null &&
+                          data['replyto'].toString().isNotEmpty) ...[
+                        _buildReplyPreview(data['replyto'], isMe),
+                        const SizedBox(height: 8),
+                      ],
+                      if (data['type'] == 'text')
+                        Text(
+                          data['message'],
+                          style: TextStyle(
+                            color: isMe ? Colors.white : _textColor,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w400,
+                          ),
+                        ),
+                      if (data['type'] == 'voice')
+                        _buildVoiceMessage(data['message'], isMe),
+                      if (data['type'] == 'doc')
+                        _buildDocumentMessage(data['message'], isMe),
+                      if (data['type'] == 'image')
+                        _buildImageMessage(data['imageUrl'], isMe),
+                      if (data['type'] == 'profile_card')
+                        _buildProfileCardMessage(data['profileData'], isMe),
+                      const SizedBox(height: 6),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            formattedTime,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isMe ? Colors.white70 : _lightTextColor,
+                            ),
+                          ),
+                          // Legacy liked indicator (when no reactions map yet)
+                          if (legacyLiked)
+                            Padding(
+                              padding: const EdgeInsets.only(left: 8),
+                              child: Icon(Icons.favorite,
+                                  size: 16,
+                                  color: isMe ? Colors.white : _accentColor),
+                            ),
+                        ],
+                      ),
+                    ],
                   ),
                 ),
-              ),
+                // Reaction chips below bubble
+                if (reactions.isNotEmpty)
+                  _buildReactionChips(reactions, msgID, isMe),
+              ],
+            ),
+          ),
+          // One-click emoji reaction button (right side for received messages)
+          if (!isMe) ...[
+            const SizedBox(width: 4),
+            _buildInlineEmojiButton(msgID, reactions,
+                onReply: () => _setReplyTo(msgID, data)),
           ],
+          if (isMe) const SizedBox(width: 8),
+          if (isMe)
+            CircleAvatar(
+              backgroundColor: Colors.transparent,
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient:
+                      widget.isAdmin ? _primaryGradient : _secondaryGradient,
+                ),
+                child: Icon(
+                  widget.isAdmin ? Icons.support_agent : Icons.person,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Small one-click emoji reaction button that appears beside each message bubble.
+  /// Single tap → opens emoji picker sheet; shows current reaction if set.
+  Widget _buildInlineEmojiButton(
+      String msgId, Map<String, dynamic> reactions,
+      {VoidCallback? onReply}) {
+    final myReaction = reactions[widget.senderID] as String?;
+    return GestureDetector(
+      onTap: () => _showReactionPicker(context, msgId, reactions,
+          onReply: onReply),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: 30,
+        height: 30,
+        decoration: BoxDecoration(
+          color: myReaction != null
+              ? _primaryGradient.colors[0].withOpacity(0.12)
+              : Colors.grey.withOpacity(0.08),
+          shape: BoxShape.circle,
+          border: Border.all(
+            color: myReaction != null
+                ? _primaryGradient.colors[0].withOpacity(0.35)
+                : Colors.grey.withOpacity(0.18),
+            width: 1,
+          ),
+        ),
+        child: Center(
+          child: myReaction != null
+              ? Text(myReaction,
+                  style: const TextStyle(fontSize: 15))
+              : Icon(Icons.add_reaction_outlined,
+                  size: 15,
+                  color: Colors.grey[500]),
         ),
       ),
     );
