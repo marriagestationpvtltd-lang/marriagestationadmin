@@ -96,7 +96,6 @@ class _IncomingVideoCallScreenState extends State<IncomingVideoCallScreen>
   }
 
   // ================= ACCEPT CALL =================
-// ================= ACCEPT CALL =================
   Future<void> _acceptCall() async {
     if (_processing) return;
     _processing = true;
