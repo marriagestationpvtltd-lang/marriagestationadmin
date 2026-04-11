@@ -50,6 +50,12 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
   bool _isFirstLoad = true;
   bool _profileCardSent = false; // Track if profile card was sent
 
+  // Pagination -- start with 30 messages, load 20 more when scrolling to top
+  static const int _messageBatchSize = 20;
+  static const double _scrollThreshold = 300;
+  int _messageLimit = 30;
+  bool _isLoadingMore = false;
+
 // Updated color scheme with gradients
   final LinearGradient _primaryGradient = const LinearGradient(
     colors: [Color(0xFF6B46C1), Color(0xFF9F7AEA)],
@@ -72,6 +78,9 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _scrollToBottom();
     });
+
+    // Scroll listener for loading older messages when user scrolls to the top
+    _scrollController.addListener(_onScroll);
 
 // Automatically send profile card if provided (optional)
     if (widget.initialProfileData != null && !_profileCardSent) {
@@ -100,6 +109,26 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
     }
   }
 
+  /// Detects when the user scrolls near the top (oldest messages) and triggers
+  /// loading of an additional page of older messages.
+  void _onScroll() {
+    if (!_scrollController.hasClients || _isLoadingMore) return;
+    final pos = _scrollController.position;
+    // reverse:true → position 0 = bottom (newest), maxScrollExtent = top (oldest)
+    if (pos.pixels >= pos.maxScrollExtent - _scrollThreshold) {
+      _loadMoreMessages();
+    }
+  }
+
+  /// Increases the Firestore query limit to load older messages.
+  void _loadMoreMessages() {
+    if (_isLoadingMore) return;
+    setState(() {
+      _isLoadingMore = true;
+      _messageLimit += _messageBatchSize;
+    });
+  }
+
 // FIXED: Correct Firestore query for chat between two users
   Stream<QuerySnapshot> _messagesStream() {
     return FirebaseFirestore.instance
@@ -107,6 +136,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
         .where('senderid', whereIn: [widget.senderID, "1"])
         .where('receiverid', whereIn: [widget.senderID, "1"])
         .orderBy('timestamp', descending: false)
+        .limitToLast(_messageLimit)
         .snapshots();
   }
 
@@ -1592,6 +1622,20 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                     _isFirstLoad = false;
                   }
 
+                  // Reset loading-more flag once the new page of data arrives.
+                  if (_isLoadingMore) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) setState(() => _isLoadingMore = false);
+                    });
+                  }
+
+                  final docs =
+                      snapshot.hasData ? snapshot.data!.docs : <QueryDocumentSnapshot>[];
+                  final int msgCount = docs.length;
+                  // Extra slot at the top (highest index in reverse list) for
+                  // the "loading older messages" spinner.
+                  final int totalCount = msgCount + (_isLoadingMore ? 1 : 0);
+
                   return Container(
                     decoration: BoxDecoration(
                       color: _backgroundColor,
@@ -1604,11 +1648,22 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                       controller: _scrollController,
                       reverse: true,
                       padding: const EdgeInsets.only(top: 16, bottom: 12),
-                      itemCount:
-                          snapshot.hasData ? snapshot.data!.docs.length : 0,
+                      itemCount: totalCount,
                       itemBuilder: (context, index) {
-                        var docs = snapshot.data!.docs;
-                        return _buildMessageItem(docs[docs.length - 1 - index]);
+                        // The last slot is visually at the top — loading indicator.
+                        if (_isLoadingMore && index == msgCount) {
+                          return const Padding(
+                            padding: EdgeInsets.symmetric(vertical: 16),
+                            child: Center(
+                              child: SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              ),
+                            ),
+                          );
+                        }
+                        return _buildMessageItem(docs[msgCount - 1 - index]);
                       },
                     ),
                   );
