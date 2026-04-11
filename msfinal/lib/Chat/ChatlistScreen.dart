@@ -330,14 +330,15 @@ class _ChatListScreenState extends State<ChatListScreen> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
 
-                              // Other Person's Name
+                              // Other Person's Name — ID first, then name truncated
                               Expanded(
                                 child: Text(
-                                  otherPersonName, // This should show "Uttam Acharya"
+                                  '#$otherParticipantId $otherPersonName',
                                   style: const TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
                                   ),
+                                  maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),

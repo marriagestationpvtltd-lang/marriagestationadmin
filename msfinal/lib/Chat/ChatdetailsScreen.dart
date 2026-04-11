@@ -2061,11 +2061,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  "${widget.receiverName}",
+                  '#${widget.receiverId} ${widget.receiverName}',
                   style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
                       fontSize: 17),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 if (_isOtherTyping)
                   const Text(
