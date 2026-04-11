@@ -289,6 +289,161 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
         .update({'liked': !currentLiked});
   }
 
+  // EMOJI REACTIONS
+  static const List<String> _reactionEmojis = ['❤️', '😂', '😮', '😢', '👍', '🙏'];
+
+  Future<void> _addReaction(String messageId, String emoji,
+      Map<String, dynamic> currentReactions) async {
+    final myId = widget.senderID;
+    final reactions = Map<String, dynamic>.from(currentReactions);
+
+    if (reactions[myId] == emoji) {
+      reactions.remove(myId);
+    } else {
+      reactions[myId] = emoji;
+    }
+
+    try {
+      await FirebaseFirestore.instance
+          .collection('adminchat')
+          .doc(messageId)
+          .update({'reactions': reactions});
+    } catch (e) {
+      debugPrint('Error adding reaction: $e');
+    }
+  }
+
+  Widget _buildReactionChips(
+      Map<String, dynamic> reactions, String msgId, bool isMe) {
+    if (reactions.isEmpty) return const SizedBox.shrink();
+
+    final Map<String, int> counts = {};
+    String? myEmoji;
+    for (final entry in reactions.entries) {
+      counts[entry.value as String] = (counts[entry.value] ?? 0) + 1;
+      if (entry.key == widget.senderID) myEmoji = entry.value as String;
+    }
+
+    return Align(
+      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+      child: Wrap(
+        spacing: 4,
+        children: counts.entries.map((e) {
+          final isMyReaction = e.key == myEmoji;
+          return GestureDetector(
+            onTap: () => _addReaction(msgId, e.key, reactions),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              margin: const EdgeInsets.only(top: 3),
+              decoration: BoxDecoration(
+                color: isMyReaction
+                    ? _primaryGradient.colors[0].withOpacity(0.15)
+                    : Colors.grey.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isMyReaction
+                      ? _primaryGradient.colors[0].withOpacity(0.5)
+                      : Colors.grey.withOpacity(0.25),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(e.key, style: const TextStyle(fontSize: 14)),
+                  if (e.value > 1) ...[
+                    const SizedBox(width: 3),
+                    Text(
+                      '${e.value}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isMyReaction
+                            ? _primaryGradient.colors[0]
+                            : Colors.grey[700],
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  void _showReactionPicker(
+      BuildContext context, String msgId, Map<String, dynamic> currentReactions,
+      {VoidCallback? onReply}) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 24),
+        decoration: const BoxDecoration(
+          color: Color(0xFF1E1E1E),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.white24,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: _reactionEmojis.map((emoji) {
+                final myReaction = currentReactions[widget.senderID];
+                final isSelected = myReaction == emoji;
+                return GestureDetector(
+                  onTap: () {
+                    _addReaction(msgId, emoji, currentReactions);
+                    Navigator.pop(ctx);
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 150),
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? Colors.white.withOpacity(0.2)
+                          : Colors.transparent,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text(emoji,
+                        style: TextStyle(
+                            fontSize: isSelected ? 32 : 28)),
+                  ),
+                );
+              }).toList(),
+            ),
+            if (onReply != null) ...[
+              const SizedBox(height: 12),
+              const Divider(color: Colors.white24, height: 1),
+              const SizedBox(height: 4),
+              ListTile(
+                leading: const Icon(Icons.reply, color: Colors.white),
+                title: const Text('Reply',
+                    style: TextStyle(color: Colors.white)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  onReply();
+                },
+              ),
+            ],
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
   Future<void> _setReplyTo(
       String messageID, Map<String, dynamic> messageData) async {
     setState(() {
@@ -364,9 +519,22 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
     String senderName =
         isFromAdmin ? "Admin Support" : (isMe ? "You" : widget.userName);
 
+    final reactions = data['reactions'] != null
+        ? Map<String, dynamic>.from(data['reactions'] as Map)
+        : <String, dynamic>{};
+
+    // Backward compat: show legacy liked heart as a reaction chip
+    final bool legacyLiked =
+        (data['liked'] ?? false) && reactions.isEmpty;
+
     return GestureDetector(
-      onDoubleTap: () => _toggleLike(msgID, data['liked'] ?? false),
-      onLongPress: () => _setReplyTo(msgID, data),
+      onDoubleTap: () => _showReactionPicker(context, msgID, reactions),
+      onLongPress: () => _showReactionPicker(
+        context,
+        msgID,
+        reactions,
+        onReply: () => _setReplyTo(msgID, data),
+      ),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 300),
         margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
@@ -469,7 +637,8 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                                 color: isMe ? Colors.white70 : _lightTextColor,
                               ),
                             ),
-                            if (data['liked'] ?? false)
+                            // Legacy liked indicator (when no reactions map yet)
+                            if (legacyLiked)
                               Padding(
                                 padding: const EdgeInsets.only(left: 8),
                                 child: Icon(Icons.favorite,
@@ -481,6 +650,9 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                       ],
                     ),
                   ),
+                  // Reaction chips below bubble
+                  if (reactions.isNotEmpty)
+                    _buildReactionChips(reactions, msgID, isMe),
                 ],
               ),
             ),
