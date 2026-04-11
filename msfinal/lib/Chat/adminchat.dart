@@ -621,6 +621,8 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
                         _buildImageMessage(data['imageUrl'], isMe),
                       if (data['type'] == 'profile_card')
                         _buildProfileCardMessage(data['profileData'], isMe),
+                      if (data['type'] == 'profile_report')
+                        _buildProfileReportCardMessage(data['reportData'], isMe),
                       const SizedBox(height: 6),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1214,6 +1216,230 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildProfileReportCardMessage(
+      Map<String, dynamic>? reportData, bool isMe) {
+    if (reportData == null) {
+      return Text('Profile Report',
+          style: TextStyle(
+            color: isMe ? Colors.white : _textColor,
+          ));
+    }
+
+    return Container(
+      width: 280,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFEF4444).withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Red header banner
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFFEF4444), Color(0xFFDC2626)],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
+              ),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(15)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(Icons.flag_rounded,
+                      color: Colors.white, size: 14),
+                ),
+                const SizedBox(width: 8),
+                const Text(
+                  'Profile Reported',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    'MS: ${reportData['reportedUserId'] ?? 'N/A'}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          Padding(
+            padding: const EdgeInsets.all(12),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Reported profile info row
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Profile image
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Container(
+                        width: 56,
+                        height: 56,
+                        color: Colors.grey.shade200,
+                        child: reportData['reportedProfileImage'] != null &&
+                                reportData['reportedProfileImage']
+                                    .toString()
+                                    .isNotEmpty
+                            ? Image.network(
+                                reportData['reportedProfileImage'],
+                                width: 56,
+                                height: 56,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => const Icon(
+                                    Icons.person,
+                                    size: 28,
+                                    color: Colors.grey),
+                              )
+                            : const Icon(Icons.person,
+                                size: 28, color: Colors.grey),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            reportData['reportedName'] ?? 'Unknown Profile',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 14,
+                              color: Color(0xFF1F2937),
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 3),
+                          Row(
+                            children: [
+                              const Icon(Icons.person_outline,
+                                  size: 11, color: Color(0xFF6B7280)),
+                              const SizedBox(width: 3),
+                              Expanded(
+                                child: Text(
+                                  'Reported by: ${reportData['reporterName'] ?? 'Anonymous'}',
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: Color(0xFF6B7280),
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              const Icon(Icons.tag,
+                                  size: 11, color: Color(0xFF6B7280)),
+                              const SizedBox(width: 3),
+                              Text(
+                                'Reporter ID: ${reportData['reporterUserId'] ?? 'N/A'}',
+                                style: const TextStyle(
+                                  fontSize: 10,
+                                  color: Color(0xFF6B7280),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+
+                // Divider
+                Divider(
+                    height: 1, color: const Color(0xFFEF4444).withOpacity(0.2)),
+                const SizedBox(height: 8),
+
+                // Reason row
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFFEF2F2),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(Icons.warning_amber_rounded,
+                          size: 14, color: Color(0xFFEF4444)),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'Reason',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF374151),
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            reportData['reason'] ?? 'No reason provided',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF6B7280),
+                            ),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );

@@ -2114,36 +2114,160 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
   }
 
   void _showReportDialog(BuildContext context) {
+    String selectedReason = 'Fake Profile';
+    final List<String> reasons = [
+      'Fake Profile',
+      'Harassment',
+      'Spam',
+      'Inappropriate Content',
+      'Suspicious Activity',
+      'Other',
+    ];
+
     showDialog<void>(
       context: context,
       builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: const Text('Report Profile'),
-          content: const Text(
-              'Are you sure you want to report this profile? This action cannot be undone.'),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () {
-                Navigator.of(dialogContext).pop();
-              },
-              child: const Text('CANCEL'),
-            ),
-            TextButton(
-              onPressed: () {
-                debugPrint('Profile reported!');
-                Navigator.of(dialogContext).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                      content: Text('Profile reported successfully!')),
-                );
-              },
-              child: Text('REPORT',
-                  style: TextStyle(color: Theme.of(context).primaryColor)),
-            ),
-          ],
+        return StatefulBuilder(
+          builder: (ctx, setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.red.shade50,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.flag_rounded,
+                        color: Colors.red.shade600, size: 18),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text('Report Profile',
+                      style: TextStyle(
+                          fontSize: 17, fontWeight: FontWeight.w700)),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Why are you reporting this profile?',
+                    style: TextStyle(fontSize: 13, color: Colors.black54),
+                  ),
+                  const SizedBox(height: 12),
+                  ...reasons.map((reason) => RadioListTile<String>(
+                        dense: true,
+                        contentPadding: EdgeInsets.zero,
+                        value: reason,
+                        groupValue: selectedReason,
+                        title: Text(reason,
+                            style: const TextStyle(fontSize: 13)),
+                        onChanged: (val) {
+                          if (val != null) {
+                            setDialogState(() => selectedReason = val);
+                          }
+                        },
+                        activeColor: Colors.red.shade600,
+                      )),
+                ],
+              ),
+              actions: <Widget>[
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(dialogContext).pop();
+                  },
+                  child: const Text('CANCEL'),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red.shade600,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8)),
+                  ),
+                  onPressed: () async {
+                    Navigator.of(dialogContext).pop();
+                    await _sendReportToAdmin(context, selectedReason);
+                  },
+                  child: const Text('REPORT'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
+  }
+
+  Future<void> _sendReportToAdmin(
+      BuildContext context, String reason) async {
+    try {
+      final reportData = {
+        'reportedUserId': widget.receiverId,
+        'reportedName': widget.receiverName,
+        'reportedProfileImage': widget.receiverImage,
+        'reporterUserId': widget.currentUserId,
+        'reporterName': widget.currentUserName,
+        'reason': reason,
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+
+      await FirebaseFirestore.instance.collection('adminchat').add({
+        'message': 'Profile Report',
+        'liked': false,
+        'replyto': '',
+        'senderid': widget.currentUserId,
+        'receiverid': '1',
+        'timestamp': FieldValue.serverTimestamp(),
+        'type': 'profile_report',
+        'reportData': reportData,
+      });
+
+      // Update conversation metadata
+      final ids = [widget.currentUserId, '1']..sort();
+      final conversationId = '${ids[0]}_${ids[1]}';
+      await FirebaseFirestore.instance
+          .collection('conversations')
+          .doc(conversationId)
+          .set({
+        'participants': [widget.currentUserId, '1'],
+        'lastMessage': 'Profile Reported: ${widget.receiverName}',
+        'lastMessageType': 'profile_report',
+        'lastMessageTime': FieldValue.serverTimestamp(),
+        'unreadCount_1': FieldValue.increment(1),
+      }, SetOptions(merge: true));
+
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                const Text('Profile reported to admin successfully.'),
+              ],
+            ),
+            backgroundColor: Colors.green.shade600,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error sending report to admin: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+              content:
+                  Text('Failed to send report. Please try again.')),
+        );
+      }
+    }
   }
 
 
