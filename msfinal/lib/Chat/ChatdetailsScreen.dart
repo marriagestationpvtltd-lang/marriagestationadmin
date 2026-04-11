@@ -94,11 +94,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
   // Cached messages to prevent blinking
   List<Map<String, dynamic>> _cachedMessages = [];
   bool _isFirstLoad = true;
+  // Tracks whether the initial jump-to-bottom has been done so stream
+  // updates from incoming messages never auto-scroll the user away.
+  bool _hasInitialScrolled = false;
 
-  // Socket.IO — typing indicator & message notifications
+  // Socket.IO — typing indicator
   bool _isOtherTyping = false;
   StreamSubscription<Map<String, dynamic>>? _typingSubscription;
-  StreamSubscription<Map<String, dynamic>>? _newMessageSubscription;
 
   @override
   void initState() {
@@ -127,12 +129,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
     WidgetsBinding.instance.addObserver(this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToBottom();
+      _jumpToBottom();
     });
 
     _checkBlockStatus(); // Add this line
 
-    // Socket.IO: join this chat room and subscribe to typing/message events
+    // Socket.IO: join this chat room and subscribe to typing events
     final socketSvc = SocketService.instance;
     socketSvc.joinRoom(widget.chatRoomId);
 
@@ -147,12 +149,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
       }
     });
 
-    // When a new real-time message arrives for this room, scroll to bottom.
-    _newMessageSubscription = socketSvc.onNewMessage.listen((data) {
-      if (data['roomId'] == widget.chatRoomId && mounted) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-      }
-    });
+    // Incoming messages are reflected through the Firestore stream listener.
+    // We do NOT subscribe to onNewMessage for scroll purposes so that the
+    // user's scroll position is kept frozen after the initial load.
   }
   Future<void> _checkBlockStatus() async {
     final prefs = await SharedPreferences.getInstance();
@@ -180,7 +179,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
     SocketService.instance.leaveRoom(widget.chatRoomId);
     SocketService.instance.sendTypingStop(widget.chatRoomId);
     _typingSubscription?.cancel();
-    _newMessageSubscription?.cancel();
 
     // Clear chat active state when screen closes
     ScreenStateManager().onChatScreenClosed();
@@ -711,6 +709,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
+      }
+    });
+  }
+
+  /// Instantly jumps to the bottom without animation.
+  /// Used only for the initial load so there is no visible scroll shake.
+  void _jumpToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients &&
+          _scrollController.position.maxScrollExtent > 0) {
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
       }
     });
   }
@@ -1477,10 +1486,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
           );
         }
 
-        // Scroll to bottom when messages are first loaded
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _scrollToBottom();
-        });
+        // Jump to bottom only on the very first load so that later stream
+        // updates from incoming messages never force the screen to scroll.
+        if (!_hasInitialScrolled) {
+          _hasInitialScrolled = true; // Set immediately so no subsequent stream
+          // update (including from incoming messages) triggers an auto-scroll.
+          _jumpToBottom();
+        }
 
         return _buildMessagesFromCache();
       },
