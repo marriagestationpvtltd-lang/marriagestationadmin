@@ -100,6 +100,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
   StreamSubscription<Map<String, dynamic>>? _typingSubscription;
   StreamSubscription<Map<String, dynamic>>? _newMessageSubscription;
 
+  // Emoji reactions
+  static const List<String> _reactionEmojis = ['❤️', '😂', '😮', '😢', '👍', '🙏'];
+
   @override
   void initState() {
     super.initState();
@@ -596,6 +599,108 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
     }
   }
 
+  // EMOJI REACTIONS
+  Map<String, dynamic> get _selectedMessageReactions =>
+      (selectedMessage?['reactions'] as Map<dynamic, dynamic>?)
+          ?.cast<String, dynamic>() ??
+      {};
+
+  Future<void> _addReaction(String messageId, String emoji) async {
+    try {
+      final docRef = _firestore
+          .collection('chatRooms')
+          .doc(widget.chatRoomId)
+          .collection('messages')
+          .doc(messageId);
+
+      final doc = await docRef.get();
+      if (!doc.exists) return;
+
+      final data = doc.data() as Map<String, dynamic>;
+      final reactions = Map<String, dynamic>.from(data['reactions'] ?? {});
+      final myId = widget.currentUserId;
+
+      if (reactions[myId] == emoji) {
+        // Toggle off — remove reaction
+        reactions.remove(myId);
+      } else {
+        // Add or change reaction
+        reactions[myId] = emoji;
+      }
+
+      await docRef.update({'reactions': reactions});
+    } catch (e) {
+      debugPrint('Error adding reaction: $e');
+    }
+
+    if (mounted) {
+      setState(() {
+        showActionOverlay = false;
+        selectedMessage = null;
+      });
+    }
+  }
+
+  Widget _buildReactionChips(Map<String, dynamic> reactions, String messageId, bool isMine) {
+    if (reactions.isEmpty) return const SizedBox.shrink();
+
+    // Group by emoji → count
+    final Map<String, int> counts = {};
+    String? myEmoji;
+    for (final entry in reactions.entries) {
+      counts[entry.value as String] = (counts[entry.value] ?? 0) + 1;
+      if (entry.key == widget.currentUserId) myEmoji = entry.value as String;
+    }
+
+    return Align(
+      alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+      child: Wrap(
+        spacing: 4,
+        children: counts.entries.map((e) {
+          final isMyReaction = e.key == myEmoji;
+          return GestureDetector(
+            onTap: () => _addReaction(messageId, e.key),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+              margin: const EdgeInsets.only(top: 3),
+              decoration: BoxDecoration(
+                color: isMyReaction
+                    ? const Color(0xFFE53935).withOpacity(0.15)
+                    : Colors.grey.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isMyReaction
+                      ? const Color(0xFFE53935).withOpacity(0.5)
+                      : Colors.grey.withOpacity(0.25),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(e.key, style: const TextStyle(fontSize: 14)),
+                  if (e.value > 1) ...[
+                    const SizedBox(width: 3),
+                    Text(
+                      '${e.value}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isMyReaction
+                            ? const Color(0xFFE53935)
+                            : Colors.grey[700],
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
   // REPLY FUNCTIONALITY
   void _setReplyMessage(Map<String, dynamic> message) {
     if (mounted) {
@@ -929,6 +1034,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
     required Map<String, dynamic> messageData,
     required Map<String, dynamic>? repliedTo,
     required bool isEdited,
+    Map<String, dynamic>? reactions,
   }) {
     final time = _formatTime(timestamp);
     final userName = isMine ? widget.currentUserName : widget.receiverName;
@@ -1076,6 +1182,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
                     ]
                   ],
                 ),
+                if (reactions != null && reactions.isNotEmpty)
+                  _buildReactionChips(
+                    reactions,
+                    messageData['messageId'] as String,
+                    isMine,
+                  ),
               ],
             ),
             if (isMine) ...[
@@ -1211,6 +1323,41 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                // Emoji reaction bar
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: _reactionEmojis.map((emoji) {
+                      final reactions = _selectedMessageReactions;
+                      final myReaction = reactions[widget.currentUserId];
+                      final isSelected = myReaction == emoji;
+                      return GestureDetector(
+                        onTap: () {
+                          if (selectedMessage != null) {
+                            _addReaction(
+                                selectedMessage!['messageId'] as String, emoji);
+                          }
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 150),
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: isSelected
+                                ? Colors.white.withOpacity(0.2)
+                                : Colors.transparent,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Text(emoji,
+                              style: TextStyle(
+                                  fontSize: isSelected ? 28 : 24)),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                ),
+                Divider(color: Colors.white.withOpacity(0.1), height: 1),
+                const SizedBox(height: 4),
                 if (selectedMessage != null &&
                     selectedMessage!['messageType'] == 'text')
                   _menuItem(Icons.reply, "Reply", () {
@@ -1538,6 +1685,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
           messageData: data,
           repliedTo: data['repliedTo'],
           isEdited: data['isEdited'] ?? false,
+          reactions: data['reactions'] != null
+              ? Map<String, dynamic>.from(data['reactions'] as Map)
+              : null,
         ));
       }
     }
