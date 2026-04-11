@@ -2183,10 +2183,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Row(
-              children: const [
-                Icon(Icons.check_circle, color: Colors.white, size: 18),
-                SizedBox(width: 8),
-                Text('Profile reported to admin successfully.'),
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white, size: 18),
+                const SizedBox(width: 8),
+                const Text('Profile reported to admin successfully.'),
               ],
             ),
             backgroundColor: Colors.green.shade600,
