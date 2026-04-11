@@ -50,7 +50,9 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
   bool _isFirstLoad = true;
   bool _profileCardSent = false; // Track if profile card was sent
 
-  // Pagination — start with 30 messages, load 20 more when scrolling to top
+  // Pagination -- start with 30 messages, load 20 more when scrolling to top
+  static const int _messageBatchSize = 20;
+  static const double _scrollThreshold = 300;
   int _messageLimit = 30;
   bool _isLoadingMore = false;
 
@@ -113,7 +115,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
     if (!_scrollController.hasClients || _isLoadingMore) return;
     final pos = _scrollController.position;
     // reverse:true → position 0 = bottom (newest), maxScrollExtent = top (oldest)
-    if (pos.pixels >= pos.maxScrollExtent - 300) {
+    if (pos.pixels >= pos.maxScrollExtent - _scrollThreshold) {
       _loadMoreMessages();
     }
   }
@@ -123,7 +125,7 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
     if (_isLoadingMore) return;
     setState(() {
       _isLoadingMore = true;
-      _messageLimit += 20;
+      _messageLimit += _messageBatchSize;
     });
   }
 

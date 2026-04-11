@@ -96,6 +96,8 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
   bool _isFirstLoad = true;
 
   // Pagination
+  static const int _messageBatchSize = 20;
+  static const double _scrollThreshold = 300;
   int _messageLimit = 30;
   bool _isLoadingMore = false;
 
@@ -928,7 +930,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
     final pos = _scrollController.position;
     // In a reverse:true ListView position 0 is the bottom (newest messages).
     // maxScrollExtent is the top (oldest messages). Load more when within 300px.
-    if (pos.pixels >= pos.maxScrollExtent - 300) {
+    if (pos.pixels >= pos.maxScrollExtent - _scrollThreshold) {
       _loadMoreMessages();
     }
   }
@@ -939,7 +941,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
     if (_isLoadingMore) return;
     setState(() {
       _isLoadingMore = true;
-      _messageLimit += 20;
+      _messageLimit += _messageBatchSize;
     });
   }
 
