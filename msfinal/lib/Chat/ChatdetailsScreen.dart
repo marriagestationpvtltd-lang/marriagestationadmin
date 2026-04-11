@@ -95,10 +95,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
   List<Map<String, dynamic>> _cachedMessages = [];
   bool _isFirstLoad = true;
 
-  // Socket.IO — typing indicator & message notifications
+  // Socket.IO — typing indicator
   bool _isOtherTyping = false;
   StreamSubscription<Map<String, dynamic>>? _typingSubscription;
-  StreamSubscription<Map<String, dynamic>>? _newMessageSubscription;
 
   // Emoji reactions
   static const List<String> _reactionEmojis = ['❤️', '😂', '😮', '😢', '👍', '🙏'];
@@ -130,12 +129,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
     WidgetsBinding.instance.addObserver(this);
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _scrollToBottom();
+      _jumpToBottom();
     });
 
     _checkBlockStatus(); // Add this line
 
-    // Socket.IO: join this chat room and subscribe to typing/message events
+    // Socket.IO: join this chat room and subscribe to typing events
     final socketSvc = SocketService.instance;
     socketSvc.joinRoom(widget.chatRoomId);
 
@@ -150,12 +149,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
       }
     });
 
-    // When a new real-time message arrives for this room, scroll to bottom.
-    _newMessageSubscription = socketSvc.onNewMessage.listen((data) {
-      if (data['roomId'] == widget.chatRoomId && mounted) {
-        WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToBottom());
-      }
-    });
+    // Incoming messages are reflected through the Firestore stream listener.
+    // We do NOT subscribe to onNewMessage for scroll purposes so that the
+    // user's scroll position is kept frozen after the initial load.
   }
   Future<void> _checkBlockStatus() async {
     final prefs = await SharedPreferences.getInstance();
@@ -183,7 +179,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
     SocketService.instance.leaveRoom(widget.chatRoomId);
     SocketService.instance.sendTypingStop(widget.chatRoomId);
     _typingSubscription?.cancel();
-    _newMessageSubscription?.cancel();
 
     // Clear chat active state when screen closes
     ScreenStateManager().onChatScreenClosed();
@@ -810,12 +805,22 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
   }
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients && _scrollController.position.maxScrollExtent > 0) {
+      if (_scrollController.hasClients) {
         _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
+          0,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
+      }
+    });
+  }
+
+  /// Instantly jumps to the bottom (position 0 with reverse:true) without
+  /// animation. Used on initial load so there is no visible scroll shake.
+  void _jumpToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(0);
       }
     });
   }
@@ -1624,11 +1629,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
           );
         }
 
-        // Scroll to bottom when messages are first loaded
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          _scrollToBottom();
-        });
-
         return _buildMessagesFromCache();
       },
     );
@@ -1692,13 +1692,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
       }
     }
 
+    final int itemCount = messageWidgets.length;
     return ListView.builder(
-      reverse: false, // Keep as false for natural order
+      reverse: true,
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
-      itemCount: messageWidgets.length,
+      itemCount: itemCount,
       itemBuilder: (context, index) {
-        return messageWidgets[index];
+        return messageWidgets[itemCount - 1 - index];
       },
     );
   }

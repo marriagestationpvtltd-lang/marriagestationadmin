@@ -91,13 +91,11 @@ class _AdminChatScreenState extends State<AdminChatScreen> {
   }
 
   void _scrollToBottom() {
+    // The ListView uses reverse: true, so position 0 is visually the bottom
+    // (latest messages). jumpTo(0) therefore scrolls to the most recent message.
     if (_scrollController.hasClients) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _scrollController.animateTo(
-          0,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+        _scrollController.jumpTo(0);
       });
     }
   }
