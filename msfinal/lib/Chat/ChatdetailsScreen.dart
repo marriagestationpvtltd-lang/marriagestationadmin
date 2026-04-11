@@ -95,6 +95,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
   List<Map<String, dynamic>> _cachedMessages = [];
   bool _isFirstLoad = true;
 
+  // Pagination
+  int _messageLimit = 30;
+  bool _isLoadingMore = false;
+
   // Socket.IO — typing indicator
   bool _isOtherTyping = false;
   StreamSubscription<Map<String, dynamic>>? _typingSubscription;
@@ -136,6 +140,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _jumpToBottom();
     });
+
+    // Scroll listener for loading older messages when user scrolls to the top
+    _scrollController.addListener(_onScroll);
 
     _checkBlockStatus(); // Add this line
 
@@ -910,6 +917,29 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
       if (_scrollController.hasClients) {
         _scrollController.jumpTo(0);
       }
+    });
+  }
+
+  /// Called whenever the scroll position changes. Detects when the user has
+  /// scrolled near the top of the message list (oldest messages) and triggers
+  /// loading of an older page.
+  void _onScroll() {
+    if (!_scrollController.hasClients || _isLoadingMore) return;
+    final pos = _scrollController.position;
+    // In a reverse:true ListView position 0 is the bottom (newest messages).
+    // maxScrollExtent is the top (oldest messages). Load more when within 300px.
+    if (pos.pixels >= pos.maxScrollExtent - 300) {
+      _loadMoreMessages();
+    }
+  }
+
+  /// Increases the message limit so the Firestore stream query returns an
+  /// additional page of older messages.
+  void _loadMoreMessages() {
+    if (_isLoadingMore) return;
+    setState(() {
+      _isLoadingMore = true;
+      _messageLimit += 20;
     });
   }
 
@@ -1718,6 +1748,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
           .doc(widget.chatRoomId)
           .collection('messages')
           .orderBy('timestamp', descending: true)
+          .limit(_messageLimit)
           .snapshots(),
       builder: (context, snapshot) {
         if (snapshot.hasError) {
@@ -1734,6 +1765,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
 
         final messages = snapshot.data!.docs;
         _isFirstLoad = false;
+
+        // Reset loading-more flag once the new page of data has arrived.
+        if (_isLoadingMore) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() => _isLoadingMore = false);
+          });
+        }
 
         // Convert to list and REVERSE to get ascending order (oldest first)
         _cachedMessages = messages.map((doc) {
@@ -1821,12 +1859,28 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
     }
 
     final int itemCount = messageWidgets.length;
+    // Extra slot at the top (highest index in reverse list) for the
+    // "loading more" spinner when fetching older messages.
+    final int totalCount = itemCount + (_isLoadingMore ? 1 : 0);
     return ListView.builder(
       reverse: true,
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
-      itemCount: itemCount,
+      itemCount: totalCount,
       itemBuilder: (context, index) {
+        // The last slot (visually the top of the list) is the loading indicator.
+        if (_isLoadingMore && index == itemCount) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          );
+        }
         return messageWidgets[itemCount - 1 - index];
       },
     );
