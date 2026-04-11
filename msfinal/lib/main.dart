@@ -12,6 +12,7 @@ import 'package:provider/provider.dart';
 // Web-specific imports
 import 'package:flutter_web_plugins/flutter_web_plugins.dart' show setUrlStrategy, PathUrlStrategy;
 
+import 'Calling/callmanager.dart';
 import 'Calling/incomingvideocall.dart';
 import 'Calling/incommingcall.dart';
 import 'Startup/SplashScreen.dart';
@@ -253,7 +254,11 @@ void _handleNotificationAction(NotificationResponse response) {
       // Cancel the ringing notification
       flutterLocalNotificationsPlugin.cancel(notificationId);
 
-      // Navigate to call page
+      // Relay to any open IncomingCallScreen first (app was backgrounded)
+      CallManager().triggerNotificationAction('accept');
+
+      // If no call screen is open (app was terminated / fully background),
+      // navigate to the incoming call screen so the user can connect.
       _navigateToCallPage(data);
 
       // Notify the system that call was accepted
@@ -267,6 +272,9 @@ void _handleNotificationAction(NotificationResponse response) {
 
       // Cancel the ringing notification
       flutterLocalNotificationsPlugin.cancel(notificationId);
+
+      // Relay to any open IncomingCallScreen (dismiss it cleanly)
+      CallManager().triggerNotificationAction('decline');
 
       // Notify the system that call was declined
       NotificationService.triggerCallResponse({
@@ -478,6 +486,9 @@ void main() async {
   // Initialize local notifications only on mobile
   if (!kIsWeb) {
     await initLocalNotifications();
+    // Register the plugin with NotificationService so call screens can show
+    // / cancel the persistent heads-up notification when backgrounded.
+    NotificationService.setLocalPlugin(flutterLocalNotificationsPlugin);
   }
 
   // Connect Socket.IO (auto-reads token + userId from SharedPreferences).

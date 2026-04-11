@@ -1,4 +1,7 @@
 import 'dart:convert';
+import 'dart:typed_data';
+import 'package:flutter/material.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:http/http.dart' as http;
 import 'dart:async';
 
@@ -6,6 +9,81 @@ import '../Calling/callmanager.dart';
 
 class NotificationService {
   static final CallManager _callManager = CallManager();
+
+  // ── Local notification plugin (set once from main.dart after initialization) ──
+  static FlutterLocalNotificationsPlugin? _localPlugin;
+  static const String _callChannelId = 'calls_channel';
+  static const String _callChannelName = 'Calls';
+
+  /// Register the local-notifications plugin so call screens can show/cancel
+  /// system notifications without depending on main.dart globals.
+  static void setLocalPlugin(FlutterLocalNotificationsPlugin plugin) {
+    _localPlugin = plugin;
+  }
+
+  /// Show a persistent heads-up notification with Accept / Decline buttons.
+  /// Called when an IncomingCallScreen is backgrounded by the user.
+  static Future<void> showIncomingCallNotification(
+      Map<String, dynamic> callData) async {
+    if (_localPlugin == null) return;
+
+    final isVideoCall =
+        callData['type'] == 'video_call' || callData['isVideoCall'] == 'true';
+    final callerName = callData['callerName'] ?? 'Unknown';
+    final notificationId = isVideoCall ? 1002 : 1001;
+
+    const acceptAction = AndroidNotificationAction(
+      'accept_call',
+      'Accept',
+      icon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+      showsUserInterface: true,
+      cancelNotification: false,
+    );
+    const declineAction = AndroidNotificationAction(
+      'decline_call',
+      'Decline',
+      icon: DrawableResourceAndroidBitmap('@mipmap/ic_launcher'),
+      showsUserInterface: true,
+      cancelNotification: true,
+    );
+
+    final androidDetails = AndroidNotificationDetails(
+      _callChannelId,
+      _callChannelName,
+      channelDescription: 'Incoming call notifications',
+      importance: Importance.max,
+      priority: Priority.max,
+      ticker: 'Incoming ${isVideoCall ? 'video' : 'voice'} call',
+      playSound: true,
+      enableVibration: true,
+      vibrationPattern: Int64List.fromList([0, 1000, 500, 1000]),
+      enableLights: true,
+      ledColor: const Color(0xFF25D366),
+      ledOnMs: 1000,
+      ledOffMs: 500,
+      fullScreenIntent: true,
+      category: AndroidNotificationCategory.call,
+      visibility: NotificationVisibility.public,
+      color: isVideoCall ? const Color(0xFF25D366) : const Color(0xFF34B7F1),
+      ongoing: true,
+      autoCancel: false,
+      actions: [acceptAction, declineAction],
+    );
+
+    await _localPlugin!.show(
+      notificationId,
+      isVideoCall ? '📹 Video Call' : '📞 Voice Call',
+      'Incoming call from $callerName',
+      NotificationDetails(android: androidDetails),
+      payload: json.encode(callData),
+    );
+  }
+
+  /// Cancel the persistent incoming-call notification.
+  static Future<void> cancelCallNotification({bool isVideoCall = false}) async {
+    if (_localPlugin == null) return;
+    await _localPlugin!.cancel(isVideoCall ? 1002 : 1001);
+  }
 
   static Stream<Map<String, dynamic>> get incomingCalls => _callManager.incomingCalls;
   static Stream<Map<String, dynamic>> get callResponses => _callManager.callResponses;

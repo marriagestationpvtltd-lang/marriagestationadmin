@@ -15,6 +15,10 @@ class CallManager {
   final StreamController<Map<String, dynamic>> _callResponseController = StreamController.broadcast();
   Stream<Map<String, dynamic>> get callResponses => _callResponseController.stream;
 
+  // Stream for notification actions (accept / decline tapped while app backgrounded)
+  final StreamController<String> _notificationActionCtrl = StreamController.broadcast();
+  Stream<String> get notificationActions => _notificationActionCtrl.stream;
+
   // Current active call data
   Map<String, dynamic>? _currentCallData;
   Timer? _callTimeoutTimer;
@@ -45,6 +49,12 @@ class CallManager {
     }
   }
 
+  /// Relay a notification action ('accept' or 'decline') to any listening call screen.
+  void triggerNotificationAction(String action) {
+    print('📱 CallManager: Notification action triggered: $action');
+    _notificationActionCtrl.add(action);
+  }
+
   // Get current call data
   Map<String, dynamic>? get currentCallData => _currentCallData;
 
@@ -61,6 +71,7 @@ class CallManager {
   void dispose() {
     _incomingCallController.close();
     _callResponseController.close();
+    _notificationActionCtrl.close();
     _callTimeoutTimer?.cancel();
   }
 }
