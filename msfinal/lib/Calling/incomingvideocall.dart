@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../pushnotification/pushservice.dart';
+import 'callmanager.dart';
 import 'tokengenerator.dart';
 
 class IncomingVideoCallScreen extends StatefulWidget {
@@ -14,7 +15,8 @@ class IncomingVideoCallScreen extends StatefulWidget {
   State<IncomingVideoCallScreen> createState() => _IncomingVideoCallScreenState();
 }
 
-class _IncomingVideoCallScreenState extends State<IncomingVideoCallScreen> {
+class _IncomingVideoCallScreenState extends State<IncomingVideoCallScreen>
+    with WidgetsBindingObserver {
   late RtcEngine _engine;
 
   int _localUid = 0;
@@ -38,12 +40,19 @@ class _IncomingVideoCallScreenState extends State<IncomingVideoCallScreen> {
   Timer? _callTimer;
   Duration _duration = Duration.zero;
 
+  StreamSubscription<String>? _notificationActionSub;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _parseData();
     _localUid = Random().nextInt(999999);
     _ringTimer = Timer(const Duration(seconds: 60), _missedCall);
+
+    // Listen for accept / decline triggered from the heads-up notification
+    _notificationActionSub =
+        CallManager().notificationActions.listen(_onNotificationAction);
   }
 
   void _parseData() {
@@ -53,6 +62,37 @@ class _IncomingVideoCallScreenState extends State<IncomingVideoCallScreen> {
     _recipientName = widget.callData['recipientName'] ?? 'You';
     _isVideoCall = widget.callData['type'] == 'video_call' ||
         (widget.callData['isVideoCall']?.toString() == 'true');
+  }
+
+  // ── Lifecycle observer ────────────────────────────────────────────────────
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_callActive) {
+      if (state == AppLifecycleState.paused ||
+          state == AppLifecycleState.inactive) {
+        // App went to background while the call is still ringing – show a
+        // persistent notification with Accept / Decline buttons.
+        NotificationService.showIncomingCallNotification(widget.callData);
+      } else if (state == AppLifecycleState.resumed) {
+        // App came back to foreground – cancel the notification so the
+        // in-app UI takes over.
+        NotificationService.cancelCallNotification(isVideoCall: _isVideoCall);
+      }
+    }
+  }
+
+  // ── Notification action relay ─────────────────────────────────────────────
+
+  void _onNotificationAction(String action) {
+    if (!mounted) return;
+    if (action == 'accept' && !_callActive && !_processing) {
+      NotificationService.cancelCallNotification(isVideoCall: _isVideoCall);
+      _acceptCall();
+    } else if (action == 'decline' && !_callActive) {
+      NotificationService.cancelCallNotification(isVideoCall: _isVideoCall);
+      _end();
+    }
   }
 
   // ================= ACCEPT CALL =================
@@ -68,8 +108,7 @@ class _IncomingVideoCallScreenState extends State<IncomingVideoCallScreen> {
       print('📞 Is Video Call: $_isVideoCall');
 
       _ringTimer?.cancel();
-
-      // Permissions
+      NotificationService.cancelCallNotification(isVideoCall: _isVideoCall);
       if (!(await Permission.microphone.request()).isGranted) {
         print('❌ Microphone permission denied');
         _end();
@@ -196,6 +235,7 @@ class _IncomingVideoCallScreenState extends State<IncomingVideoCallScreen> {
 
   // ================= MISSED =================
   Future<void> _missedCall() async {
+    NotificationService.cancelCallNotification(isVideoCall: _isVideoCall);
     await NotificationService.sendMissedVideoCallNotification(
       callerId: _callerId,
       callerName: _callerName,
@@ -206,6 +246,7 @@ class _IncomingVideoCallScreenState extends State<IncomingVideoCallScreen> {
   // ================= END =================
   Future<void> _endCall() async {
     _callTimer?.cancel();
+    NotificationService.cancelCallNotification(isVideoCall: _isVideoCall);
 
     if (_callActive) {
       await NotificationService.sendVideoCallEndedNotification(
@@ -225,6 +266,7 @@ class _IncomingVideoCallScreenState extends State<IncomingVideoCallScreen> {
   }
 
   void _end() {
+    NotificationService.cancelCallNotification(isVideoCall: _isVideoCall);
     if (mounted) Navigator.pop(context);
   }
 
@@ -239,10 +281,15 @@ class _IncomingVideoCallScreenState extends State<IncomingVideoCallScreen> {
   // ================= UI =================
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: _callActive ? _buildActiveCallUI() : _buildIncomingCallUI(),
+    // Prevent back navigation: the user must explicitly accept or reject via
+    // the on-screen buttons, matching WhatsApp behaviour.
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          child: _callActive ? _buildActiveCallUI() : _buildIncomingCallUI(),
+        ),
       ),
     );
   }
@@ -543,6 +590,8 @@ class _IncomingVideoCallScreenState extends State<IncomingVideoCallScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _notificationActionSub?.cancel();
     _ringTimer?.cancel();
     _callTimer?.cancel();
     super.dispose();

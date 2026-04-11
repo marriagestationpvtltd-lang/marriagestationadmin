@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../pushnotification/pushservice.dart';
+import 'callmanager.dart';
 import 'tokengenerator.dart';
 
 class IncomingCallScreen extends StatefulWidget {
@@ -14,7 +15,8 @@ class IncomingCallScreen extends StatefulWidget {
   State<IncomingCallScreen> createState() => _IncomingCallScreenState();
 }
 
-class _IncomingCallScreenState extends State<IncomingCallScreen> {
+class _IncomingCallScreenState extends State<IncomingCallScreen>
+    with WidgetsBindingObserver {
   late RtcEngine _engine;
 
   int _localUid = 0;
@@ -35,12 +37,19 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   Timer? _callTimer;
   Duration _duration = Duration.zero;
 
+  StreamSubscription<String>? _notificationActionSub;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _parseData();
     _localUid = Random().nextInt(999999);
     _ringTimer = Timer(const Duration(seconds: 60), _missedCall);
+
+    // Listen for accept / decline triggered from the heads-up notification
+    _notificationActionSub =
+        CallManager().notificationActions.listen(_onNotificationAction);
   }
 
   void _parseData() {
@@ -50,6 +59,37 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
     _recipientName = widget.callData['recipientName'] ?? 'You';
   }
 
+  // ── Lifecycle observer ────────────────────────────────────────────────────
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!_callActive) {
+      if (state == AppLifecycleState.paused ||
+          state == AppLifecycleState.inactive) {
+        // App went to background while the call is still ringing – show a
+        // persistent notification with Accept / Decline buttons.
+        NotificationService.showIncomingCallNotification(widget.callData);
+      } else if (state == AppLifecycleState.resumed) {
+        // App came back to foreground – cancel the notification so the
+        // in-app UI takes over.
+        NotificationService.cancelCallNotification(isVideoCall: false);
+      }
+    }
+  }
+
+  // ── Notification action relay ─────────────────────────────────────────────
+
+  void _onNotificationAction(String action) {
+    if (!mounted) return;
+    if (action == 'accept' && !_callActive && !_processing) {
+      NotificationService.cancelCallNotification(isVideoCall: false);
+      _acceptCall();
+    } else if (action == 'decline' && !_callActive) {
+      NotificationService.cancelCallNotification(isVideoCall: false);
+      _end();
+    }
+  }
+
   // ================= ACCEPT CALL =================
   Future<void> _acceptCall() async {
     if (_processing) return;
@@ -57,6 +97,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
 
     try {
       _ringTimer?.cancel();
+      NotificationService.cancelCallNotification(isVideoCall: false);
 
       if (!(await Permission.microphone.request()).isGranted) {
         _end();
@@ -133,6 +174,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
 
   // ================= MISSED =================
   Future<void> _missedCall() async {
+    NotificationService.cancelCallNotification(isVideoCall: false);
     await NotificationService.sendMissedCallNotification(
       callerId: _callerId,
       callerName: _callerName,
@@ -143,6 +185,7 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   // ================= END =================
   Future<void> _endCall() async {
     _callTimer?.cancel();
+    NotificationService.cancelCallNotification(isVideoCall: false);
 
     if (_callActive) {
       await NotificationService.sendCallEndedNotification(
@@ -162,47 +205,51 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   }
 
   void _end() {
+    NotificationService.cancelCallNotification(isVideoCall: false);
     if (mounted) Navigator.pop(context);
   }
 
   // ================= UI =================
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                _callActive ? Icons.phone_in_talk : Icons.phone,
-                color: Colors.white,
-                size: 80,
-              ),
-              const SizedBox(height: 20),
-              Text(
-                _callActive ? 'Connected' : 'Incoming call',
-                style: const TextStyle(color: Colors.white70),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                _callerName,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                _callActive
-                    ? _format(_duration)
-                    : 'Voice Call',
-                style: const TextStyle(color: Colors.white70),
-              ),
-              const SizedBox(height: 40),
-              _callActive ? _activeControls() : _incomingControls(),
-            ],
+    // Prevent back navigation: the user must explicitly accept or reject via
+    // the on-screen buttons, matching WhatsApp behaviour.
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  _callActive ? Icons.phone_in_talk : Icons.phone,
+                  color: Colors.white,
+                  size: 80,
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  _callActive ? 'Connected' : 'Incoming call',
+                  style: const TextStyle(color: Colors.white70),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _callerName,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  _callActive ? _format(_duration) : 'Voice Call',
+                  style: const TextStyle(color: Colors.white70),
+                ),
+                const SizedBox(height: 40),
+                _callActive ? _activeControls() : _incomingControls(),
+              ],
+            ),
           ),
         ),
       ),
@@ -210,37 +257,37 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
   }
 
   Widget _incomingControls() => Row(
-    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-    children: [
-      _btn(Icons.call, Colors.green, _acceptCall),
-      _btn(Icons.call_end, Colors.red, _end),
-    ],
-  );
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _btn(Icons.call, Colors.green, _acceptCall),
+          _btn(Icons.call_end, Colors.red, _end),
+        ],
+      );
 
   Widget _activeControls() => Row(
-    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-    children: [
-      _btn(
-        _micMuted ? Icons.mic_off : Icons.mic,
-        Colors.white,
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          _btn(
+            _micMuted ? Icons.mic_off : Icons.mic,
+            Colors.white,
             () {
-          _micMuted = !_micMuted;
-          _engine.muteLocalAudioStream(_micMuted);
-          setState(() {});
-        },
-      ),
-      _btn(Icons.call_end, Colors.red, _endCall),
-      _btn(
-        _speakerOn ? Icons.volume_up : Icons.volume_off,
-        Colors.white,
+              _micMuted = !_micMuted;
+              _engine.muteLocalAudioStream(_micMuted);
+              setState(() {});
+            },
+          ),
+          _btn(Icons.call_end, Colors.red, _endCall),
+          _btn(
+            _speakerOn ? Icons.volume_up : Icons.volume_off,
+            Colors.white,
             () {
-          _speakerOn = !_speakerOn;
-          _engine.setEnableSpeakerphone(_speakerOn);
-          setState(() {});
-        },
-      ),
-    ],
-  );
+              _speakerOn = !_speakerOn;
+              _engine.setEnableSpeakerphone(_speakerOn);
+              setState(() {});
+            },
+          ),
+        ],
+      );
 
   Widget _btn(IconData i, Color c, VoidCallback f) =>
       IconButton(icon: Icon(i, color: c, size: 48), onPressed: f);
@@ -250,6 +297,8 @@ class _IncomingCallScreenState extends State<IncomingCallScreen> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _notificationActionSub?.cancel();
     _ringTimer?.cancel();
     _callTimer?.cancel();
     super.dispose();
