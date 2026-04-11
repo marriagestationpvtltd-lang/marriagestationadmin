@@ -94,9 +94,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
   // Cached messages to prevent blinking
   List<Map<String, dynamic>> _cachedMessages = [];
   bool _isFirstLoad = true;
-  // Tracks whether the initial jump-to-bottom has been done so stream
-  // updates from incoming messages never auto-scroll the user away.
-  bool _hasInitialScrolled = false;
 
   // Socket.IO — typing indicator
   bool _isOtherTyping = false;
@@ -703,9 +700,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
   }
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients && _scrollController.position.maxScrollExtent > 0) {
+      if (_scrollController.hasClients) {
         _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
+          0,
           duration: const Duration(milliseconds: 300),
           curve: Curves.easeOut,
         );
@@ -713,13 +710,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
     });
   }
 
-  /// Instantly jumps to the bottom without animation.
-  /// Used only for the initial load so there is no visible scroll shake.
+  /// Instantly jumps to the bottom (position 0 with reverse:true) without
+  /// animation. Used on initial load so there is no visible scroll shake.
   void _jumpToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_scrollController.hasClients &&
-          _scrollController.position.maxScrollExtent > 0) {
-        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      if (_scrollController.hasClients) {
+        _scrollController.jumpTo(0);
       }
     });
   }
@@ -1486,14 +1482,6 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
           );
         }
 
-        // Jump to bottom only on the very first load so that later stream
-        // updates from incoming messages never force the screen to scroll.
-        if (!_hasInitialScrolled) {
-          _hasInitialScrolled = true; // Set immediately so no subsequent stream
-          // update (including from incoming messages) triggers an auto-scroll.
-          _jumpToBottom();
-        }
-
         return _buildMessagesFromCache();
       },
     );
@@ -1554,13 +1542,14 @@ class _ChatDetailScreenState extends State<ChatDetailScreen>
       }
     }
 
+    final int itemCount = messageWidgets.length;
     return ListView.builder(
-      reverse: false, // Keep as false for natural order
+      reverse: true,
       controller: _scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 20),
-      itemCount: messageWidgets.length,
+      itemCount: itemCount,
       itemBuilder: (context, index) {
-        return messageWidgets[index];
+        return messageWidgets[itemCount - 1 - index];
       },
     );
   }
